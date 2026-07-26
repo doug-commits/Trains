@@ -14,6 +14,19 @@
 
   <div class="stage">
     <form class="controls" onsubmit="return false">
+      <div class="ask">
+        <label class="field">
+          <span>Where do you want to go?</span>
+          <span class="ask-row">
+            <input type="text" id="askbox" placeholder="Angkor Wat to Ha Long Bay" autocomplete="off" spellcheck="false">
+            <button type="button" id="askgo" class="ask-go">Plan</button>
+          </span>
+        </label>
+        <p id="asknote" class="ask-note" hidden></p>
+      </div>
+
+      <p class="or"><span>or choose stations</span></p>
+
       <div class="search">
         <label class="field">
           <span>From</span>

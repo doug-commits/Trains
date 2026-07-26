@@ -426,12 +426,26 @@ const UI = (() => {
       )
       .join('')
 
+    const labels = opts.labels && opts.labels.from && opts.labels.to ? opts.labels : null
+    const scene = typeof Scene !== 'undefined' ? Scene.kindFor(network, LANDMARKS, toId) : null
+    const banner = scene
+      ? `<div class="banner"><canvas class="scene" data-scene="${esc(scene)}" data-seed="${esc(toId)}"></canvas>
+         <span class="banner-cap">${esc(to.city)}</span></div>`
+      : ''
+
     return `
+      ${banner}
       <header class="head">
-        <p class="eyebrow">${esc(opts.railOnly ? 'Hard rail-only' : 'Pragmatic')} routing${
-          opts.date ? ` · departing ${esc(opts.date)}` : ''
-        }${opts.nationality ? ` · ${esc(opts.nationality)} passport` : ''}</p>
-        <h1>${esc(from.city)} <span aria-hidden="true">→</span> ${esc(to.city)} overland</h1>
+        <p class="eyebrow">${
+          labels
+            ? `${esc(from.name)} <span aria-hidden="true">→</span> ${esc(to.name)}`
+            : `${esc(opts.railOnly ? 'Hard rail-only' : 'Pragmatic')} routing${
+                opts.date ? ` · departing ${esc(opts.date)}` : ''
+              }${opts.nationality ? ` · ${esc(opts.nationality)} passport` : ''}`
+        }</p>
+        <h1>${esc(labels ? labels.from : from.city)} <span aria-hidden="true">→</span> ${esc(
+          labels ? labels.to : to.city
+        )} overland</h1>
         ${statBar(plan)}
         <p class="lede">${lede(network, plan, fromId, toId)}</p>
       </header>
@@ -514,7 +528,11 @@ const UI = (() => {
                <span><b>${esc(money(st.usd))}</b>all in</span>
              </span>`
           : ''
+        const art = p.scene
+          ? `<span class="corridor-art"><canvas class="scene" data-scene="${esc(p.scene)}" data-seed="${esc(p.sceneSeed || p.to)}"></canvas></span>`
+          : ''
         return `<button type="button" class="corridor" data-preset="${i}">
+            ${art}
             <span class="corridor-name">${esc(p.label)}<em aria-hidden="true">→</em></span>
             <span class="corridor-note">${esc(p.note)}</span>
             ${stats}

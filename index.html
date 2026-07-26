@@ -23,6 +23,19 @@
 
   <div class="stage">
     <form class="controls" onsubmit="return false">
+      <div class="ask">
+        <label class="field">
+          <span>Where do you want to go?</span>
+          <span class="ask-row">
+            <input type="text" id="askbox" placeholder="Angkor Wat to Ha Long Bay" autocomplete="off" spellcheck="false">
+            <button type="button" id="askgo" class="ask-go">Plan</button>
+          </span>
+        </label>
+        <p id="asknote" class="ask-note" hidden></p>
+      </div>
+
+      <p class="or"><span>or choose stations</span></p>
+
       <div class="search">
         <label class="field">
           <span>From</span>
@@ -1285,6 +1298,122 @@ table { width: 100%; border-collapse: collapse; }
   font-size: 0.86rem;
 }
 .disclosure b { font-family: var(--sans); color: var(--ink-soft); }
+
+/* ------------------------------------------------------- ask, in sentences */
+
+.ask { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.ask-row { display: flex; gap: 0.4rem; }
+.ask-row input { flex: 1 1 auto; min-width: 0; }
+
+.ask-go {
+  flex: none;
+  padding: 0 0.9rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sea);
+  background: var(--rail);
+  border: 1px solid var(--rail);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.ask-go:hover { filter: brightness(1.1); }
+
+/* What it decided, shown rather than assumed — including the road gap it
+   cannot cover, which is the part that would otherwise be a nasty surprise. */
+.ask-note {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  background: var(--raise);
+  border-left: 2px solid var(--panel-edge);
+  border-radius: 2px;
+  color: var(--muted);
+}
+.ask-note b { color: var(--ink); font-weight: 600; }
+.ask-note.ok { border-left-color: var(--rail); }
+.ask-note.warn { border-left-color: var(--alert); color: var(--ink-soft); }
+
+.or {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.or::before,
+.or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--panel-edge);
+}
+
+/* ------------------------------------------------------------ destinations */
+
+/* Original illustrations rather than photographs — see src/scene.js for why. */
+.corridor-art {
+  display: block;
+  margin: -0.8rem -0.9rem 0.7rem;
+  height: 4.6rem;
+  overflow: hidden;
+  position: relative;
+}
+.corridor-art canvas { display: block; width: 100%; height: 100%; }
+/* Fade the plate into the card so it sits in the layout rather than on it. */
+.corridor-art::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 32%;
+  background: linear-gradient(transparent, var(--raise));
+  pointer-events: none;
+}
+
+.banner {
+  position: relative;
+  margin: -1.9rem -1.9rem 1.4rem;
+  height: 9rem;
+  overflow: hidden;
+}
+.banner canvas { display: block; width: 100%; height: 100%; }
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  background: linear-gradient(transparent, var(--panel-solid));
+  pointer-events: none;
+}
+.banner-cap {
+  position: absolute;
+  left: 1.9rem;
+  bottom: 0.6rem;
+  z-index: 1;
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.5);
+}
+
+@media (max-width: 60rem) {
+  .banner { margin: -1.5rem -1.25rem 1.2rem; height: 7.5rem; }
+  .banner-cap { left: 1.25rem; }
+}
 </style>
 <script>
 (function(){
@@ -2110,6 +2239,164 @@ const NETWORK = {
 }
 
 
+/* ===== data/landmarks.js ===== */
+/* Landmarks, and the station you actually get off at.
+ *
+ * Travellers think in sights, not railheads. Nobody wants to go to Sisophon;
+ * they want to go to Angkor. This table is the translation layer, and it is
+ * also where the honesty lives — Angkor is two hours by road from the nearest
+ * track, and the app says so rather than pretending Siem Reap has a station.
+ *
+ * `station`  the railhead or terminal the route should actually target
+ * `last`     how you cover the gap between that station and the sight itself,
+ *            null when you arrive essentially on top of it
+ * `scene`    which procedural illustration to draw (see src/scene.js)
+ * `aka`      alternative spellings and names people actually type
+ */
+
+const LANDMARKS = [
+  // --- Thailand
+  { name: 'Grand Palace', station: 'bkk_aphiwat', scene: 'temple', country: 'th',
+    aka: ['wat phra kaew', 'emerald buddha', 'bangkok'], last: 'MRT and a river boat across Bangkok' },
+  { name: 'Wat Arun', station: 'bkk_aphiwat', scene: 'temple', country: 'th', aka: ['temple of dawn'], last: 'Cross-river ferry' },
+  { name: 'Khao San Road', station: 'bkk_aphiwat', scene: 'skyline', country: 'th', aka: ['khaosan'], last: 'Taxi across Bangkok' },
+  { name: 'Ayutthaya ruins', station: 'ayutthaya', scene: 'temple', country: 'th',
+    aka: ['ayutthaya', 'wat mahathat', 'buddha head in tree'], last: null },
+  { name: 'Sukhothai Historical Park', station: 'phitsanulok', scene: 'temple', country: 'th',
+    aka: ['sukhothai'], last: 'About an hour by bus from Phitsanulok' },
+  { name: 'Doi Suthep', station: 'chiangmai', scene: 'hills', country: 'th',
+    aka: ['chiang mai', 'old city', 'nimman'], last: 'Songthaew up the mountain' },
+  { name: 'Khao Yai National Park', station: 'pakchong', scene: 'forest', country: 'th',
+    aka: ['khao yai'], last: 'Songthaew or taxi from Pak Chong to the gate' },
+  { name: 'Bridge on the River Kwai', station: 'kanchanaburi', scene: 'river', country: 'th',
+    aka: ['death railway', 'kanchanaburi', 'river kwai'], last: null },
+  { name: 'Erawan Falls', station: 'kanchanaburi', scene: 'forest', country: 'th',
+    aka: ['erawan'], last: 'Bus from Kanchanaburi, about 90 minutes' },
+  { name: 'Phanom Rung', station: 'buriram', scene: 'temple', country: 'th',
+    aka: ['buriram'], last: 'Taxi from Buriram' },
+  { name: 'Hua Hin beach', station: 'huahin', scene: 'coast', country: 'th', aka: ['hua hin'], last: null },
+  { name: 'Railay Beach', station: 'krabi', scene: 'karst', country: 'th',
+    aka: ['krabi', 'ao nang', 'railay'], last: 'Longtail boat from Ao Nang — there is no road in' },
+  { name: 'Maya Bay', station: 'kohphiphi', scene: 'karst', country: 'th',
+    aka: ['phi phi', 'koh phi phi', 'the beach'], last: 'Boat tour from Phi Phi Don' },
+  { name: 'Patong Beach', station: 'phuket', scene: 'coast', country: 'th',
+    aka: ['phuket', 'big buddha', 'old town phuket'], last: 'Taxi from Rassada pier' },
+  { name: 'Full Moon Party', station: 'kohphangan', scene: 'coast', country: 'th',
+    aka: ['koh phangan', 'haad rin'], last: null },
+  { name: 'Koh Tao diving', station: 'kohtao', scene: 'coast', country: 'th', aka: ['koh tao', 'sairee'], last: null },
+  { name: 'Chaweng Beach', station: 'kohsamui', scene: 'coast', country: 'th', aka: ['koh samui', 'samui'], last: null },
+  { name: 'Similan Islands', station: 'phuket', scene: 'coast', country: 'th',
+    aka: ['similan'], last: 'Liveaboard or day boat from Khao Lak, north of Phuket' },
+
+  // --- Laos
+  { name: 'Kuang Si Falls', station: 'luangprabang', scene: 'forest', country: 'la',
+    aka: ['kuang si', 'luang prabang', 'mount phousi', 'alms giving'], last: 'Tuk-tuk, about 40 minutes' },
+  { name: 'Blue Lagoon', station: 'vangvieng', scene: 'karst', country: 'la',
+    aka: ['vang vieng', 'tubing'], last: 'Bicycle or tuk-tuk from town' },
+  { name: 'Pha That Luang', station: 'vte_khamsavath', scene: 'temple', country: 'la',
+    aka: ['vientiane', 'patuxai', 'buddha park'], last: 'Tuk-tuk into Vientiane' },
+
+  // --- Cambodia
+  { name: 'Angkor Wat', station: 'sisophon', scene: 'temple', country: 'kh',
+    aka: ['angkor', 'siem reap', 'ta prohm', 'bayon', 'angkor thom'],
+    last: 'Two hours by road from the railhead at Sisophon — Angkor has no railway' },
+  { name: 'Tonlé Sap floating villages', station: 'siemreap', scene: 'river', country: 'kh',
+    aka: ['tonle sap', 'kampong phluk'], last: 'Boat from Siem Reap' },
+  { name: 'Royal Palace, Phnom Penh', station: 'phnompenh', scene: 'temple', country: 'kh',
+    aka: ['phnom penh', 'killing fields', 's-21', 'tuol sleng', 'silver pagoda'], last: null },
+  { name: 'Bamboo train', station: 'battambang', scene: 'paddy', country: 'kh',
+    aka: ['battambang', 'norry'], last: 'Tuk-tuk from Battambang' },
+  { name: 'Bokor Hill Station', station: 'kampot', scene: 'hills', country: 'kh',
+    aka: ['kampot', 'kep', 'bokor'], last: 'Motorbike or taxi up the plateau' },
+  { name: 'Koh Rong beaches', station: 'kohrong', scene: 'coast', country: 'kh',
+    aka: ['koh rong', 'long set beach'], last: null },
+  { name: 'Otres Beach', station: 'sihanoukville', scene: 'coast', country: 'kh', aka: ['sihanoukville'], last: null },
+
+  // --- Vietnam
+  { name: 'Ha Long Bay', station: 'catba', scene: 'karst', country: 'vn',
+    aka: ['halong', 'ha long', 'lan ha bay', 'cat ba'], last: null },
+  { name: 'Hanoi Old Quarter', station: 'hanoi', scene: 'skyline', country: 'vn',
+    aka: ['hanoi', 'hoan kiem', 'ho chi minh mausoleum'], last: null },
+  { name: 'Sapa rice terraces', station: 'laocai', scene: 'paddy', country: 'vn',
+    aka: ['sapa', 'sa pa', 'fansipan'], last: 'An hour by bus up from Lào Cai' },
+  { name: 'Trang An and Tam Coc', station: 'ninhbinh', scene: 'karst', country: 'vn',
+    aka: ['ninh binh', 'tam coc', 'trang an', 'halong on land'], last: 'Short taxi from Ninh Bình' },
+  { name: 'Phong Nha caves', station: 'donghoi', scene: 'karst', country: 'vn',
+    aka: ['phong nha', 'son doong', 'paradise cave'], last: 'About 45 minutes by road from Đồng Hới' },
+  { name: 'Huế Imperial City', station: 'hue', scene: 'temple', country: 'vn',
+    aka: ['hue', 'perfume river', 'citadel'], last: null },
+  { name: 'Hội An old town', station: 'danang', scene: 'river', country: 'vn',
+    aka: ['hoi an', 'da nang', 'golden bridge', 'ba na hills', 'my son'], last: '45 minutes by taxi from Đà Nẵng' },
+  { name: 'Mũi Né dunes', station: 'muongman', scene: 'coast', country: 'vn',
+    aka: ['mui ne', 'phan thiet', 'sand dunes'], last: 'Taxi from Mương Mán' },
+  { name: 'Đà Lạt', station: 'thapcham', scene: 'hills', country: 'vn',
+    aka: ['dalat', 'da lat'], last: 'Winding road up from Tháp Chàm, about three hours' },
+  { name: 'Cu Chi Tunnels', station: 'saigon', scene: 'forest', country: 'vn',
+    aka: ['cu chi', 'ho chi minh city', 'saigon', 'ben thanh', 'war remnants'], last: 'Half-day trip from the city' },
+  { name: 'Mekong Delta', station: 'chaudoc', scene: 'river', country: 'vn',
+    aka: ['mekong delta', 'chau doc', 'can tho', 'floating market'], last: null },
+
+  // --- Malaysia
+  { name: 'Petronas Towers', station: 'klsentral', scene: 'skyline', country: 'my',
+    aka: ['kuala lumpur', 'klcc', 'batu caves', 'kl'], last: 'One stop on the LRT' },
+  { name: 'George Town street art', station: 'georgetown', scene: 'coast', country: 'my',
+    aka: ['penang', 'george town', 'kek lok si', 'penang hill'], last: null },
+  { name: 'Cameron Highlands', station: 'ipoh', scene: 'hills', country: 'my',
+    aka: ['cameron highlands', 'tanah rata', 'tea plantation'], last: 'Two hours by bus from Ipoh' },
+  { name: 'Taman Negara', station: 'jerantut', scene: 'forest', country: 'my',
+    aka: ['taman negara', 'kuala tahan', 'canopy walkway'], last: 'Bus or river boat from Jerantut' },
+  { name: 'Langkawi Sky Bridge', station: 'langkawi', scene: 'karst', country: 'my',
+    aka: ['langkawi', 'cenang', 'kuah'], last: 'Cable car from the island road' },
+  { name: 'Melaka old town', station: 'melaka', scene: 'coast', country: 'my',
+    aka: ['malacca', 'melaka', 'jonker street'], last: null },
+  { name: 'Perhentian Islands', station: 'wakafbaharu', scene: 'coast', country: 'my',
+    aka: ['perhentian', 'kota bharu'], last: 'Bus to Kuala Besut, then a speedboat' },
+  { name: 'Mount Kinabalu', station: 'kotakinabalu', scene: 'volcano', country: 'my',
+    aka: ['kinabalu', 'kota kinabalu', 'sabah'], last: 'Two hours by road to the park gate' },
+
+  // --- Singapore
+  { name: 'Marina Bay Sands', station: 'singapore', scene: 'skyline', country: 'sg',
+    aka: ['singapore', 'gardens by the bay', 'merlion', 'sentosa'], last: 'MRT from HarbourFront' },
+
+  // --- Brunei
+  { name: 'Omar Ali Saifuddien Mosque', station: 'bandarseri', scene: 'temple', country: 'bn',
+    aka: ['brunei', 'bandar seri begawan'], last: 'Taxi from Muara' },
+
+  // --- Indonesia
+  { name: 'Borobudur', station: 'yogyakarta', scene: 'temple', country: 'id',
+    aka: ['yogyakarta', 'jogja', 'prambanan', 'malioboro'], last: 'An hour by road from Yogyakarta' },
+  { name: 'Mount Bromo', station: 'probolinggo', scene: 'volcano', country: 'id',
+    aka: ['bromo', 'cemoro lawang', 'sea of sand'], last: 'Jeep from Probolinggo to the rim' },
+  { name: 'Ijen blue fire', station: 'banyuwangi', scene: 'volcano', country: 'id',
+    aka: ['ijen', 'kawah ijen', 'banyuwangi'], last: 'Night jeep from Banyuwangi' },
+  { name: 'Ubud', station: 'denpasar', scene: 'paddy', country: 'id',
+    aka: ['bali', 'kuta', 'canggu', 'uluwatu', 'tanah lot', 'denpasar'], last: 'An hour inland from Denpasar' },
+  { name: 'Gili Trawangan', station: 'gili', scene: 'coast', country: 'id',
+    aka: ['gili islands', 'gili t'], last: null },
+  { name: 'Mount Rinjani', station: 'mataram', scene: 'volcano', country: 'id',
+    aka: ['rinjani', 'lombok', 'senaru'], last: 'Road to Senaru, then a two-day climb' },
+  { name: 'Lake Toba', station: 'medan', scene: 'volcano', country: 'id',
+    aka: ['toba', 'samosir', 'medan'], last: 'Four hours by road from Medan to Parapat' },
+  { name: 'Kota Tua, Jakarta', station: 'jakarta', scene: 'skyline', country: 'id',
+    aka: ['jakarta', 'old batavia'], last: 'Commuter train from Gambir' },
+  { name: 'Tangkuban Perahu', station: 'bandung', scene: 'volcano', country: 'id',
+    aka: ['bandung', 'tangkuban'], last: 'An hour north of Bandung' },
+  { name: 'Kraton and Solo batik', station: 'solo', scene: 'temple', country: 'id',
+    aka: ['solo', 'surakarta'], last: null },
+
+  // --- China
+  { name: 'Stone Forest', station: 'kunming', scene: 'karst', country: 'cn',
+    aka: ['kunming', 'shilin'], last: 'Ninety minutes by road from Kunming' },
+]
+
+/* When someone names a country rather than a place, aim at the station a
+ * traveller would actually be heading for. */
+const COUNTRY_HUB = {
+  th: 'bkk_aphiwat', la: 'vte_khamsavath', kh: 'phnompenh', vn: 'hanoi',
+  my: 'klsentral', sg: 'singapore', id: 'jakarta', cn: 'kunming', bn: 'bandarseri',
+}
+
+
 /* ===== src/proj.js ===== */
 /* Web Mercator projection with a fitted, pannable, zoomable viewport.
  *
@@ -2909,6 +3196,586 @@ const Plan = (() => {
   }
 
   return { build, bufferFor, seasonHits, DETOURS, HOTEL_USD, clone }
+})()
+
+
+/* ===== src/scene.js ===== */
+/* Destination artwork, drawn rather than photographed.
+ *
+ * Photographs would be better, and they are not available: every image host is
+ * unreachable from the build environment, stock libraries carry licences this
+ * page cannot honour, and hotlinking would break the moment a third party moved
+ * a file. So each destination gets an original illustration composed from the
+ * landform that actually characterises it — karst towers for Hạ Long, a cone
+ * for Bromo, stepped terraces for Borobudur.
+ *
+ * These are deliberately illustrations and not fake photographs. They commit to
+ * one dusk palette so the set reads as a single hand, the way a guidebook's
+ * plates do, and they sit on their own sky so they work on either theme.
+ *
+ * Everything is deterministic: the same place draws the same picture every
+ * time, seeded from its station id.
+ */
+
+const Scene = (() => {
+  /* Mulberry32 — small, fast, and stable across engines, which matters because
+   * a destination that redrew differently on each visit would feel broken. */
+  function rng(seedStr) {
+    let h = 1779033703 ^ seedStr.length
+    for (let i = 0; i < seedStr.length; i++) {
+      h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353)
+      h = (h << 13) | (h >>> 19)
+    }
+    let a = h >>> 0
+    return () => {
+      a |= 0
+      a = (a + 0x6d2b79f5) | 0
+      let t = Math.imul(a ^ (a >>> 15), 1 | a)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+  }
+
+  /* sky: [top, horizon]  far / mid / near: silhouette layers  water: reflection */
+  const PALETTE = {
+    karst:   { sky: ['#12313d', '#2f6f74'], far: '#22525a', mid: '#153c46', near: '#0d2830', water: '#2a6068' },
+    volcano: { sky: ['#2a1c33', '#8a4a3c'], far: '#5a3040', mid: '#38202f', near: '#1d1220', water: null, ember: '#e8934a' },
+    temple:  { sky: ['#243043', '#c08a4e'], far: '#6a5137', mid: '#3d3122', near: '#221b14', water: null },
+    skyline: { sky: ['#141d33', '#4d5a86'], far: '#2b3557', mid: '#1b2340', near: '#101528', water: '#232c4a', lit: '#e9a63e' },
+    coast:   { sky: ['#153744', '#6fa7a3'], far: '#2f6a6a', mid: '#1d4a50', near: '#123037', water: '#3d8189' },
+    hills:   { sky: ['#1a3436', '#7f9a63'], far: '#3f6448', mid: '#2a4732', near: '#182a1f', water: null },
+    forest:  { sky: ['#17362f', '#83b06d'], far: '#417049', mid: '#2a5636', near: '#173425', water: null },
+    river:   { sky: ['#1b2d3d', '#8b8f74'], far: '#40584f', mid: '#2a3c39', near: '#18242a', water: '#456070' },
+    paddy:   { sky: ['#1d3330', '#a7a860'], far: '#5c7146', mid: '#3b4f30', near: '#22301f', water: '#6d7f4a' },
+  }
+
+  const DEFAULT_BY_COUNTRY = {
+    th: 'temple', la: 'karst', kh: 'temple', vn: 'karst',
+    my: 'forest', sg: 'skyline', id: 'volcano', cn: 'karst', bn: 'coast', mm: 'hills',
+  }
+
+  /** Which illustration a station should carry. */
+  function kindFor(network, landmarks, stationId) {
+    const lm = landmarks.find(l => l.station === stationId)
+    if (lm) return lm.scene
+    const st = network.stations[stationId]
+    if (!st) return 'hills'
+    if (st.hub) return 'skyline'
+    if (!st.gauge) return 'coast' // pier or island — it is reached by water
+    return DEFAULT_BY_COUNTRY[st.country] || 'hills'
+  }
+
+  /* ------------------------------------------------------------- primitives */
+
+  function sky(ctx, w, h, pal) {
+    const g = ctx.createLinearGradient(0, 0, 0, h)
+    g.addColorStop(0, pal.sky[0])
+    g.addColorStop(1, pal.sky[1])
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, w, h)
+  }
+
+  function sun(ctx, w, h, pal, r) {
+    const x = w * (0.2 + r() * 0.6)
+    const y = h * 0.62
+    ctx.save()
+    ctx.globalAlpha = 0.35
+    ctx.fillStyle = '#ffe9c4'
+    ctx.beginPath()
+    ctx.arc(x, y, h * 0.13, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  /** A rolling ridgeline, drawn as a closed shape down to the base. */
+  function ridge(ctx, w, h, baseY, amp, color, r, steps = 9) {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.moveTo(0, h)
+    ctx.lineTo(0, baseY)
+    for (let i = 0; i <= steps; i++) {
+      const x = (w * i) / steps
+      const y = baseY - Math.sin((i / steps) * Math.PI * (1 + r())) * amp * (0.55 + r() * 0.6)
+      ctx.lineTo(x, y)
+    }
+    ctx.lineTo(w, h)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  /* ------------------------------------------------------------ scene kinds */
+
+  const DRAW = {
+    karst(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.56, h * 0.12, pal.far, r, 6)
+      // Steep-sided limestone towers with rounded crowns.
+      const n = 4 + Math.floor(r() * 3)
+      for (let i = 0; i < n; i++) {
+        const cx = w * ((i + 0.5) / n) + (r() - 0.5) * (w / n) * 0.7
+        const tw = w * (0.05 + r() * 0.05)
+        const th = h * (0.3 + r() * 0.34)
+        const baseY = h * 0.8
+        ctx.fillStyle = i % 2 ? pal.mid : pal.near
+        ctx.beginPath()
+        ctx.moveTo(cx - tw, baseY)
+        ctx.quadraticCurveTo(cx - tw * 0.92, baseY - th * 0.72, cx - tw * 0.34, baseY - th)
+        ctx.quadraticCurveTo(cx, baseY - th * 1.1, cx + tw * 0.4, baseY - th * 0.94)
+        ctx.quadraticCurveTo(cx + tw * 0.95, baseY - th * 0.6, cx + tw, baseY)
+        ctx.closePath()
+        ctx.fill()
+      }
+      water(ctx, w, h, pal, 0.8)
+    },
+
+    volcano(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.6, h * 0.09, pal.far, r, 7)
+      const cx = w * (0.35 + r() * 0.3)
+      const baseY = h * 0.86
+      const peak = h * 0.14
+      const halfW = w * 0.3
+      ctx.fillStyle = pal.mid
+      ctx.beginPath()
+      ctx.moveTo(cx - halfW, baseY)
+      ctx.lineTo(cx - w * 0.045, peak)
+      ctx.lineTo(cx + w * 0.05, peak + h * 0.03)
+      ctx.lineTo(cx + halfW, baseY)
+      ctx.closePath()
+      ctx.fill()
+      // Plume, leaning with the wind.
+      ctx.save()
+      ctx.globalAlpha = 0.4
+      ctx.fillStyle = pal.ember || '#e8934a'
+      const lean = (r() - 0.5) * w * 0.18
+      ctx.beginPath()
+      ctx.ellipse(cx + lean, peak - h * 0.06, w * 0.09, h * 0.07, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      ridge(ctx, w, h, h * 0.9, h * 0.05, pal.near, r, 5)
+    },
+
+    temple(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.6, h * 0.08, pal.far, r, 6)
+      // A stepped platform carrying spires.
+      const cx = w * 0.5
+      const baseY = h * 0.82
+      const tiers = 4
+      ctx.fillStyle = pal.mid
+      for (let i = 0; i < tiers; i++) {
+        const tw = w * (0.42 - i * 0.075)
+        const ty = baseY - i * (h * 0.1)
+        ctx.fillRect(cx - tw, ty - h * 0.1, tw * 2, h * 0.1)
+      }
+      ctx.fillStyle = pal.near
+      const spires = [0, -1, 1]
+      for (const s of spires) {
+        const sx = cx + s * w * 0.13
+        const sh = s === 0 ? h * 0.3 : h * 0.2
+        const sy = baseY - tiers * (h * 0.1)
+        ctx.beginPath()
+        ctx.moveTo(sx - w * 0.028, sy)
+        ctx.quadraticCurveTo(sx - w * 0.012, sy - sh * 0.7, sx, sy - sh)
+        ctx.quadraticCurveTo(sx + w * 0.012, sy - sh * 0.7, sx + w * 0.028, sy)
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.fillStyle = pal.near
+      ctx.fillRect(0, baseY, w, h - baseY)
+    },
+
+    skyline(ctx, w, h, pal, r) {
+      sun(ctx, w, h, pal, r)
+      let x = 0
+      const rows = [
+        { color: pal.far, base: h * 0.84, max: h * 0.5 },
+        { color: pal.mid, base: h * 0.9, max: h * 0.66 },
+      ]
+      for (const row of rows) {
+        x = -w * 0.05
+        while (x < w) {
+          const bw = w * (0.04 + r() * 0.07)
+          const bh = row.max * (0.35 + r() * 0.65)
+          ctx.fillStyle = row.color
+          ctx.fillRect(x, row.base - bh, bw, bh)
+          // The occasional lit window, which is what makes it read as a city.
+          if (r() > 0.55) {
+            ctx.fillStyle = pal.lit || '#e9a63e'
+            ctx.globalAlpha = 0.5
+            ctx.fillRect(x + bw * 0.3, row.base - bh + h * 0.06, bw * 0.16, h * 0.05)
+            ctx.globalAlpha = 1
+          }
+          x += bw + w * 0.012
+        }
+      }
+      water(ctx, w, h, pal, 0.9)
+    },
+
+    coast(ctx, w, h, pal, r) {
+      sun(ctx, w, h, pal, r)
+      ridge(ctx, w, h, h * 0.46, h * 0.18, pal.far, r, 5)
+      // A headland running out from one side.
+      const fromLeft = r() > 0.5
+      ctx.fillStyle = pal.mid
+      ctx.beginPath()
+      ctx.moveTo(fromLeft ? 0 : w, h * 0.78)
+      ctx.quadraticCurveTo(w * (fromLeft ? 0.3 : 0.7), h * 0.56, w * (fromLeft ? 0.52 : 0.48), h * 0.8)
+      ctx.lineTo(fromLeft ? 0 : w, h * 0.8)
+      ctx.closePath()
+      ctx.fill()
+      water(ctx, w, h, pal, 0.72)
+    },
+
+    hills(ctx, w, h, pal, r) {
+      sun(ctx, w, h, pal, r)
+      ridge(ctx, w, h, h * 0.44, h * 0.2, pal.far, r, 5)
+      ridge(ctx, w, h, h * 0.62, h * 0.18, pal.mid, r, 6)
+      ridge(ctx, w, h, h * 0.82, h * 0.14, pal.near, r, 7)
+    },
+
+    forest(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.48, h * 0.12, pal.far, r, 5)
+      // Canopy: overlapping crowns rather than a ridgeline.
+      for (const [color, base, size] of [[pal.mid, 0.62, 0.1], [pal.near, 0.8, 0.13]]) {
+        let x = -w * 0.04
+        while (x < w * 1.05) {
+          const rad = w * size * (0.5 + r() * 0.7)
+          ctx.fillStyle = color
+          ctx.beginPath()
+          ctx.arc(x, h * base - rad * 0.35, rad, Math.PI, 0)
+          ctx.fill()
+          ctx.fillRect(x - rad, h * base - rad * 0.35, rad * 2, h)
+          x += rad * (0.7 + r() * 0.5)
+        }
+      }
+    },
+
+    river(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.44, h * 0.13, pal.far, r, 6)
+      // Two banks converging toward a vanishing point.
+      const vpx = w * (0.4 + r() * 0.2)
+      for (const side of [-1, 1]) {
+        ctx.fillStyle = side < 0 ? pal.mid : pal.near
+        ctx.beginPath()
+        ctx.moveTo(side < 0 ? 0 : w, h * 0.72)
+        ctx.quadraticCurveTo(vpx + side * w * 0.22, h * 0.7, vpx + side * w * 0.03, h * 0.62)
+        ctx.lineTo(side < 0 ? 0 : w, h * 0.62)
+        ctx.closePath()
+        ctx.fill()
+        ctx.beginPath()
+        ctx.moveTo(side < 0 ? 0 : w, h)
+        ctx.lineTo(side < 0 ? 0 : w, h * 0.72)
+        ctx.quadraticCurveTo(vpx + side * w * 0.22, h * 0.74, vpx + side * w * 0.04, h * 0.63)
+        ctx.lineTo(vpx, h)
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.fillStyle = pal.water
+      ctx.globalAlpha = 0.5
+      ctx.beginPath()
+      ctx.moveTo(vpx, h * 0.62)
+      ctx.lineTo(w * 0.78, h)
+      ctx.lineTo(w * 0.22, h)
+      ctx.closePath()
+      ctx.fill()
+      ctx.globalAlpha = 1
+    },
+
+    paddy(ctx, w, h, pal, r) {
+      ridge(ctx, w, h, h * 0.5, h * 0.13, pal.far, r, 5)
+      // Terraces: stacked arcs stepping down the slope.
+      const bands = 6
+      for (let i = 0; i < bands; i++) {
+        const y = h * (0.4 + (i / bands) * 0.56)
+        const bow = w * (0.3 + r() * 0.4)
+        ctx.fillStyle = i % 2 ? pal.mid : pal.near
+        ctx.beginPath()
+        ctx.moveTo(0, y + h * 0.07)
+        ctx.quadraticCurveTo(bow, y - h * 0.06, w, y + h * 0.06)
+        ctx.lineTo(w, y + h * 0.2)
+        ctx.quadraticCurveTo(w * 0.5, y + h * 0.09, 0, y + h * 0.21)
+        ctx.closePath()
+        ctx.fill()
+        // A lit lip on each riser: standing water catching the last of the sky.
+        ctx.save()
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = pal.water
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(0, y + h * 0.07)
+        ctx.quadraticCurveTo(bow, y - h * 0.06, w, y + h * 0.06)
+        ctx.stroke()
+        ctx.restore()
+      }
+    },
+  }
+
+  function water(ctx, w, h, pal, from) {
+    if (!pal.water) return
+    ctx.save()
+    ctx.fillStyle = pal.water
+    ctx.fillRect(0, h * from, w, h * (1 - from))
+    ctx.globalAlpha = 0.25
+    ctx.fillStyle = '#ffffff'
+    for (let i = 0; i < 5; i++) {
+      const y = h * from + (h * (1 - from) * (i + 0.5)) / 5
+      ctx.fillRect(w * (0.08 + i * 0.14), y, w * (0.1 + i * 0.03), 1)
+    }
+    ctx.restore()
+  }
+
+  /** Paint one canvas from its data attributes. */
+  function paint(canvas) {
+    const kind = canvas.dataset.scene
+    const pal = PALETTE[kind] || PALETTE.hills
+    const draw = DRAW[kind] || DRAW.hills
+    const rect = canvas.getBoundingClientRect()
+    const cssW = rect.width || canvas.clientWidth || 320
+    const cssH = rect.height || canvas.clientHeight || 84
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    canvas.width = Math.round(cssW * dpr)
+    canvas.height = Math.round(cssH * dpr)
+    const ctx = canvas.getContext('2d')
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, cssW, cssH)
+    const r = rng(canvas.dataset.seed || kind)
+    sky(ctx, cssW, cssH, pal)
+    draw(ctx, cssW, cssH, pal, r)
+    canvas.dataset.painted = '1'
+  }
+
+  function paintAll(root) {
+    root.querySelectorAll('canvas.scene').forEach(paint)
+  }
+
+  return { paint, paintAll, kindFor, PALETTE }
+})()
+
+
+/* ===== src/ask.js ===== */
+/* Turning a sentence into two stations.
+ *
+ * "How do I get from Angkor Wat to Ha Long Bay?" has to become sisophon →
+ * catba, and the traveller has to be able to see that is what happened —
+ * because Angkor is a two-hour drive from the nearest track and silently
+ * routing them to Sisophon without saying so would be a trap.
+ *
+ * No network and no model: a gazetteer plus scored fuzzy matching. That keeps
+ * the answer identical offline, on a Vercel deploy, and on a train in Laos.
+ */
+
+const Ask = (() => {
+  /* Vietnamese and Lao names are full of diacritics that nobody types, and đ
+   * is a distinct letter rather than a combining mark, so it needs its own rule. */
+  function norm(s) {
+    return String(s)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0111/g, 'd')
+      .replace(/['’`]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  }
+
+  const COUNTRY_LABEL = {
+    cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
+    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', mm: 'Myanmar',
+  }
+
+  /* Phrases people wrap the actual question in. Stripped before matching so
+   * "i want to go from X to Y by train" leaves just X and Y. */
+  const LEAD = [
+    'how do i get', 'how do you get', 'how to get', 'how do i travel', 'how can i get',
+    'whats the best way', 'what is the best way', 'best way', 'can i take a train',
+    'can you take a train', 'can i get', 'is there a train', 'i want to go', 'i want to travel',
+    'i need to get', 'travel', 'route', 'getting', 'going', 'go',
+  ]
+  const TAIL = [
+    'by train', 'by rail', 'by land', 'overland', 'without flying', 'without a flight',
+    'no flights', 'by boat', 'by ferry', 'on the ground', 'please', 'thanks',
+  ]
+
+  function build(network, landmarks, countryHub) {
+    const entries = []
+    /* Ties are common — "Singapore" is a city on two stations. Bias toward the
+     * one a traveller actually means: the hub over the border post, a named
+     * landmark over a bare station name. */
+    const add = (label, key, stationId, kind, extra) => {
+      const st = network.stations[stationId]
+      const bias =
+        (kind === 'landmark' ? 6 : 0) + (st && st.hub ? 4 : 0) + (st && st.minor ? -4 : 0)
+      entries.push({ label, key: norm(key), stationId, kind, bias, ...extra })
+    }
+
+    for (const lm of landmarks) {
+      add(lm.name, lm.name, lm.station, 'landmark', { landmark: lm })
+      for (const alias of lm.aka || []) {
+        /* An alias that is simply the city or station name is not a landmark
+         * reference — someone typing "bangkok" means Bangkok, and answering
+         * them with "Grand Palace" reads as a non-sequitur. */
+        const st = network.stations[lm.station]
+        const a = norm(alias)
+        if (st && a === norm(st.city)) add(st.city, alias, lm.station, 'city')
+        else if (st && a === norm(st.name)) add(st.city, alias, lm.station, 'city')
+        else add(lm.name, alias, lm.station, 'landmark', { landmark: lm })
+      }
+    }
+    for (const [id, s] of Object.entries(network.stations)) {
+      add(s.name, s.name, id, 'station')
+      if (norm(s.city) !== norm(s.name)) add(s.city, s.city, id, 'city')
+    }
+    for (const [code, label] of Object.entries(COUNTRY_LABEL)) {
+      if (countryHub[code]) add(label, label, countryHub[code], 'country')
+    }
+    return entries
+  }
+
+  /* Deliberately conservative. A wrong confident match is worse than asking
+   * again, because the traveller has no way to tell it guessed. */
+  function score(query, entry) {
+    const q = query
+    const k = entry.key
+    if (!q || !k) return 0
+    if (q === k) return 100
+    if (k.startsWith(q) || q.startsWith(k)) {
+      return 84 - Math.min(20, Math.abs(k.length - q.length))
+    }
+    if (q.length >= 4 && k.includes(q)) return 66
+    if (k.length >= 4 && q.includes(k)) return 62
+
+    // People type "danang" for "Đà Nẵng" and "hochiminh" for "Ho Chi Minh".
+    const qj = q.replace(/ /g, '')
+    const kj = k.replace(/ /g, '')
+    if (qj === kj) return 96
+    if (kj.startsWith(qj) || qj.startsWith(kj)) {
+      return 78 - Math.min(20, Math.abs(kj.length - qj.length))
+    }
+    if (qj.length >= 5 && kj.includes(qj)) return 58
+
+    const qt = new Set(q.split(' ').filter(w => w.length > 2))
+    const kt = k.split(' ').filter(w => w.length > 2)
+    if (!qt.size || !kt.length) return 0
+    const hits = kt.filter(w => qt.has(w)).length
+    if (!hits) return 0
+    return 30 * (hits / Math.max(qt.size, kt.length)) + 12 * hits
+  }
+
+  function match(entries, raw) {
+    const q = norm(raw)
+    if (!q) return null
+    const ranked = entries
+      .map(e => ({ entry: e, s: score(q, e) + (score(q, e) > 0 ? e.bias : 0) }))
+      .filter(r => r.s > 0)
+      .sort((a, b) => b.s - a.s || a.entry.label.length - b.entry.label.length)
+    if (!ranked.length) return null
+
+    // Collapse duplicates that resolve to the same station.
+    const seen = new Set()
+    const unique = []
+    for (const r of ranked) {
+      const id = r.entry.stationId
+      if (seen.has(id)) continue
+      seen.add(id)
+      unique.push(r)
+      if (unique.length >= 5) break
+    }
+    const best = unique[0]
+    return {
+      stationId: best.entry.stationId,
+      label: best.entry.label,
+      kind: best.entry.kind,
+      landmark: best.entry.landmark || null,
+      confident: best.s >= 60,
+      alternatives: unique.slice(1, 4).map(r => ({
+        label: r.entry.label,
+        stationId: r.entry.stationId,
+      })),
+    }
+  }
+
+  function strip(text) {
+    let t = norm(text)
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const p of LEAD) {
+        if (t.startsWith(p + ' ')) {
+          t = t.slice(p.length + 1)
+          changed = true
+        }
+      }
+      for (const p of TAIL) {
+        if (t.endsWith(' ' + p)) {
+          t = t.slice(0, -(p.length + 1))
+          changed = true
+        }
+      }
+    }
+    return t.trim()
+  }
+
+  /** Split a question into its two endpoints. */
+  function split(text) {
+    const t = strip(text)
+    let m = t.match(/^from\s+(.+?)\s+to\s+(.+)$/)
+    if (m) return [m[1], m[2]]
+    m = t.match(/^(.+?)\s+to\s+(.+)$/)
+    if (m) return [m[1], m[2]]
+    m = t.match(/^(.+?)\s+(?:then|until|till|then on to|onto)\s+(.+)$/)
+    if (m) return [m[1], m[2]]
+    // "X - Y" only when both halves look substantial, so hyphenated place
+    // names such as Ho-Chi-Minh survive.
+    const parts = String(text).split(/\s+[-–—>]+\s+|\s*→\s*/)
+    if (parts.length === 2 && parts.every(p => strip(p).length > 2)) {
+      return [strip(parts[0]), strip(parts[1])]
+    }
+    return null
+  }
+
+  function ask(network, entries, text) {
+    const pair = split(text)
+    if (!pair) {
+      return {
+        ok: false,
+        reason: 'Say where you are starting and where you want to end up — "Angkor Wat to Ha Long Bay".',
+      }
+    }
+    const [rawFrom, rawTo] = pair
+    const from = match(entries, rawFrom)
+    const to = match(entries, rawTo)
+
+    const missing = []
+    if (!from || !from.confident) missing.push(rawFrom)
+    if (!to || !to.confident) missing.push(rawTo)
+    if (missing.length) {
+      const near = [from, to].filter(x => x && x.alternatives)
+      return {
+        ok: false,
+        reason: `Not sure what you mean by ${missing.map(m => `“${m}”`).join(' or ')}.`,
+        suggestions: near.flatMap(x => [x.label, ...x.alternatives.map(a => a.label)]).slice(0, 5),
+      }
+    }
+    if (from.stationId === to.stationId) {
+      return { ok: false, reason: `Those both resolve to ${from.label}. Pick two different places.` }
+    }
+    return { ok: true, from, to }
+  }
+
+  /** How the answer explains itself, including the gap it cannot cover by rail. */
+  function explain(network, side) {
+    const station = network.stations[side.stationId]
+    const bits = []
+    if (side.kind === 'landmark' && side.landmark) {
+      bits.push(`${side.label} → ${station.name}`)
+      if (side.landmark.last) bits.push(side.landmark.last)
+    } else if (side.kind === 'country') {
+      bits.push(`${side.label} → ${station.name}`)
+    } else {
+      bits.push(station.name)
+    }
+    return bits
+  }
+
+  return { build, ask, match, explain, norm, COUNTRY_LABEL }
 })()
 
 
@@ -3829,12 +4696,26 @@ const UI = (() => {
       )
       .join('')
 
+    const labels = opts.labels && opts.labels.from && opts.labels.to ? opts.labels : null
+    const scene = typeof Scene !== 'undefined' ? Scene.kindFor(network, LANDMARKS, toId) : null
+    const banner = scene
+      ? `<div class="banner"><canvas class="scene" data-scene="${esc(scene)}" data-seed="${esc(toId)}"></canvas>
+         <span class="banner-cap">${esc(to.city)}</span></div>`
+      : ''
+
     return `
+      ${banner}
       <header class="head">
-        <p class="eyebrow">${esc(opts.railOnly ? 'Hard rail-only' : 'Pragmatic')} routing${
-          opts.date ? ` · departing ${esc(opts.date)}` : ''
-        }${opts.nationality ? ` · ${esc(opts.nationality)} passport` : ''}</p>
-        <h1>${esc(from.city)} <span aria-hidden="true">→</span> ${esc(to.city)} overland</h1>
+        <p class="eyebrow">${
+          labels
+            ? `${esc(from.name)} <span aria-hidden="true">→</span> ${esc(to.name)}`
+            : `${esc(opts.railOnly ? 'Hard rail-only' : 'Pragmatic')} routing${
+                opts.date ? ` · departing ${esc(opts.date)}` : ''
+              }${opts.nationality ? ` · ${esc(opts.nationality)} passport` : ''}`
+        }</p>
+        <h1>${esc(labels ? labels.from : from.city)} <span aria-hidden="true">→</span> ${esc(
+          labels ? labels.to : to.city
+        )} overland</h1>
         ${statBar(plan)}
         <p class="lede">${lede(network, plan, fromId, toId)}</p>
       </header>
@@ -3917,7 +4798,11 @@ const UI = (() => {
                <span><b>${esc(money(st.usd))}</b>all in</span>
              </span>`
           : ''
+        const art = p.scene
+          ? `<span class="corridor-art"><canvas class="scene" data-scene="${esc(p.scene)}" data-seed="${esc(p.sceneSeed || p.to)}"></canvas></span>`
+          : ''
         return `<button type="button" class="corridor" data-preset="${i}">
+            ${art}
             <span class="corridor-name">${esc(p.label)}<em aria-hidden="true">→</em></span>
             <span class="corridor-note">${esc(p.note)}</span>
             ${stats}
@@ -4002,16 +4887,43 @@ const UI = (() => {
     nationality: '',
     pace: 'standard',
     plan: null,
+    // Set only when the question named places rather than stations, so the
+    // answer can be headlined in the words that were actually used.
+    labels: null,
   }
 
   /* Real numbers on the corridor cards, so the choice is informed before the
      click. Six Dijkstra runs over 155 edges — cheap enough to do at boot. */
   function withStats(presets) {
+    // Several corridors end in the same kind of place, and three identical
+    // skylines in a row reads as a rendering bug. Where the terminus repeats,
+    // take the illustration from somewhere else the route actually calls at.
+    const used = new Set()
     return presets.map(p => {
       const routed = Router.route(NETWORK, p.from, p.to, {})
       if (!routed) return p
-      const t = Plan.build(NETWORK, routed, {}).totals
-      return { ...p, stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd } }
+      const plan = Plan.build(NETWORK, routed, {})
+      const t = plan.totals
+
+      let scene = Scene.kindFor(NETWORK, LANDMARKS, p.to)
+      let seed = p.to
+      if (used.has(scene)) {
+        const along = plan.stationIds
+          .map(id => ({ id, kind: Scene.kindFor(NETWORK, LANDMARKS, id) }))
+          .find(x => !used.has(x.kind))
+        if (along) {
+          scene = along.kind
+          seed = along.id
+        }
+      }
+      used.add(scene)
+
+      return {
+        ...p,
+        scene,
+        sceneSeed: `${seed}-${p.from}`,
+        stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd },
+      }
     })
   }
   const CORRIDORS = withStats(PRESETS)
@@ -4068,6 +4980,7 @@ const UI = (() => {
       app.dataset.active = 'false'
       panel.innerHTML = UI.idle(NETWORK, CORRIDORS)
       resetScroll()
+      paintScenes()
       return
     }
 
@@ -4076,6 +4989,7 @@ const UI = (() => {
       date: state.date,
       nationality: state.nationality,
       pace: state.pace,
+      labels: state.labels,
     }
     const routed = Router.route(NETWORK, state.from, state.to, opts)
 
@@ -4086,6 +5000,7 @@ const UI = (() => {
       app.dataset.active = 'true'
       panel.innerHTML = UI.unreachable(NETWORK, state.from, state.to, reach, opts)
       resetScroll()
+      paintScenes()
       return
     }
 
@@ -4095,6 +5010,7 @@ const UI = (() => {
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
     panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
     resetScroll()
+    paintScenes()
     bindPanel()
     writeHash()
   }
@@ -4107,6 +5023,10 @@ const UI = (() => {
       const wrap = document.querySelector('.mapwrap')
       if (wrap) window.scrollTo({ top: wrap.offsetTop, behavior: 'smooth' })
     }
+  }
+
+  function paintScenes() {
+    Scene.paintAll(panel)
   }
 
   function bindPanel() {
@@ -4245,14 +5165,17 @@ const UI = (() => {
   /* ------------------------------------------------------------- listeners */
 
   $('#from').addEventListener('change', e => {
+    state.labels = null
     state.from = e.target.value || null
     compute()
   })
   $('#to').addEventListener('change', e => {
+    state.labels = null
     state.to = e.target.value || null
     compute()
   })
   $('#swap').addEventListener('click', () => {
+    if (state.labels) state.labels = { from: state.labels.to, to: state.labels.from }
     ;[state.from, state.to] = [state.to, state.from]
     renderControls()
     compute()
@@ -4277,6 +5200,49 @@ const UI = (() => {
     state.pace = e.target.value
     compute()
   })
+  const ASK_INDEX = Ask.build(NETWORK, LANDMARKS, COUNTRY_HUB)
+
+  function showAskNote(html, tone) {
+    const el = $('#asknote')
+    el.className = 'ask-note' + (tone ? ' ' + tone : '')
+    el.innerHTML = html
+    el.hidden = !html
+  }
+
+  function runAsk() {
+    const text = $('#askbox').value.trim()
+    if (!text) return showAskNote('')
+
+    const result = Ask.ask(NETWORK, ASK_INDEX, text)
+    if (!result.ok) {
+      const hint = result.suggestions && result.suggestions.length
+        ? ` Try ${result.suggestions.slice(0, 3).map(s => `<b>${UI.esc(s)}</b>`).join(', ')}.`
+        : ''
+      return showAskNote(UI.esc(result.reason) + hint, 'warn')
+    }
+
+    state.from = result.from.stationId
+    state.to = result.to.stationId
+    state.labels = { from: result.from.label, to: result.to.label }
+    renderControls()
+    compute()
+
+    // Say what it decided, including any gap it cannot cover by rail.
+    const line = side =>
+      Ask.explain(NETWORK, side)
+        .map((b, i) => (i === 0 ? `<b>${UI.esc(b)}</b>` : `<span>${UI.esc(b)}</span>`))
+        .join(' — ')
+    showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')
+  }
+
+  $('#askgo').addEventListener('click', runAsk)
+  $('#askbox').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      runAsk()
+    }
+  })
+
   $('#reset').addEventListener('click', () => map.resetView())
 
   /* Back to a blank slate: clear the pair, drop the shared URL, refit the map. */
@@ -4284,6 +5250,9 @@ const UI = (() => {
     state.from = null
     state.to = null
     state.plan = null
+    state.labels = null
+    $('#askbox').value = ''
+    showAskNote('')
     history.replaceState(null, '', location.pathname + location.search)
     renderControls()
     compute()
@@ -4298,6 +5267,7 @@ const UI = (() => {
     const p = PRESETS[Number(chip.dataset.preset)]
     state.from = p.from
     state.to = p.to
+    state.labels = null
     renderControls()
     compute()
   })
@@ -4331,6 +5301,7 @@ const UI = (() => {
     resizeTimer = setTimeout(() => {
       updateInset()
       map.resize()
+      paintScenes() // canvases are sized in device pixels, so they redraw on resize
     }, 120)
   })
 

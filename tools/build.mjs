@@ -27,9 +27,12 @@ const DESCRIPTION =
 // Order matters: each module reads the ones above it.
 const SCRIPTS = [
   'data/network.js',
+  'data/landmarks.js',
   'src/proj.js',
   'src/router.js',
   'src/plan.js',
+  'src/scene.js',
+  'src/ask.js',
   'src/map.js',
   'src/ui.js',
   'src/app.js',

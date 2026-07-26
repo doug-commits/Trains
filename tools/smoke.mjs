@@ -176,6 +176,47 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------- asking in plain language */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(500)
+
+  // Illustrations are canvases; a blank one is a silent failure.
+  const art = await page.evaluate(() =>
+    [...document.querySelectorAll('canvas.scene')].map(c => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+      const seen = new Set()
+      for (let i = 0; i < d.length; i += 800) seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`)
+      return seen.size
+    })
+  )
+  check('destination art renders on every card', art.length >= 6 && art.every(n => n > 5),
+    `${art.length} drawn, min ${Math.min(...art)} colours`)
+
+  await page.fill('#askbox', 'how do I get from Angkor Wat to Ha Long Bay')
+  await page.click('#askgo')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const h1 = (await page.textContent('#panel h1')).replace(/\s+/g, ' ').trim()
+  check('answered in the words that were asked', /Angkor Wat/.test(h1) && /Ha Long Bay/.test(h1), h1)
+  check('railheads still shown', /Sisophon/.test(await page.textContent('.eyebrow')))
+
+  const note = await page.textContent('#asknote')
+  check('the road gap to Angkor is disclosed', /two hours by road/i.test(note))
+  check('selects reflect the reading', (await page.locator('#from').inputValue()) === 'sisophon')
+
+  await page.fill('#askbox', 'from mordor to gondor')
+  await page.click('#askgo')
+  await page.waitForTimeout(400)
+  check('nonsense is refused, not guessed at', /Not sure what you mean/.test(await page.textContent('#asknote')))
+
+  await page.screenshot({ path: join(outDir, '16-ask-answer.png') })
+  await context.close()
+}
+
 /* ------------------------------------------------- getting back to home */
 {
   const { page, context } = await newPage()

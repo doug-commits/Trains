@@ -35,16 +35,43 @@
     nationality: '',
     pace: 'standard',
     plan: null,
+    // Set only when the question named places rather than stations, so the
+    // answer can be headlined in the words that were actually used.
+    labels: null,
   }
 
   /* Real numbers on the corridor cards, so the choice is informed before the
      click. Six Dijkstra runs over 155 edges — cheap enough to do at boot. */
   function withStats(presets) {
+    // Several corridors end in the same kind of place, and three identical
+    // skylines in a row reads as a rendering bug. Where the terminus repeats,
+    // take the illustration from somewhere else the route actually calls at.
+    const used = new Set()
     return presets.map(p => {
       const routed = Router.route(NETWORK, p.from, p.to, {})
       if (!routed) return p
-      const t = Plan.build(NETWORK, routed, {}).totals
-      return { ...p, stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd } }
+      const plan = Plan.build(NETWORK, routed, {})
+      const t = plan.totals
+
+      let scene = Scene.kindFor(NETWORK, LANDMARKS, p.to)
+      let seed = p.to
+      if (used.has(scene)) {
+        const along = plan.stationIds
+          .map(id => ({ id, kind: Scene.kindFor(NETWORK, LANDMARKS, id) }))
+          .find(x => !used.has(x.kind))
+        if (along) {
+          scene = along.kind
+          seed = along.id
+        }
+      }
+      used.add(scene)
+
+      return {
+        ...p,
+        scene,
+        sceneSeed: `${seed}-${p.from}`,
+        stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd },
+      }
     })
   }
   const CORRIDORS = withStats(PRESETS)
@@ -101,6 +128,7 @@
       app.dataset.active = 'false'
       panel.innerHTML = UI.idle(NETWORK, CORRIDORS)
       resetScroll()
+      paintScenes()
       return
     }
 
@@ -109,6 +137,7 @@
       date: state.date,
       nationality: state.nationality,
       pace: state.pace,
+      labels: state.labels,
     }
     const routed = Router.route(NETWORK, state.from, state.to, opts)
 
@@ -119,6 +148,7 @@
       app.dataset.active = 'true'
       panel.innerHTML = UI.unreachable(NETWORK, state.from, state.to, reach, opts)
       resetScroll()
+      paintScenes()
       return
     }
 
@@ -128,6 +158,7 @@
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
     panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
     resetScroll()
+    paintScenes()
     bindPanel()
     writeHash()
   }
@@ -140,6 +171,10 @@
       const wrap = document.querySelector('.mapwrap')
       if (wrap) window.scrollTo({ top: wrap.offsetTop, behavior: 'smooth' })
     }
+  }
+
+  function paintScenes() {
+    Scene.paintAll(panel)
   }
 
   function bindPanel() {
@@ -278,14 +313,17 @@
   /* ------------------------------------------------------------- listeners */
 
   $('#from').addEventListener('change', e => {
+    state.labels = null
     state.from = e.target.value || null
     compute()
   })
   $('#to').addEventListener('change', e => {
+    state.labels = null
     state.to = e.target.value || null
     compute()
   })
   $('#swap').addEventListener('click', () => {
+    if (state.labels) state.labels = { from: state.labels.to, to: state.labels.from }
     ;[state.from, state.to] = [state.to, state.from]
     renderControls()
     compute()
@@ -310,6 +348,49 @@
     state.pace = e.target.value
     compute()
   })
+  const ASK_INDEX = Ask.build(NETWORK, LANDMARKS, COUNTRY_HUB)
+
+  function showAskNote(html, tone) {
+    const el = $('#asknote')
+    el.className = 'ask-note' + (tone ? ' ' + tone : '')
+    el.innerHTML = html
+    el.hidden = !html
+  }
+
+  function runAsk() {
+    const text = $('#askbox').value.trim()
+    if (!text) return showAskNote('')
+
+    const result = Ask.ask(NETWORK, ASK_INDEX, text)
+    if (!result.ok) {
+      const hint = result.suggestions && result.suggestions.length
+        ? ` Try ${result.suggestions.slice(0, 3).map(s => `<b>${UI.esc(s)}</b>`).join(', ')}.`
+        : ''
+      return showAskNote(UI.esc(result.reason) + hint, 'warn')
+    }
+
+    state.from = result.from.stationId
+    state.to = result.to.stationId
+    state.labels = { from: result.from.label, to: result.to.label }
+    renderControls()
+    compute()
+
+    // Say what it decided, including any gap it cannot cover by rail.
+    const line = side =>
+      Ask.explain(NETWORK, side)
+        .map((b, i) => (i === 0 ? `<b>${UI.esc(b)}</b>` : `<span>${UI.esc(b)}</span>`))
+        .join(' — ')
+    showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')
+  }
+
+  $('#askgo').addEventListener('click', runAsk)
+  $('#askbox').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      runAsk()
+    }
+  })
+
   $('#reset').addEventListener('click', () => map.resetView())
 
   /* Back to a blank slate: clear the pair, drop the shared URL, refit the map. */
@@ -317,6 +398,9 @@
     state.from = null
     state.to = null
     state.plan = null
+    state.labels = null
+    $('#askbox').value = ''
+    showAskNote('')
     history.replaceState(null, '', location.pathname + location.search)
     renderControls()
     compute()
@@ -331,6 +415,7 @@
     const p = PRESETS[Number(chip.dataset.preset)]
     state.from = p.from
     state.to = p.to
+    state.labels = null
     renderControls()
     compute()
   })
@@ -364,6 +449,7 @@
     resizeTimer = setTimeout(() => {
       updateInset()
       map.resize()
+      paintScenes() // canvases are sized in device pixels, so they redraw on resize
     }, 120)
   })
 

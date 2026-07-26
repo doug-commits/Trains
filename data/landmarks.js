@@ -1,0 +1,155 @@
+/* Landmarks, and the station you actually get off at.
+ *
+ * Travellers think in sights, not railheads. Nobody wants to go to Sisophon;
+ * they want to go to Angkor. This table is the translation layer, and it is
+ * also where the honesty lives — Angkor is two hours by road from the nearest
+ * track, and the app says so rather than pretending Siem Reap has a station.
+ *
+ * `station`  the railhead or terminal the route should actually target
+ * `last`     how you cover the gap between that station and the sight itself,
+ *            null when you arrive essentially on top of it
+ * `scene`    which procedural illustration to draw (see src/scene.js)
+ * `aka`      alternative spellings and names people actually type
+ */
+
+const LANDMARKS = [
+  // --- Thailand
+  { name: 'Grand Palace', station: 'bkk_aphiwat', scene: 'temple', country: 'th',
+    aka: ['wat phra kaew', 'emerald buddha', 'bangkok'], last: 'MRT and a river boat across Bangkok' },
+  { name: 'Wat Arun', station: 'bkk_aphiwat', scene: 'temple', country: 'th', aka: ['temple of dawn'], last: 'Cross-river ferry' },
+  { name: 'Khao San Road', station: 'bkk_aphiwat', scene: 'skyline', country: 'th', aka: ['khaosan'], last: 'Taxi across Bangkok' },
+  { name: 'Ayutthaya ruins', station: 'ayutthaya', scene: 'temple', country: 'th',
+    aka: ['ayutthaya', 'wat mahathat', 'buddha head in tree'], last: null },
+  { name: 'Sukhothai Historical Park', station: 'phitsanulok', scene: 'temple', country: 'th',
+    aka: ['sukhothai'], last: 'About an hour by bus from Phitsanulok' },
+  { name: 'Doi Suthep', station: 'chiangmai', scene: 'hills', country: 'th',
+    aka: ['chiang mai', 'old city', 'nimman'], last: 'Songthaew up the mountain' },
+  { name: 'Khao Yai National Park', station: 'pakchong', scene: 'forest', country: 'th',
+    aka: ['khao yai'], last: 'Songthaew or taxi from Pak Chong to the gate' },
+  { name: 'Bridge on the River Kwai', station: 'kanchanaburi', scene: 'river', country: 'th',
+    aka: ['death railway', 'kanchanaburi', 'river kwai'], last: null },
+  { name: 'Erawan Falls', station: 'kanchanaburi', scene: 'forest', country: 'th',
+    aka: ['erawan'], last: 'Bus from Kanchanaburi, about 90 minutes' },
+  { name: 'Phanom Rung', station: 'buriram', scene: 'temple', country: 'th',
+    aka: ['buriram'], last: 'Taxi from Buriram' },
+  { name: 'Hua Hin beach', station: 'huahin', scene: 'coast', country: 'th', aka: ['hua hin'], last: null },
+  { name: 'Railay Beach', station: 'krabi', scene: 'karst', country: 'th',
+    aka: ['krabi', 'ao nang', 'railay'], last: 'Longtail boat from Ao Nang — there is no road in' },
+  { name: 'Maya Bay', station: 'kohphiphi', scene: 'karst', country: 'th',
+    aka: ['phi phi', 'koh phi phi', 'the beach'], last: 'Boat tour from Phi Phi Don' },
+  { name: 'Patong Beach', station: 'phuket', scene: 'coast', country: 'th',
+    aka: ['phuket', 'big buddha', 'old town phuket'], last: 'Taxi from Rassada pier' },
+  { name: 'Full Moon Party', station: 'kohphangan', scene: 'coast', country: 'th',
+    aka: ['koh phangan', 'haad rin'], last: null },
+  { name: 'Koh Tao diving', station: 'kohtao', scene: 'coast', country: 'th', aka: ['koh tao', 'sairee'], last: null },
+  { name: 'Chaweng Beach', station: 'kohsamui', scene: 'coast', country: 'th', aka: ['koh samui', 'samui'], last: null },
+  { name: 'Similan Islands', station: 'phuket', scene: 'coast', country: 'th',
+    aka: ['similan'], last: 'Liveaboard or day boat from Khao Lak, north of Phuket' },
+
+  // --- Laos
+  { name: 'Kuang Si Falls', station: 'luangprabang', scene: 'forest', country: 'la',
+    aka: ['kuang si', 'luang prabang', 'mount phousi', 'alms giving'], last: 'Tuk-tuk, about 40 minutes' },
+  { name: 'Blue Lagoon', station: 'vangvieng', scene: 'karst', country: 'la',
+    aka: ['vang vieng', 'tubing'], last: 'Bicycle or tuk-tuk from town' },
+  { name: 'Pha That Luang', station: 'vte_khamsavath', scene: 'temple', country: 'la',
+    aka: ['vientiane', 'patuxai', 'buddha park'], last: 'Tuk-tuk into Vientiane' },
+
+  // --- Cambodia
+  { name: 'Angkor Wat', station: 'sisophon', scene: 'temple', country: 'kh',
+    aka: ['angkor', 'siem reap', 'ta prohm', 'bayon', 'angkor thom'],
+    last: 'Two hours by road from the railhead at Sisophon — Angkor has no railway' },
+  { name: 'Tonlé Sap floating villages', station: 'siemreap', scene: 'river', country: 'kh',
+    aka: ['tonle sap', 'kampong phluk'], last: 'Boat from Siem Reap' },
+  { name: 'Royal Palace, Phnom Penh', station: 'phnompenh', scene: 'temple', country: 'kh',
+    aka: ['phnom penh', 'killing fields', 's-21', 'tuol sleng', 'silver pagoda'], last: null },
+  { name: 'Bamboo train', station: 'battambang', scene: 'paddy', country: 'kh',
+    aka: ['battambang', 'norry'], last: 'Tuk-tuk from Battambang' },
+  { name: 'Bokor Hill Station', station: 'kampot', scene: 'hills', country: 'kh',
+    aka: ['kampot', 'kep', 'bokor'], last: 'Motorbike or taxi up the plateau' },
+  { name: 'Koh Rong beaches', station: 'kohrong', scene: 'coast', country: 'kh',
+    aka: ['koh rong', 'long set beach'], last: null },
+  { name: 'Otres Beach', station: 'sihanoukville', scene: 'coast', country: 'kh', aka: ['sihanoukville'], last: null },
+
+  // --- Vietnam
+  { name: 'Ha Long Bay', station: 'catba', scene: 'karst', country: 'vn',
+    aka: ['halong', 'ha long', 'lan ha bay', 'cat ba'], last: null },
+  { name: 'Hanoi Old Quarter', station: 'hanoi', scene: 'skyline', country: 'vn',
+    aka: ['hanoi', 'hoan kiem', 'ho chi minh mausoleum'], last: null },
+  { name: 'Sapa rice terraces', station: 'laocai', scene: 'paddy', country: 'vn',
+    aka: ['sapa', 'sa pa', 'fansipan'], last: 'An hour by bus up from Lào Cai' },
+  { name: 'Trang An and Tam Coc', station: 'ninhbinh', scene: 'karst', country: 'vn',
+    aka: ['ninh binh', 'tam coc', 'trang an', 'halong on land'], last: 'Short taxi from Ninh Bình' },
+  { name: 'Phong Nha caves', station: 'donghoi', scene: 'karst', country: 'vn',
+    aka: ['phong nha', 'son doong', 'paradise cave'], last: 'About 45 minutes by road from Đồng Hới' },
+  { name: 'Huế Imperial City', station: 'hue', scene: 'temple', country: 'vn',
+    aka: ['hue', 'perfume river', 'citadel'], last: null },
+  { name: 'Hội An old town', station: 'danang', scene: 'river', country: 'vn',
+    aka: ['hoi an', 'da nang', 'golden bridge', 'ba na hills', 'my son'], last: '45 minutes by taxi from Đà Nẵng' },
+  { name: 'Mũi Né dunes', station: 'muongman', scene: 'coast', country: 'vn',
+    aka: ['mui ne', 'phan thiet', 'sand dunes'], last: 'Taxi from Mương Mán' },
+  { name: 'Đà Lạt', station: 'thapcham', scene: 'hills', country: 'vn',
+    aka: ['dalat', 'da lat'], last: 'Winding road up from Tháp Chàm, about three hours' },
+  { name: 'Cu Chi Tunnels', station: 'saigon', scene: 'forest', country: 'vn',
+    aka: ['cu chi', 'ho chi minh city', 'saigon', 'ben thanh', 'war remnants'], last: 'Half-day trip from the city' },
+  { name: 'Mekong Delta', station: 'chaudoc', scene: 'river', country: 'vn',
+    aka: ['mekong delta', 'chau doc', 'can tho', 'floating market'], last: null },
+
+  // --- Malaysia
+  { name: 'Petronas Towers', station: 'klsentral', scene: 'skyline', country: 'my',
+    aka: ['kuala lumpur', 'klcc', 'batu caves', 'kl'], last: 'One stop on the LRT' },
+  { name: 'George Town street art', station: 'georgetown', scene: 'coast', country: 'my',
+    aka: ['penang', 'george town', 'kek lok si', 'penang hill'], last: null },
+  { name: 'Cameron Highlands', station: 'ipoh', scene: 'hills', country: 'my',
+    aka: ['cameron highlands', 'tanah rata', 'tea plantation'], last: 'Two hours by bus from Ipoh' },
+  { name: 'Taman Negara', station: 'jerantut', scene: 'forest', country: 'my',
+    aka: ['taman negara', 'kuala tahan', 'canopy walkway'], last: 'Bus or river boat from Jerantut' },
+  { name: 'Langkawi Sky Bridge', station: 'langkawi', scene: 'karst', country: 'my',
+    aka: ['langkawi', 'cenang', 'kuah'], last: 'Cable car from the island road' },
+  { name: 'Melaka old town', station: 'melaka', scene: 'coast', country: 'my',
+    aka: ['malacca', 'melaka', 'jonker street'], last: null },
+  { name: 'Perhentian Islands', station: 'wakafbaharu', scene: 'coast', country: 'my',
+    aka: ['perhentian', 'kota bharu'], last: 'Bus to Kuala Besut, then a speedboat' },
+  { name: 'Mount Kinabalu', station: 'kotakinabalu', scene: 'volcano', country: 'my',
+    aka: ['kinabalu', 'kota kinabalu', 'sabah'], last: 'Two hours by road to the park gate' },
+
+  // --- Singapore
+  { name: 'Marina Bay Sands', station: 'singapore', scene: 'skyline', country: 'sg',
+    aka: ['singapore', 'gardens by the bay', 'merlion', 'sentosa'], last: 'MRT from HarbourFront' },
+
+  // --- Brunei
+  { name: 'Omar Ali Saifuddien Mosque', station: 'bandarseri', scene: 'temple', country: 'bn',
+    aka: ['brunei', 'bandar seri begawan'], last: 'Taxi from Muara' },
+
+  // --- Indonesia
+  { name: 'Borobudur', station: 'yogyakarta', scene: 'temple', country: 'id',
+    aka: ['yogyakarta', 'jogja', 'prambanan', 'malioboro'], last: 'An hour by road from Yogyakarta' },
+  { name: 'Mount Bromo', station: 'probolinggo', scene: 'volcano', country: 'id',
+    aka: ['bromo', 'cemoro lawang', 'sea of sand'], last: 'Jeep from Probolinggo to the rim' },
+  { name: 'Ijen blue fire', station: 'banyuwangi', scene: 'volcano', country: 'id',
+    aka: ['ijen', 'kawah ijen', 'banyuwangi'], last: 'Night jeep from Banyuwangi' },
+  { name: 'Ubud', station: 'denpasar', scene: 'paddy', country: 'id',
+    aka: ['bali', 'kuta', 'canggu', 'uluwatu', 'tanah lot', 'denpasar'], last: 'An hour inland from Denpasar' },
+  { name: 'Gili Trawangan', station: 'gili', scene: 'coast', country: 'id',
+    aka: ['gili islands', 'gili t'], last: null },
+  { name: 'Mount Rinjani', station: 'mataram', scene: 'volcano', country: 'id',
+    aka: ['rinjani', 'lombok', 'senaru'], last: 'Road to Senaru, then a two-day climb' },
+  { name: 'Lake Toba', station: 'medan', scene: 'volcano', country: 'id',
+    aka: ['toba', 'samosir', 'medan'], last: 'Four hours by road from Medan to Parapat' },
+  { name: 'Kota Tua, Jakarta', station: 'jakarta', scene: 'skyline', country: 'id',
+    aka: ['jakarta', 'old batavia'], last: 'Commuter train from Gambir' },
+  { name: 'Tangkuban Perahu', station: 'bandung', scene: 'volcano', country: 'id',
+    aka: ['bandung', 'tangkuban'], last: 'An hour north of Bandung' },
+  { name: 'Kraton and Solo batik', station: 'solo', scene: 'temple', country: 'id',
+    aka: ['solo', 'surakarta'], last: null },
+
+  // --- China
+  { name: 'Stone Forest', station: 'kunming', scene: 'karst', country: 'cn',
+    aka: ['kunming', 'shilin'], last: 'Ninety minutes by road from Kunming' },
+]
+
+/* When someone names a country rather than a place, aim at the station a
+ * traveller would actually be heading for. */
+const COUNTRY_HUB = {
+  th: 'bkk_aphiwat', la: 'vte_khamsavath', kh: 'phnompenh', vn: 'hanoi',
+  my: 'klsentral', sg: 'singapore', id: 'jakarta', cn: 'kunming', bn: 'bandarseri',
+}
