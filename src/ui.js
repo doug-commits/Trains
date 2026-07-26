@@ -111,6 +111,15 @@ const UI = (() => {
       .join('')}</div>`
   }
 
+  /* Long runs call at a dozen places; listing them all buries the useful ones. */
+  function viaLine(via) {
+    if (!via.length) return ''
+    const shown = via.slice(0, 6)
+    const rest = via.length - shown.length
+    const text = shown.join(' · ') + (rest ? ` · +${rest} more` : '')
+    return `<span class="via" title="${esc(via.join(' · '))}">via ${esc(text)}</span>`
+  }
+
   function routeTable(network, plan) {
     const rows = plan.legs
       .map((entry, i) => {
@@ -127,11 +136,7 @@ const UI = (() => {
               <span class="arrow" aria-hidden="true">→</span>
               <b>${esc(entry.toName)}</b>
               <span class="svc">${esc(leg.service)}${cls}</span>
-              ${
-                entry.via.length
-                  ? `<span class="via">via ${esc(entry.via.join(' · '))}</span>`
-                  : ''
-              }
+              ${viaLine(entry.via)}
               ${leg.note ? `<span class="leg-note">${esc(leg.note)}</span>` : ''}
             </td>
             <td class="op">

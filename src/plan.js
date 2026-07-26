@@ -57,6 +57,16 @@ const Plan = (() => {
       cost: '+1 day, ~$5',
       text: 'From Bangkok Thonburi via Kanchanaburi. The Wampo viaduct clinging to the cliff above the river is the reason to go.',
     },
+    semarang: {
+      title: 'Swap the north coast for Bandung and Yogyakarta',
+      cost: '+2 hours moving, +2 nights',
+      text: 'The router picked the north-coast line through Semarang because it is the quicker way across Java. The southern route — Whoosh to Bandung, then the Argo Wilis through the hills to Purwokerto and Yogyakarta — is slower, prettier, and puts you within reach of Borobudur and Prambanan. On a journey taken deliberately by land, that is usually the better trade.',
+    },
+    solo: {
+      title: 'Borobudur and Prambanan from Yogyakarta',
+      cost: '+2 nights',
+      text: 'You are already passing through. Yogyakarta is an hour back down the line from Solo and is the reason most people stop on Java at all.',
+    },
     banyuwangi: {
       title: 'Take the dawn crossing to Bali',
       cost: '+0 nights',
