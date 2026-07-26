@@ -127,6 +127,41 @@ const UI = (() => {
       .join('')}</div>`
   }
 
+  /* An operator plate: our own mark in the operator's approximate livery, not
+   * their logo. Legible on both grounds because it carries its own ink colour. */
+  function plate(op) {
+    return (
+      `<span class="plate" style="--livery:${esc(op.livery)};--plate-ink:${esc(op.ink)}" ` +
+      `aria-hidden="true">${esc(op.mono)}</span>`
+    )
+  }
+
+  const host = url => url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')
+
+  /* Operator first, always. An aggregator only appears where the operator
+   * genuinely cannot be booked from abroad, and never as an upsell over a
+   * working official site. */
+  function bookLine(network, op, mode) {
+    if (op.book) {
+      return (
+        `<a class="book-leg" href="${esc(op.book)}" target="_blank" rel="noopener noreferrer" ` +
+        `title="${esc(op.bookNote || '')}">Book with ${esc(op.short)}` +
+        `<span class="host">${esc(host(op.book))}</span></a>`
+      )
+    }
+    if (op.bookVia === 'aggregator') {
+      const agg = network.aggregators[0]
+      return (
+        `<span class="book-leg via" title="${esc(op.bookNote || '')}">No bookable site of its own — try ` +
+        `<a href="${esc(agg.url)}" target="_blank" rel="noopener noreferrer">${esc(agg.name)}</a>` +
+        `<span class="host">${esc(host(agg.url))}</span></span>`
+      )
+    }
+    const where =
+      mode === 'ferry' ? 'Pay at the pier' : mode === 'rail' ? 'Buy at the station' : 'Pay on the spot'
+    return `<span class="book-leg none" title="${esc(op.bookNote || '')}">${where}</span>`
+  }
+
   /* Long runs call at a dozen places; listing them all buries the useful ones. */
   function viaLine(via) {
     if (!via.length) return ''
@@ -144,6 +179,7 @@ const UI = (() => {
         const junction = plan.junctions.find(j => j.afterLeg === i)
         const cls = leg.cls ? `<span class="cls">${esc(leg.cls)}</span>` : ''
 
+        const op = entry.operator
         const main = `
           <tr class="leg" data-leg="${i}" tabindex="0">
             <td class="num"><span class="mode-dot ${leg.mode}" aria-hidden="true"></span>${i + 1}</td>
@@ -151,13 +187,15 @@ const UI = (() => {
               <b>${esc(entry.fromName)}</b>
               <span class="arrow" aria-hidden="true">→</span>
               <b>${esc(entry.toName)}</b>
+              <span class="opline">
+                ${plate(op)}
+                <span class="op-name">${esc(op.name)}</span>
+                <span class="tag ${conf.tone}" title="${esc(conf.title)}">${esc(conf.label)}</span>
+              </span>
               <span class="svc">${esc(leg.service)}${cls}</span>
               ${viaLine(entry.via)}
               ${leg.note ? `<span class="leg-note">${esc(leg.note)}</span>` : ''}
-            </td>
-            <td class="op">
-              <span class="op-name">${esc(entry.operator.short)}</span>
-              <span class="tag ${conf.tone}" title="${esc(conf.title)}">${esc(conf.label)}</span>
+              ${bookLine(network, op, leg.mode)}
             </td>
             <td class="dur num-col">${esc(hours(leg.hours))}</td>
             <td class="fare num-col">${esc(money(leg.usd ?? 0))}</td>
@@ -169,7 +207,7 @@ const UI = (() => {
           main +
           `<tr class="junction ${warn ? 'warn' : ''}">
             <td></td>
-            <td colspan="4">
+            <td colspan="3">
               <span class="j-label">Change at ${esc(junction.stationName)}</span>
               <span class="j-buffer">allow ${junction.minutes >= 120 ? `${(junction.minutes / 60).toFixed(junction.minutes % 60 ? 1 : 0)} h` : `${junction.minutes} min`} minimum</span>
               <span class="j-rule">${esc(junction.rule)}</span>
@@ -187,7 +225,7 @@ const UI = (() => {
         Take these legs to the booking sites below and read the real clock there.</p>
         <div class="table-wrap">
           <table class="route">
-            <thead><tr><th></th><th>Leg</th><th>Operator</th><th class="num-col">Time</th><th class="num-col">Fare</th></tr></thead>
+            <thead><tr><th></th><th>Leg &amp; operator</th><th class="num-col">Time</th><th class="num-col">Fare</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
@@ -265,35 +303,52 @@ const UI = (() => {
   }
 
   function bookingSection(network, plan) {
-    const items = plan.booking
-      .map(
-        (b, i) => `
-        <li>
-          <span class="rank">${i + 1}</span>
+    const scarce = plan.booking.filter(b => !b.other)
+    const rest = plan.booking.filter(b => b.other)
+
+    // The same operator can appear twice — a named scarce service and the
+    // operator itself. Say how to buy from them once.
+    const noteShown = new Set()
+    const row = (b, n) => {
+      const showNote = b.operator && b.operator.bookNote && !noteShown.has(b.op)
+      if (b.operator) noteShown.add(b.op)
+      return `
+        <li${b.other ? ' class="other"' : ''}>
+          <span class="rank">${b.other ? '·' : n}</span>
           <div>
-            <h3>${esc(b.service || b.operator.name)}</h3>
-            <p class="window">${esc(b.window)}</p>
-            <p>${esc(b.why)}</p>
-            ${
-              b.operator.book
-                ? `<a class="book" href="${esc(b.operator.book)}" target="_blank" rel="noopener noreferrer">${esc(
-                    new URL(b.operator.book).hostname.replace(/^www\./, '')
-                  )}</a>`
-                : '<span class="book none">Bought at the pier, or through a local agent</span>'
-            }
+            <h3>
+              ${b.operator ? plate(b.operator) : ''}
+              ${esc(b.service || (b.operator ? b.operator.name : MODE_LABEL[b.mode] + ' legs'))}
+            </h3>
+            ${b.window ? `<p class="window">${esc(b.window)}</p>` : ''}
+            ${b.why ? `<p>${esc(b.why)}</p>` : ''}
+            ${showNote ? `<p>${esc(b.operator.bookNote)}</p>` : ''}
+            ${b.operator ? bookLine(network, b.operator, null) : ''}
           </div>
         </li>`
-      )
-      .join('')
+    }
+
+    const items =
+      scarce.map((b, i) => row(b, i + 1)).join('') +
+      (rest.length
+        ? `<li class="divider"><span></span><p>Everything else on this route, in no
+           particular hurry:</p></li>` + rest.map(b => row(b, null)).join('')
+        : '')
 
     return `<section class="block"><h2>Booking sequence</h2>
       <p class="sub">Book in order of scarcity times window length, not in the order you travel.
       The shortest leg on the whole spine sells out first.</p>
       <ol class="booking">${items}</ol>
-      <p class="sub foot">Where an operator cannot be booked from abroad — LCR above all — an
-      aggregator such as 12Go or Baolau is the practical route in. They add a fee, and some sell
-      tickets they do not yet hold and buy them when inventory opens, which is a genuine cancellation
-      risk on a scarce sleeper. Prefer the operator wherever the operator actually works.</p>
+      <p class="sub foot">Where an operator cannot be booked from abroad — the Laos–China Railway
+      above all — an aggregator is the practical route in. They add a fee, and some sell tickets they
+      do not yet hold and buy them when inventory opens, which is a genuine cancellation risk on a
+      scarce sleeper. Prefer the operator wherever the operator actually works, which is most of the
+      time.</p>
+      <p class="sub disclosure"><b>No affiliate links.</b> Every link here goes straight to the
+      operator or aggregator and earns this project nothing. The operator's own site is listed first
+      because it is usually cheaper and always more reliable, not because of what it pays.
+      Booking URLs were last reviewed ${esc(network.reviewed)} and are not machine-checked — if one
+      is dead, search the operator name rather than trusting a reseller that ranks well.</p>
       </section>`
   }
 

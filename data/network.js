@@ -44,17 +44,107 @@ const NETWORK = {
       reality: 'There are two, 15 km apart, on different gauges, serving opposite directions. Always name which one.' },
   ],
 
+  /* ------------------------------------------------------------- operators
+   * `mono` and `livery` drive the operator plate shown against each leg. These
+   * are our own marks in each operator's approximate livery colour, NOT their
+   * logos — those are trademarks, and redistributing them inside a published
+   * page is not ours to do.
+   *
+   * `book` is the operator's own booking site where one genuinely exists and is
+   * usable from abroad. Where it does not, `book` is null and `bookNote` says
+   * how the ticket is actually bought. Never invent a URL to fill the column: a
+   * dead booking link is worse than an honest "buy it at the pier".
+   */
   operators: {
-    lcr:   { name: 'Laos–China Railway',      short: 'LCR',   gauge: 'standard', book: 'https://www.laoschinarailway.com', punctual: 'good',  note: 'Chinese-operated, keeps time. The risk is ticket availability, not delay.' },
-    cr:    { name: 'China Railway',           short: 'CR',    gauge: 'standard', book: 'https://www.12306.cn',              punctual: 'good',  note: '' },
-    srt:   { name: 'State Railway of Thailand', short: 'SRT', gauge: 'metre',    book: 'https://dticket.railway.co.th',     punctual: 'poor',  note: 'Long-distance services routinely run 30–90 min late. Southbound to Hat Yai is the worst offender.' },
-    ktmb:  { name: 'KTMB',                    short: 'KTMB',  gauge: 'metre',    book: 'https://online.ktmb.com.my',        punctual: 'good',  note: 'Genuinely punctual. You can plan to it.' },
-    rrc:   { name: 'Royal Railway Cambodia',  short: 'RRC',   gauge: 'metre',    book: 'https://www.royal-railway.com',     punctual: 'poor',  note: 'Limited frequency — often weekends plus selected days, not daily. Verify the train runs at all on your date.' },
-    dsvn:  { name: 'Vietnam Railways',        short: 'DSVN',  gauge: 'metre',    book: 'https://dsvn.vn',                   punctual: 'fair',  note: 'dsvn.vn is the genuine official site; several convincing lookalike domains are resellers.' },
-    kai:   { name: 'KAI (Indonesia)',         short: 'KAI',   gauge: 'metre',    book: 'https://booking.kai.id',            punctual: 'good',  note: 'The best rail in Southeast Asia — punctual, cheap, scenic.' },
-    ferry: { name: 'Ferry operator',          short: 'Ferry', gauge: null,       book: null,                                punctual: 'weather', note: 'Ferries are weather-cancelled rather than late. A cancellation costs a day.' },
-    road:  { name: 'Bus / taxi',              short: 'Road',  gauge: null,       book: null,                                punctual: 'fair',  note: '' },
+    // --- rail
+    lcr:   { name: 'Laos–China Railway', short: 'LCR', mono: 'LCR', livery: '#c8102e', ink: '#fff',
+             gauge: 'standard', punctual: 'good', book: null, bookVia: 'aggregator',
+             bookNote: 'Station counters and the Lao ticketing app. From abroad an agent or aggregator is the practical route in — this is the hardest ticket in the region to buy independently, and the sale window is short.',
+             note: 'Chinese-operated, keeps time. The risk is ticket availability, not delay.' },
+    srt:   { name: 'State Railway of Thailand', short: 'SRT', mono: 'SRT', livery: '#e4002b', ink: '#fff',
+             gauge: 'metre', punctual: 'poor', book: 'https://dticket.railway.co.th',
+             bookNote: 'The official e-ticket site. Foreign cards fail on it fairly often, and an aggregator is the usual fallback when they do.',
+             note: 'Long-distance services routinely run 30–90 min late. Southbound to Hat Yai is the worst offender.' },
+    ktmb:  { name: 'KTMB', short: 'KTMB', mono: 'KTM', livery: '#003da5', ink: '#fff',
+             gauge: 'metre', punctual: 'good', book: 'https://online.ktmb.com.my',
+             bookNote: 'Reliable and genuinely bookable from abroad. Use it directly rather than a reseller — you gain nothing by going through one.',
+             note: 'Genuinely punctual. You can plan to it.' },
+    rrc:   { name: 'Royal Railway Cambodia', short: 'Royal', mono: 'RRC', livery: '#b8912f', ink: '#1a1a1a',
+             gauge: 'metre', punctual: 'poor', book: 'https://www.royal-railway.com',
+             bookNote: 'Schedule changes are announced informally, often on Facebook rather than the site. Confirm the train runs on your date before you plan anything around it.',
+             note: 'Limited frequency — often weekends plus selected days, not daily.' },
+    dsvn:  { name: 'Vietnam Railways', short: 'DSVN', mono: 'DSVN', livery: '#0f6baf', ink: '#fff',
+             gauge: 'metre', punctual: 'fair', book: 'https://dsvn.vn',
+             bookNote: 'dsvn.vn is the genuine official site. Several convincing lookalike domains are resellers, so check the address bar before you pay.',
+             note: 'The private carriages attached to these trains — Livitrans, Violette, Lotus — are usually the better product.' },
+    kai:   { name: 'KAI', short: 'KAI', mono: 'KAI', livery: '#1b3a8c', ink: '#fff',
+             gauge: 'metre', punctual: 'good', book: 'https://booking.kai.id',
+             bookNote: 'Good site, bookable from abroad. The Access by KAI app is easier once you are in Indonesia.',
+             note: 'The best rail in Southeast Asia — punctual, cheap, scenic.' },
+
+    // --- sea
+    lomprayah:     { name: 'Lomprayah', short: 'Lomprayah', mono: 'LOM', livery: '#00868b', ink: '#fff',
+                     punctual: 'weather', book: 'https://www.lomprayah.com',
+                     bookNote: 'Sells combined train-plus-boat tickets from Bangkok, which removes the transfer problem entirely.',
+                     note: 'Catamarans, timed off the overnight trains into Chumphon.' },
+    rajaferry:     { name: 'Raja Ferry', short: 'Raja', mono: 'RAJA', livery: '#e07b28', ink: '#1a1a1a',
+                     punctual: 'weather', book: 'https://www.rajaferryport.com',
+                     bookNote: 'Vehicle ferry, frequent, rarely sold out. Combined train-bus-boat tickets are widely sold.', note: '' },
+    asdp:          { name: 'ASDP Indonesia Ferry', short: 'ASDP', mono: 'ASDP', livery: '#0e4c92', ink: '#fff',
+                     punctual: 'weather', book: 'https://ferizy.com',
+                     bookNote: 'Ferizy is ASDP\'s official booking platform. Crossings are frequent enough that walking up usually works too.', note: '' },
+    penangferry:   { name: 'Penang Ferry', short: 'Penang Ferry', mono: 'PGF', livery: '#4f7f3a', ink: '#fff',
+                     punctual: 'good', book: null, bookVia: 'counter',
+                     bookNote: 'Pay at the terminal beside Butterworth station. A few ringgit, no booking, no queue worth worrying about.', note: '' },
+    langkawiferry: { name: 'Langkawi ferry lines', short: 'Langkawi Ferry', mono: 'LGK', livery: '#1b7fa8', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     bookNote: 'Several small operators share these routes and their own sites come and go. An aggregator is the reliable way to see what is actually sailing on your date.', note: '' },
+    mekongboat:    { name: 'Mekong slow boat', short: 'Slow boat', mono: 'MEK', livery: '#8a6a3b', ink: '#fff',
+                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     bookNote: 'Bought through guesthouses and agents in Huay Xai, or an aggregator. Buy the day before — it leaves early and does not wait.', note: '' },
+    tonlesap:      { name: 'Tonlé Sap boat', short: 'Tonlé Sap', mono: 'TSB', livery: '#4e7a6b', ink: '#fff',
+                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     bookNote: 'Sold through guesthouses and aggregators. Only runs when the lake is high, roughly August to March.', note: '' },
+    speedferry:    { name: 'Speed Ferry Cambodia', short: 'Speed Ferry', mono: 'SFC', livery: '#2e7da8', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'counter', bookNote: 'Bought at the Sihanoukville pier or through your guesthouse.', note: '' },
+    hangchau:      { name: 'Hang Chau / Blue Cruiser', short: 'Mekong boat', mono: 'HC', livery: '#7a5c9e', ink: '#fff',
+                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     bookNote: 'Sold as a through ticket that includes the border formalities. Aggregators carry both operators.', note: '' },
+    riauferry:     { name: 'Riau / Straits ferries', short: 'Straits ferry', mono: 'RIAU', livery: '#3e7b8c', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     bookNote: 'Operators on the Straits routes change often. Check what is currently sailing before you commit to a date.', note: '' },
+    localferry:    { name: 'Local ferry', short: 'Local ferry', mono: 'FRY', livery: '#4b7c8c', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'counter',
+                     bookNote: 'Bought at the pier. Turn up, check the last departure when you arrive, and do not be the one still on the dock.', note: '' },
+
+    // --- road
+    greenbus:  { name: 'Green Bus', short: 'Green Bus', mono: 'GRN', livery: '#2e7d32', ink: '#fff',
+                 punctual: 'fair', book: 'https://www.greenbusthailand.com',
+                 bookNote: 'Northern Thailand\'s main intercity operator, bookable online and comfortable enough.', note: '' },
+    damri:     { name: 'Damri', short: 'Damri', mono: 'DMR', livery: '#c1272d', ink: '#fff',
+                 punctual: 'fair', book: 'https://damri.co.id',
+                 bookNote: 'Indonesia\'s state bus operator. Often sold as a through ticket with the ferry.', note: '' },
+    giantibis: { name: 'Giant Ibis', short: 'Giant Ibis', mono: 'GI', livery: '#6b4e3d', ink: '#fff',
+                 punctual: 'fair', book: 'https://www.giantibis.com',
+                 bookNote: 'Handles the border formalities as a group and is worth the small premium over the local buses.', note: '' },
+    coach:     { name: 'Long-distance coach', short: 'Coach', mono: 'BUS', livery: '#8c7b6b', ink: '#fff',
+                 punctual: 'fair', book: null, bookVia: 'aggregator',
+                 bookNote: 'Several operators run these corridors at varying quality. An aggregator is the sane way to compare them.', note: '' },
+    transfer:  { name: 'Local transfer', short: 'Transfer', mono: 'TRF', livery: '#6e828c', ink: '#fff',
+                 punctual: 'fair', book: null, bookVia: 'counter',
+                 bookNote: 'Taxi, tuk-tuk, songthaew or minivan at the station. Agree the fare before you get in.', note: '' },
+    metro:     { name: 'Urban metro', short: 'Metro', mono: 'MTR', livery: '#4a6b8a', ink: '#fff',
+                 punctual: 'good', book: null, bookVia: 'counter',
+                 bookNote: 'Contactless or a stored-value card at the station. Nothing to plan.', note: '' },
   },
+
+  /* Where the operator cannot be booked from abroad, these are the fallbacks.
+   * They are plain links — this project earns nothing from them, and if that
+   * ever changes it must be disclosed here and in the output. */
+  aggregators: [
+    { name: '12Go', url: 'https://12go.asia', note: 'Widest coverage in the region, including boats and minivans.' },
+    { name: 'Baolau', url: 'https://www.baolau.com', note: 'Stronger on Vietnamese and Cambodian rail.' },
+  ],
 
   /* ---------------------------------------------------------------- stations
    * gauge: which network the platform physically belongs to. Two stations in
@@ -300,7 +390,7 @@ const NETWORK = {
     { from: 'phonhong', to: 'vte_banthen', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
 
     // === The Vientiane gauge break =====================================
-    { from: 'vte_banthen', to: 'vte_khamsavath', mode: 'road', op: 'road', service: 'Taxi across Vientiane', hours: 0.75, usd: 12, essential: true, km: 15,
+    { from: 'vte_banthen', to: 'vte_khamsavath', mode: 'road', op: 'transfer', service: 'Taxi across Vientiane', hours: 0.75, usd: 12, essential: true, km: 15,
       confidence: 'structural',
       note: 'Two unconnected railways on two gauges, 15 km apart. There is no rail link and there will not be one soon. Expect a taxi queue when a full train empties out.' },
 
@@ -326,16 +416,16 @@ const NETWORK = {
     { from: 'lampang', to: 'chiangmai', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 2.5, usd: 7, scenic: true, confidence: 'reported' },
 
     // === Death Railway branch ==========================================
-    { from: 'bkk_aphiwat', to: 'bkk_thonburi', mode: 'road', op: 'road', service: 'Taxi / MRT across Bangkok', hours: 0.6, usd: 5, essential: true, confidence: 'structural' },
+    { from: 'bkk_aphiwat', to: 'bkk_thonburi', mode: 'road', op: 'transfer', service: 'Taxi / MRT across Bangkok', hours: 0.6, usd: 5, essential: true, confidence: 'structural' },
     { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, confidence: 'reported' },
     { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, confidence: 'reported',
       note: 'The Death Railway. The Wampo viaduct section is the reason to take it.' },
 
     // === SRT east — Cambodia ===========================================
-    { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'road', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
+    { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'metro', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
     { from: 'bkk_hualamphong', to: 'chachoengsao', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 1.5, usd: 0.6, cls: '3rd class fan', confidence: 'reported' },
     { from: 'chachoengsao', to: 'aranyaprathet', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 4, usd: 1.4, cls: '3rd class fan', confidence: 'reported' },
-    { from: 'aranyaprathet', to: 'poipet', mode: 'road', op: 'road', service: 'Tuk-tuk / on foot through the border complex', hours: 0.5, usd: 2, essential: true, border: 'poipet', confidence: 'structural' },
+    { from: 'aranyaprathet', to: 'poipet', mode: 'road', op: 'transfer', service: 'Tuk-tuk / on foot through the border complex', hours: 0.5, usd: 2, essential: true, border: 'poipet', confidence: 'structural' },
     { from: 'poipet', to: 'sisophon', mode: 'rail', op: 'rrc', service: 'Royal Railway northern line', hours: 1, usd: 1.5, confidence: 'verify',
       note: 'Verify the train runs at all on your date — frequency is often weekends plus selected days.' },
     { from: 'sisophon', to: 'battambang', mode: 'rail', op: 'rrc', service: 'Royal Railway northern line', hours: 3, usd: 4.5, confidence: 'verify' },
@@ -344,7 +434,7 @@ const NETWORK = {
     { from: 'phnompenh', to: 'takeo', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 1.5, usd: 3, confidence: 'verify' },
     { from: 'takeo', to: 'kampot', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 2.5, usd: 4, confidence: 'verify' },
     { from: 'kampot', to: 'sihanoukville', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 2.0, usd: 4, scenic: true, confidence: 'verify' },
-    { from: 'phnompenh', to: 'saigon', mode: 'road', op: 'road', service: 'Giant Ibis / Mekong Express coach', hours: 7.0, usd: 15, border: 'bavet', confidence: 'reported',
+    { from: 'phnompenh', to: 'saigon', mode: 'road', op: 'giantibis', service: 'Giant Ibis / Mekong Express coach', hours: 7.0, usd: 15, border: 'bavet', confidence: 'reported',
       note: 'No railway exists on this corridor and none is under construction. This is a bus, and calling it anything else would be dishonest.' },
 
     // === SRT south =====================================================
@@ -359,16 +449,16 @@ const NETWORK = {
     { from: 'hatyai', to: 'sungaikolok', mode: 'rail', op: 'srt', service: 'Rapid / Ordinary', hours: 4.0, usd: 6, advisory: 'deepsouth', confidence: 'reported' },
 
     // === Thai island branches ==========================================
-    { from: 'suratthani', to: 'donsak', mode: 'road', op: 'road', service: 'Connecting bus from Phun Phin station', hours: 1.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'donsak', to: 'kohsamui', mode: 'ferry', op: 'ferry', service: 'Raja / Seatran vehicle ferry', hours: 1.5, usd: 6, seasonal: 'gulf', confidence: 'reported',
+    { from: 'suratthani', to: 'donsak', mode: 'road', op: 'transfer', service: 'Connecting bus from Phun Phin station', hours: 1.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'donsak', to: 'kohsamui', mode: 'ferry', op: 'rajaferry', service: 'Raja / Seatran vehicle ferry', hours: 1.5, usd: 6, seasonal: 'gulf', confidence: 'reported',
       note: 'Combined train + bus + ferry tickets are widely sold and remove most of the friction.' },
-    { from: 'trang', to: 'kohlanta', mode: 'ferry', op: 'ferry', service: 'Minivan to pier, then ferry', hours: 3.0, usd: 15, seasonal: 'andaman', confidence: 'verify' },
-    { from: 'chumphon', to: 'ranong', mode: 'road', op: 'road', service: 'Local bus', hours: 3.0, usd: 5, confidence: 'reported' },
-    { from: 'ranong', to: 'kawthaung', mode: 'ferry', op: 'ferry', service: 'Longtail across the estuary', hours: 0.75, usd: 10, advisory: 'myanmar', confidence: 'verify' },
+    { from: 'trang', to: 'kohlanta', mode: 'ferry', op: 'localferry', service: 'Minivan to pier, then ferry', hours: 3.0, usd: 15, seasonal: 'andaman', confidence: 'verify' },
+    { from: 'chumphon', to: 'ranong', mode: 'road', op: 'coach', service: 'Local bus', hours: 3.0, usd: 5, confidence: 'reported' },
+    { from: 'ranong', to: 'kawthaung', mode: 'ferry', op: 'localferry', service: 'Longtail across the estuary', hours: 0.75, usd: 10, advisory: 'myanmar', confidence: 'verify' },
 
     // === Thailand ↔ Malaysia east coast ================================
-    { from: 'sungaikolok', to: 'rantaupanjang', mode: 'road', op: 'road', service: 'On foot across the frontier bridge', hours: 0.5, usd: 1, essential: true, border: 'sungaikolok', advisory: 'deepsouth', confidence: 'structural' },
-    { from: 'rantaupanjang', to: 'wakafbaharu', mode: 'road', op: 'road', service: 'Local taxi / bus', hours: 0.75, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'sungaikolok', to: 'rantaupanjang', mode: 'road', op: 'transfer', service: 'On foot across the frontier bridge', hours: 0.5, usd: 1, essential: true, border: 'sungaikolok', advisory: 'deepsouth', confidence: 'structural' },
+    { from: 'rantaupanjang', to: 'wakafbaharu', mode: 'road', op: 'transfer', service: 'Local taxi / bus', hours: 0.75, usd: 6, essential: true, confidence: 'reported' },
     { from: 'wakafbaharu', to: 'dabong', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 3, usd: 2.5, scenic: true, confidence: 'reported' },
     { from: 'dabong', to: 'guamusang', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 2, usd: 2, scenic: true, confidence: 'reported' },
     { from: 'guamusang', to: 'kualalipis', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 2, usd: 1.5, scenic: true, confidence: 'reported' },
@@ -395,39 +485,39 @@ const NETWORK = {
     { from: 'klsentral', to: 'portklang', mode: 'rail', op: 'ktmb', service: 'KTM Komuter', hours: 1.2, usd: 2, confidence: 'reported' },
 
     // === Malaysian sea branches ========================================
-    { from: 'butterworth', to: 'georgetown', mode: 'ferry', op: 'ferry', service: 'Penang ferry', hours: 0.25, usd: 1, essential: true, scenic: true, confidence: 'structural',
+    { from: 'butterworth', to: 'georgetown', mode: 'ferry', op: 'penangferry', service: 'Penang ferry', hours: 0.25, usd: 1, essential: true, scenic: true, confidence: 'structural',
       note: 'Berths beside the KTMB station. Take it over the bridge bus every time — the approach to George Town by water is one of the better moments on the whole spine.' },
-    { from: 'arau', to: 'kualaperlis', mode: 'road', op: 'road', service: 'Taxi from Arau station', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'kualaperlis', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Langkawi fast ferry', hours: 1.25, usd: 5, seasonal: 'andaman', confidence: 'reported',
+    { from: 'arau', to: 'kualaperlis', mode: 'road', op: 'transfer', service: 'Taxi from Arau station', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'kualaperlis', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Langkawi fast ferry', hours: 1.25, usd: 5, seasonal: 'andaman', confidence: 'reported',
       note: 'Puts a genuine rest day right at the Thai–Malaysian border, which is exactly where a long spine journey needs one.' },
-    { from: 'tampin', to: 'melaka', mode: 'road', op: 'road', service: 'Bus / taxi from Pulau Sebang', hours: 0.75, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'tampin', to: 'melaka', mode: 'road', op: 'transfer', service: 'Bus / taxi from Pulau Sebang', hours: 0.75, usd: 5, essential: true, confidence: 'reported' },
 
     // === Malaysia ↔ Singapore ==========================================
     { from: 'jbsentral', to: 'woodlands', mode: 'rail', op: 'ktmb', service: 'Shuttle Tebrau', hours: 0.1, usd: 1.2, border: 'woodlands', confidence: 'structural',
       note: 'Five minutes of track and the most reliably sold-out service in Southeast Asia. Book it the instant the window opens.' },
-    { from: 'woodlands', to: 'singapore', mode: 'road', op: 'road', service: 'MRT Thomson–East Coast Line', hours: 0.5, usd: 1.5, essential: true, confidence: 'structural' },
+    { from: 'woodlands', to: 'singapore', mode: 'road', op: 'metro', service: 'MRT Thomson–East Coast Line', hours: 0.5, usd: 1.5, essential: true, confidence: 'structural' },
 
     // === Singapore / Malaysia ↔ Indonesia ==============================
-    { from: 'singapore', to: 'batam', mode: 'ferry', op: 'ferry', service: 'HarbourFront or Tanah Merah fast ferry', hours: 1.0, usd: 18, border: 'batam', confidence: 'reported',
+    { from: 'singapore', to: 'batam', mode: 'ferry', op: 'riauferry', service: 'HarbourFront or Tanah Merah fast ferry', hours: 1.0, usd: 18, border: 'batam', confidence: 'reported',
       note: 'This is how you get past Singapore\'s dead end. Full immigration both ends.' },
-    { from: 'batam', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Riau inter-island ferry', hours: 6.0, usd: 30, confidence: 'verify',
+    { from: 'batam', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Riau inter-island ferry', hours: 6.0, usd: 30, confidence: 'verify',
       note: 'Schedules and operators on the Riau routes change often. Verify before you rely on it.' },
-    { from: 'melaka', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Melaka–Dumai international ferry', hours: 3.0, usd: 40, border: 'dumai', confidence: 'verify',
+    { from: 'melaka', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Melaka–Dumai international ferry', hours: 3.0, usd: 40, border: 'dumai', confidence: 'verify',
       note: 'The elegant Malaysia→Sumatra continuation when it runs — but this route has suspended and resumed repeatedly. Verify, and have the Batam routing as fallback.' },
-    { from: 'portklang', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Port Klang–Dumai international ferry', hours: 5.0, usd: 45, border: 'dumai', confidence: 'verify' },
-    { from: 'georgetown', to: 'belawan', mode: 'ferry', op: 'ferry', service: 'Penang–Belawan ferry', hours: 5.0, usd: 50, border: 'belawan', confidence: 'verify',
+    { from: 'portklang', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Port Klang–Dumai international ferry', hours: 5.0, usd: 45, border: 'dumai', confidence: 'verify' },
+    { from: 'georgetown', to: 'belawan', mode: 'ferry', op: 'riauferry', service: 'Penang–Belawan ferry', hours: 5.0, usd: 50, border: 'belawan', confidence: 'verify',
       note: 'Historically operated, intermittent. When running it shortcuts the whole peninsula.' },
 
     // === Sumatra =======================================================
-    { from: 'belawan', to: 'medan', mode: 'road', op: 'road', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'medan', to: 'pekanbaru', mode: 'road', op: 'road', service: 'Long-distance coach', hours: 14.0, usd: 20, confidence: 'reported',
+    { from: 'belawan', to: 'medan', mode: 'road', op: 'transfer', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'medan', to: 'pekanbaru', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 14.0, usd: 20, confidence: 'reported',
       note: 'North Sumatra\'s railway does not reach south Sumatra\'s. This gap is road, and it is the least pleasant day of any Singapore–Bali itinerary.' },
-    { from: 'dumai', to: 'pekanbaru', mode: 'road', op: 'road', service: 'Coach', hours: 3.0, usd: 8, confidence: 'reported' },
-    { from: 'pekanbaru', to: 'palembang', mode: 'road', op: 'road', service: 'Long-distance coach', hours: 12.0, usd: 20, confidence: 'reported' },
+    { from: 'dumai', to: 'pekanbaru', mode: 'road', op: 'coach', service: 'Coach', hours: 3.0, usd: 8, confidence: 'reported' },
+    { from: 'pekanbaru', to: 'palembang', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 12.0, usd: 20, confidence: 'reported' },
     { from: 'palembang', to: 'bandarlampung', mode: 'rail', op: 'kai', service: 'Rajabasa / Sriwijaya', hours: 9.0, usd: 8, sleeper: true, confidence: 'reported',
       note: 'South Sumatra\'s isolated network. Pleasant, and a relief after the coaches.' },
-    { from: 'bandarlampung', to: 'bakauheni', mode: 'road', op: 'road', service: 'Damri bus', hours: 2.0, usd: 4, essential: true, confidence: 'reported' },
-    { from: 'bakauheni', to: 'merak', mode: 'ferry', op: 'ferry', service: 'ASDP ferry', hours: 2.0, usd: 1.5, essential: true, confidence: 'reported',
+    { from: 'bandarlampung', to: 'bakauheni', mode: 'road', op: 'damri', service: 'Damri bus', hours: 2.0, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'bakauheni', to: 'merak', mode: 'ferry', op: 'asdp', service: 'ASDP ferry', hours: 2.0, usd: 1.5, essential: true, confidence: 'reported',
       note: 'Very frequent, around the clock. Usually taken as a through bus-plus-ferry ticket.' },
 
     // === Java ==========================================================
@@ -441,12 +531,12 @@ const NETWORK = {
     { from: 'surabaya', to: 'probolinggo', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 3, confidence: 'reported' },
     { from: 'probolinggo', to: 'jember', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2.5, usd: 3, scenic: true, confidence: 'reported' },
     { from: 'jember', to: 'banyuwangi', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 2, scenic: true, confidence: 'reported' },
-    { from: 'banyuwangi', to: 'gilimanuk', mode: 'ferry', op: 'ferry', service: 'ASDP Ketapang–Gilimanuk', hours: 0.75, usd: 1, essential: true, confidence: 'structural',
+    { from: 'banyuwangi', to: 'gilimanuk', mode: 'ferry', op: 'asdp', service: 'ASDP Ketapang–Gilimanuk', hours: 0.75, usd: 1, essential: true, confidence: 'structural',
       note: 'Runs around the clock, pier beside the station. The dawn crossing is the one people remember.' },
-    { from: 'gilimanuk', to: 'denpasar', mode: 'road', op: 'road', service: 'Bus / private car', hours: 4.0, usd: 10, essential: true, confidence: 'reported' },
+    { from: 'gilimanuk', to: 'denpasar', mode: 'road', op: 'transfer', service: 'Bus / private car', hours: 4.0, usd: 10, essential: true, confidence: 'reported' },
 
     // === Vietnam =======================================================
-    { from: 'vte_khamsavath', to: 'hanoi', mode: 'road', op: 'road', service: 'Sleeper coach via Nam Phao / Cau Treo', hours: 20.0, usd: 30, border: 'namphao', confidence: 'reported',
+    { from: 'vte_khamsavath', to: 'hanoi', mode: 'road', op: 'coach', service: 'Sleeper coach via Nam Phao / Cau Treo', hours: 20.0, usd: 30, border: 'namphao', confidence: 'reported',
       note: 'There is no railway between Laos and Vietnam. None is built and none is imminent. This is a twenty-hour bus and it should be planned as one — the coach leaves from Vientiane\'s bus terminal, not from either railway station.' },
     { from: 'hanoi', to: 'ninhbinh', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 2, usd: 4, confidence: 'reported' },
     { from: 'ninhbinh', to: 'thanhhoa', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 1.5, usd: 3, confidence: 'reported' },
@@ -473,58 +563,58 @@ const NETWORK = {
     { from: 'surabaya', to: 'malang', mode: 'rail', op: 'kai', service: 'KAI (Surabaya – Malang)', hours: 2, usd: 4, scenic: true, confidence: 'reported' },
 
     // === Mekong slow boat ==============================================
-    { from: 'chiangmai', to: 'chiangkhong', mode: 'road', op: 'road', service: 'Green Bus via Chiang Rai', hours: 6, usd: 12, essential: true, confidence: 'reported' },
-    { from: 'chiangkhong', to: 'huayxai', mode: 'road', op: 'road', service: 'Shuttle over the Fourth Thai–Lao Friendship Bridge', hours: 0.5, usd: 2, essential: true, border: 'huayxai', confidence: 'structural' },
-    { from: 'huayxai', to: 'pakbeng', mode: 'ferry', op: 'ferry', service: 'Mekong slow boat (day 1)', hours: 6, usd: 15, scenic: true, confidence: 'reported',
+    { from: 'chiangmai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus via Chiang Rai', hours: 6, usd: 12, essential: true, confidence: 'reported' },
+    { from: 'chiangkhong', to: 'huayxai', mode: 'road', op: 'transfer', service: 'Shuttle over the Fourth Thai–Lao Friendship Bridge', hours: 0.5, usd: 2, essential: true, border: 'huayxai', confidence: 'structural' },
+    { from: 'huayxai', to: 'pakbeng', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 1)', hours: 6, usd: 15, scenic: true, confidence: 'reported',
       note: 'Two days downriver with a night at Pakbeng. The speedboat alternative does it in one day and has a genuinely bad safety record — take the slow boat.' },
-    { from: 'pakbeng', to: 'luangprabang', mode: 'ferry', op: 'ferry', service: 'Mekong slow boat (day 2)', hours: 8, usd: 15, scenic: true, confidence: 'reported' },
+    { from: 'pakbeng', to: 'luangprabang', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 2)', hours: 8, usd: 15, scenic: true, confidence: 'reported' },
 
     // === Gulf of Thailand islands ======================================
-    { from: 'chumphon', to: 'kohtao', mode: 'ferry', op: 'ferry', service: 'Lomprayah / Songserm catamaran', hours: 1.75, usd: 17, seasonal: 'gulf', confidence: 'reported',
+    { from: 'chumphon', to: 'kohtao', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah / Songserm catamaran', hours: 1.75, usd: 17, seasonal: 'gulf', confidence: 'reported',
       note: 'The pier is at Thung Makham Noi, a short transfer from Chumphon station, and the boats are timed off the overnight trains from Bangkok.' },
-    { from: 'kohtao', to: 'kohphangan', mode: 'ferry', op: 'ferry', service: 'Lomprayah catamaran', hours: 1.5, usd: 12, seasonal: 'gulf', scenic: true, confidence: 'reported' },
-    { from: 'kohphangan', to: 'kohsamui', mode: 'ferry', op: 'ferry', service: 'Lomprayah / Raja ferry', hours: 0.5, usd: 9, seasonal: 'gulf', confidence: 'reported' },
+    { from: 'kohtao', to: 'kohphangan', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah catamaran', hours: 1.5, usd: 12, seasonal: 'gulf', scenic: true, confidence: 'reported' },
+    { from: 'kohphangan', to: 'kohsamui', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah / Raja ferry', hours: 0.5, usd: 9, seasonal: 'gulf', confidence: 'reported' },
 
     // === Andaman islands ===============================================
-    { from: 'trang', to: 'krabi', mode: 'road', op: 'road', service: 'Minivan', hours: 2, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'krabi', to: 'kohphiphi', mode: 'ferry', op: 'ferry', service: 'Andaman Wave / Ao Nang Princess', hours: 2, usd: 14, seasonal: 'andaman', scenic: true, confidence: 'reported' },
-    { from: 'kohphiphi', to: 'kohlanta', mode: 'ferry', op: 'ferry', service: 'Island-hopper ferry', hours: 1.5, usd: 12, seasonal: 'andaman', confidence: 'verify',
+    { from: 'trang', to: 'krabi', mode: 'road', op: 'transfer', service: 'Minivan', hours: 2, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'krabi', to: 'kohphiphi', mode: 'ferry', op: 'localferry', service: 'Andaman Wave / Ao Nang Princess', hours: 2, usd: 14, seasonal: 'andaman', scenic: true, confidence: 'reported' },
+    { from: 'kohphiphi', to: 'kohlanta', mode: 'ferry', op: 'localferry', service: 'Island-hopper ferry', hours: 1.5, usd: 12, seasonal: 'andaman', confidence: 'verify',
       note: 'Runs in high season only. Out of season the connection is back via Krabi by road.' },
-    { from: 'kohphiphi', to: 'phuket', mode: 'ferry', op: 'ferry', service: 'Phi Phi – Rassada ferry', hours: 2, usd: 14, seasonal: 'andaman', confidence: 'reported' },
+    { from: 'kohphiphi', to: 'phuket', mode: 'ferry', op: 'localferry', service: 'Phi Phi – Rassada ferry', hours: 2, usd: 14, seasonal: 'andaman', confidence: 'reported' },
 
     // === Thailand ↔ Malaysia by sea ====================================
-    { from: 'hatyai', to: 'satun', mode: 'road', op: 'road', service: 'Minivan to Tammalang pier', hours: 2, usd: 7, essential: true, confidence: 'reported' },
-    { from: 'satun', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Tammalang – Kuah international ferry', hours: 1.5, usd: 12, border: 'satun', seasonal: 'andaman', confidence: 'verify',
+    { from: 'hatyai', to: 'satun', mode: 'road', op: 'transfer', service: 'Minivan to Tammalang pier', hours: 2, usd: 7, essential: true, confidence: 'reported' },
+    { from: 'satun', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Tammalang – Kuah international ferry', hours: 1.5, usd: 12, border: 'satun', seasonal: 'andaman', confidence: 'verify',
       note: 'A sea border, and the one way to reach Malaysia from Thailand without touching Padang Besar. Sailings are few per day and stop early — missing the last one strands you in Satun.' },
 
     // === More Langkawi piers ===========================================
-    { from: 'alorsetar', to: 'kualakedah', mode: 'road', op: 'road', service: 'Taxi from Alor Setar station', hours: 0.4, usd: 4, essential: true, confidence: 'reported' },
-    { from: 'kualakedah', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Kuala Kedah – Kuah ferry', hours: 1.75, usd: 6, seasonal: 'andaman', confidence: 'reported' },
-    { from: 'georgetown', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Penang – Langkawi ferry', hours: 2.75, usd: 18, seasonal: 'andaman', confidence: 'verify',
+    { from: 'alorsetar', to: 'kualakedah', mode: 'road', op: 'transfer', service: 'Taxi from Alor Setar station', hours: 0.4, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'kualakedah', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Kuala Kedah – Kuah ferry', hours: 1.75, usd: 6, seasonal: 'andaman', confidence: 'reported' },
+    { from: 'georgetown', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Penang – Langkawi ferry', hours: 2.75, usd: 18, seasonal: 'andaman', confidence: 'verify',
       note: 'Operates seasonally and has suspended before. Verify it is running rather than assuming it.' },
 
     // === Cambodia: Angkor, the Tonlé Sap and the islands ===============
-    { from: 'sisophon', to: 'siemreap', mode: 'road', op: 'road', service: 'Bus / shared taxi', hours: 2, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'phnompenh', to: 'siemreap', mode: 'ferry', op: 'ferry', service: 'Tonlé Sap fast boat', hours: 6, usd: 35, scenic: true, confidence: 'verify',
+    { from: 'sisophon', to: 'siemreap', mode: 'road', op: 'transfer', service: 'Bus / shared taxi', hours: 2, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'phnompenh', to: 'siemreap', mode: 'ferry', op: 'tonlesap', service: 'Tonlé Sap fast boat', hours: 6, usd: 35, scenic: true, confidence: 'verify',
       note: 'Only runs when the lake is high, roughly August to March, and it is a hot crowded six hours. People take it for the floating villages, not the comfort.' },
-    { from: 'sihanoukville', to: 'kohrong', mode: 'ferry', op: 'ferry', service: 'Speed Ferry Cambodia', hours: 0.75, usd: 12, scenic: true, confidence: 'reported' },
+    { from: 'sihanoukville', to: 'kohrong', mode: 'ferry', op: 'speedferry', service: 'Speed Ferry Cambodia', hours: 0.75, usd: 12, scenic: true, confidence: 'reported' },
 
     // === Vietnam by water ==============================================
-    { from: 'haiphong', to: 'catba', mode: 'ferry', op: 'ferry', service: 'Cát Bà fast ferry', hours: 1, usd: 10, scenic: true, confidence: 'reported',
+    { from: 'haiphong', to: 'catba', mode: 'ferry', op: 'localferry', service: 'Cát Bà fast ferry', hours: 1, usd: 10, scenic: true, confidence: 'reported',
       note: 'The practical way into Hạ Long Bay from the railway, rather than a coach from Hanoi.' },
-    { from: 'saigon', to: 'chaudoc', mode: 'road', op: 'road', service: 'Coach into the Mekong Delta', hours: 6, usd: 12, confidence: 'reported' },
-    { from: 'chaudoc', to: 'phnompenh', mode: 'ferry', op: 'ferry', service: 'Mekong river boat (Hang Chau / Blue Cruiser)', hours: 5, usd: 35, border: 'chaudoc', scenic: true, confidence: 'verify',
+    { from: 'saigon', to: 'chaudoc', mode: 'road', op: 'coach', service: 'Coach into the Mekong Delta', hours: 6, usd: 12, confidence: 'reported' },
+    { from: 'chaudoc', to: 'phnompenh', mode: 'ferry', op: 'hangchau', service: 'Mekong river boat (Hang Chau / Blue Cruiser)', hours: 5, usd: 35, border: 'chaudoc', scenic: true, confidence: 'verify',
       note: 'The only Vietnam–Cambodia crossing that is not a road. Immigration happens on the riverbank at Vĩnh Xương and Kaam Samnor while the boat waits.' },
 
     // === Sabah ↔ Brunei ================================================
-    { from: 'kotakinabalu', to: 'labuan', mode: 'ferry', op: 'ferry', service: 'Labuan express ferry', hours: 3, usd: 15, confidence: 'reported' },
-    { from: 'labuan', to: 'bandarseri', mode: 'ferry', op: 'ferry', service: 'Labuan – Muara ferry', hours: 1.5, usd: 12, border: 'brunei', confidence: 'verify' },
+    { from: 'kotakinabalu', to: 'labuan', mode: 'ferry', op: 'localferry', service: 'Labuan express ferry', hours: 3, usd: 15, confidence: 'reported' },
+    { from: 'labuan', to: 'bandarseri', mode: 'ferry', op: 'localferry', service: 'Labuan – Muara ferry', hours: 1.5, usd: 12, border: 'brunei', confidence: 'verify' },
 
     // === Bali onward ===================================================
-    { from: 'denpasar', to: 'padangbai', mode: 'road', op: 'road', service: 'Shuttle to the port', hours: 1.5, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'padangbai', to: 'mataram', mode: 'ferry', op: 'ferry', service: 'ASDP Padangbai – Lembar', hours: 4.5, usd: 4, scenic: true, confidence: 'reported',
+    { from: 'denpasar', to: 'padangbai', mode: 'road', op: 'transfer', service: 'Shuttle to the port', hours: 1.5, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'padangbai', to: 'mataram', mode: 'ferry', op: 'asdp', service: 'ASDP Padangbai – Lembar', hours: 4.5, usd: 4, scenic: true, confidence: 'reported',
       note: 'Slow, cheap and rolls in the strait. The tourist fast boats do it in under two hours from Padangbai or Serangan.' },
-    { from: 'mataram', to: 'gili', mode: 'ferry', op: 'ferry', service: 'Bangsal – Gili public boat', hours: 0.75, usd: 3, scenic: true, confidence: 'reported' },
+    { from: 'mataram', to: 'gili', mode: 'ferry', op: 'localferry', service: 'Bangsal – Gili public boat', hours: 0.75, usd: 3, scenic: true, confidence: 'reported' },
 
     // === Sabah (isolated) ==============================================
     { from: 'kotakinabalu', to: 'tenom', mode: 'rail', op: 'ktmb', service: 'Sabah State Railway', hours: 2.5, usd: 5, scenic: true, confidence: 'reported' },
@@ -719,6 +809,7 @@ const NETWORK = {
     { op: 'rrc', service: null, rank: 5, window: 'Limited and short', why: 'Verify the train runs at all on your date before anything else.' },
     { op: 'kai', service: null, rank: 6, window: '~45 days', why: 'Plentiful, but the Bandung and Yogyakarta services fill at weekends.' },
     { op: 'ktmb', service: null, rank: 7, window: '~30 days, extended to ~6 months around major festivals', why: 'ETS is plentiful outside festival periods.' },
-    { op: 'ferry', service: null, rank: 8, window: 'Mostly turn-up-and-go', why: 'Langkawi and Samui routes are worth pre-booking in season.' },
+    { mode: 'ferry', rank: 8, window: 'Mostly turn-up-and-go', why: 'Langkawi and Samui routes are worth pre-booking in season, and the Mekong slow boat the day before you sail.' },
+    { mode: 'road', rank: 9, window: 'Walk-up, except the long coaches', why: 'The Vientiane–Hanoi sleeper coach and the Sumatra runs are worth a day or two ahead.' },
   ],
 }

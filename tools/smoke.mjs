@@ -93,6 +93,15 @@ function check(label, condition, detail = '') {
   check('Vientiane gauge break surfaced', /15 km/.test(padang))
   check('booking sequence present', (await page.locator('.booking li').count()) > 0)
 
+  // Every leg must offer some route to a ticket: an operator link, an
+  // aggregator fallback, or an honest "pay at the counter".
+  const bookless = await page.evaluate(
+    () => [...document.querySelectorAll('tr.leg')].filter(r => !r.querySelector('.book-leg')).length
+  )
+  check('every leg has a way to book it', bookless === 0, `${bookless} without`)
+  check('operator plates render', (await page.locator('tr.leg .plate').count()) === legs)
+  check('no affiliate links claimed', /No affiliate links/.test(await page.textContent('#panel')))
+
   // Nothing may overflow the panel horizontally.
   const overflow = await page.evaluate(() => {
     const p = document.querySelector('#panel')

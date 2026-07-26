@@ -73,7 +73,7 @@ src/shell.html       Markup.
 tools/               Build and data-generation scripts.
 ```
 
-### Two ideas worth knowing before you edit
+### Three ideas worth knowing before you edit
 
 **A leg is one vehicle, not one hop.** The graph stores station-to-station
 segments; `mergeSegments` in `src/plan.js` collapses consecutive segments that
@@ -92,6 +92,24 @@ sends someone eight hundred kilometres the wrong way down a railway to dodge a
 two-hour minivan. `essential` legs also survive hard rail-only mode, for the
 same reason: excluding them would not route around the gap, it would just make
 the journey impossible.
+
+**Operator first, never an affiliate.** Every leg carries a booking route, and
+`bookLine` in `src/ui.js` resolves it in one order: the operator's own site if
+one genuinely exists and works from abroad, an aggregator only where it does
+not, and an honest "pay at the pier" where there is nothing to book. There are
+no affiliate links in this project and the output says so. If that ever changes
+it has to be disclosed in the page, not just in a commit message.
+
+`operators` in `data/network.js` covers named ferry and bus companies as well as
+the railways — Lomprayah, ASDP, Giant Ibis, Green Bus and so on — because
+"Ferry" in an operator column tells a traveller nothing. Each carries a `mono`
+and a `livery` colour that render as a plate beside the leg. **These are our own
+marks, not the operators' logos**: the logos are trademarks and redistributing
+them inside a published page is not ours to do.
+
+Never invent a booking URL to fill the column. `book: null` with a `bookNote`
+saying how the ticket is really bought is worth more than a link that 404s, and
+the smoke test enforces that every leg resolves to one of the three outcomes.
 
 ---
 

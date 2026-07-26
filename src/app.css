@@ -931,3 +931,99 @@ table { width: 100%; border-collapse: collapse; }
   letter-spacing: 0.02em;
   color: var(--muted);
 }
+
+/* ------------------------------------------------- operators and booking */
+
+/* Our own mark in the operator's livery, not their logo. It carries its own
+   ink colour so it stays legible on either ground. */
+.plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.15rem;
+  padding: 0.06rem 0.3rem;
+  background: var(--livery);
+  color: var(--plate-ink);
+  border-radius: 2px;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+  vertical-align: 0.05rem;
+  flex: none;
+}
+
+.opline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.opline .op-name {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.opline .tag { margin-top: 0; }
+
+.book-leg {
+  display: block;
+  margin-top: 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rail);
+  text-decoration: none;
+}
+.book-leg:hover { text-decoration: underline; text-underline-offset: 2px; }
+.book-leg .host {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+/* No direct site, or nothing to book — say so rather than showing a dead link. */
+.book-leg.none,
+.book-leg.via {
+  font-weight: 500;
+  color: var(--muted);
+}
+.book-leg.via a { color: var(--rail); font-weight: 600; }
+
+.booking li.divider {
+  display: block;
+  padding: 1.1rem 0 0.2rem;
+  border-bottom: none;
+}
+.booking li.divider p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.booking li.other .rank { color: var(--muted); }
+.booking h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.booking .book-leg { margin-top: 0.5rem; }
+
+.disclosure {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--raise);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  font-size: 0.86rem;
+}
+.disclosure b { font-family: var(--sans); color: var(--ink-soft); }

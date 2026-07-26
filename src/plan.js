@@ -381,15 +381,30 @@ const Plan = (() => {
   /* ------------------------------------------------------- booking order */
   function bookingOrder(network, legs) {
     const usedOps = new Set(legs.map(e => e.leg.op))
+    const usedModes = new Set(legs.map(e => e.leg.mode))
     const usedServices = new Set(legs.map(e => e.leg.service))
     const out = []
 
     for (const item of network.scarcity) {
-      if (!usedOps.has(item.op)) continue
+      // Rows key on either a specific operator or a whole mode.
+      if (item.op && !usedOps.has(item.op)) continue
+      if (item.mode && !usedModes.has(item.mode)) continue
+      // A row about booking coaches ahead is noise on a route whose only road
+      // leg is a metro ride to the hotel.
+      if (item.mode === 'road' && !legs.some(e => e.leg.mode === 'road' && !e.leg.essential)) continue
       if (item.service && ![...usedServices].some(s => s && s.includes(item.service))) continue
-      out.push({ ...item, operator: network.operators[item.op] })
+      out.push({ ...item, operator: item.op ? network.operators[item.op] : null })
     }
-    return out.sort((a, b) => a.rank - b.rank)
+
+    // Everything else the traveller has to buy, so no leg is left without a
+    // route to a ticket.
+    const covered = new Set(out.filter(o => o.op).map(o => o.op))
+    const others = [...usedOps]
+      .filter(op => !covered.has(op))
+      .map(op => ({ op, operator: network.operators[op], rank: 99, other: true }))
+      .sort((a, b) => a.operator.name.localeCompare(b.operator.name))
+
+    return [...out.sort((a, b) => a.rank - b.rank), ...others]
   }
 
   /* --------------------------------------------------------------- build */
