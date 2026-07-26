@@ -16,8 +16,8 @@ the typefaces all travel inside the page.
 ## What it actually does
 
 The routing is the easy part. The graph of Southeast Asian railways is small
-enough to hold in your head, and Dijkstra over ninety edges is not an
-achievement. The work is in **feasibility** — the reasons a route that looks
+enough to hold in your head, and Dijkstra over a hundred and fifty edges is not
+an achievement. The work is in **feasibility** — the reasons a route that looks
 fine on a map fails in reality:
 
 - **Connection buffers.** Every junction is measured against the rulebook in
@@ -82,12 +82,16 @@ KL Sentral is one ETS ticket, not five. Getting this wrong invents four
 connections that do not exist and buries the two that do. If you add legs, set
 `service` to the same string across everything that is genuinely one train.
 
-**Road time is charged at 3.5×.** `src/router.js` weights road legs far above
-their clock time, which is why the planner will happily spend six extra hours on
-a train to avoid two on a coach. Road legs marked `essential` — a taxi across
-Vientiane, a walk between two railheads — survive even in hard rail-only mode,
-because excluding them would not route around the gap, it would just make the
-journey impossible.
+**Substitute road time is charged at 3.5×, connectors at 1.5×.**
+`src/router.js` weights road legs above their clock time, which is why the
+planner will happily spend six extra hours on a train to avoid two on a coach.
+But legs marked `essential` — a taxi across Vientiane, the bus to a pier, a
+shuttle over a frontier bridge — are charged far less, because they are part of
+the rail journey rather than an alternative to it. Get this wrong and the router
+sends someone eight hundred kilometres the wrong way down a railway to dodge a
+two-hour minivan. `essential` legs also survive hard rail-only mode, for the
+same reason: excluding them would not route around the gap, it would just make
+the journey impossible.
 
 ---
 

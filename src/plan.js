@@ -8,7 +8,7 @@
  */
 
 const Plan = (() => {
-  const UTC_OFFSET = { cn: 8, la: 7, th: 7, kh: 7, vn: 7, my: 8, sg: 8, id: 7, mm: 6.5 }
+  const UTC_OFFSET = { cn: 8, la: 7, th: 7, kh: 7, vn: 7, my: 8, sg: 8, bn: 8, id: 7, mm: 6.5 }
   // Indonesia spans three zones; Bali is WITA, an hour ahead of Java.
   const TZ_OVERRIDE = { denpasar: 8, gilimanuk: 8, banyuwangi: 7, kotakinabalu: 8, tenom: 8 }
 
@@ -41,6 +41,26 @@ const Plan = (() => {
       title: 'The Jungle Railway north from Gemas',
       cost: '+2 days, ~$12',
       text: 'The Shuttle Timuran up the East Coast Line to Kuala Lipis and Wakaf Baharu. Slow, scenic, cult status. Take it because the journey is the point, not to get anywhere.',
+    },
+    chumphon: {
+      title: 'Koh Tao and Koh Phangan, straight off the train',
+      cost: '+2 nights, ~$30',
+      text: 'The Lomprayah catamarans leave from a pier a short transfer from Chumphon station and are timed off the overnight trains from Bangkok. Of all the rail-to-island links in Thailand this is the least friction — you step off a sleeper and onto a boat.',
+    },
+    sisophon: {
+      title: 'Angkor, from Sisophon',
+      cost: '+2 nights, ~$12',
+      text: 'Two hours by road from the railhead at Sisophon. Angkor has no railway and never will, so this road leg is the price of the single best reason to be in Cambodia.',
+    },
+    saigon: {
+      title: 'Take the Mekong to Phnom Penh instead of the bus',
+      cost: '+1 night, ~$35',
+      text: 'Coach to Châu Đốc, then a river boat up the Mekong with immigration on the riverbank at Vĩnh Xương. It is slower and dearer than the direct coach, and it is the only Vietnam–Cambodia crossing that is not a road.',
+    },
+    haiphong: {
+      title: 'Hạ Long Bay via Cát Bà',
+      cost: '+2 nights',
+      text: 'An hour by fast ferry from Hải Phòng, which is itself a two-and-a-half hour train from Hanoi. Reaching the bay by rail and boat rather than a tour coach is both nicer and cheaper.',
     },
     hue: {
       title: 'Ride Huế to Đà Nẵng in daylight',
@@ -172,11 +192,14 @@ const Plan = (() => {
     const border = network.borders[nextLeg.borderAtStart] || network.borders[prevLeg.borderAtEnd]
     if (border) {
       const onFoot = (border.minutes ?? 60) >= 180
+      const bothRail = prevLeg.mode === 'rail' && nextLeg.mode === 'rail'
       rules.push({
         minutes: onFoot ? 240 : 120,
         rule: onFoot
           ? 'International border crossed on foot'
-          : 'International border with a change of train',
+          : bothRail
+            ? 'International border with a change of train'
+            : 'International border with a change of vehicle',
       })
     }
 

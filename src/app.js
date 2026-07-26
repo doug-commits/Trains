@@ -5,9 +5,9 @@
 ;(function () {
   const COUNTRY_NAME = {
     cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
-    my: 'Malaysia', sg: 'Singapore', id: 'Indonesia', mm: 'Myanmar',
+    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', mm: 'Myanmar',
   }
-  const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'id', 'mm']
+  const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'bn', 'id', 'mm']
 
   const PRESETS = [
     { label: 'The Spine', from: 'kunming', to: 'singapore', note: 'Kunming to Singapore — the only continuous rail corridor in the region' },
@@ -16,6 +16,7 @@
     { label: 'Singapore → Bali', from: 'singapore', to: 'denpasar', note: 'Land and sea the whole way. The flagship' },
     { label: 'Bangkok → Hanoi', from: 'bkk_aphiwat', to: 'hanoi', note: 'There is no rail answer. See what the honest one looks like' },
     { label: 'The Jungle Railway', from: 'klsentral', to: 'wakafbaharu', note: 'Slow, scenic, cult status — the journey as the point' },
+    { label: 'The Mekong slow boat', from: 'chiangmai', to: 'luangprabang', note: 'Two days downriver into Laos, with a night at Pakbeng' },
   ]
 
   const $ = sel => document.querySelector(sel)

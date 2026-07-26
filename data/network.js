@@ -232,6 +232,45 @@ const NETWORK = {
     kohsamui:       { name: 'Koh Samui',                city: 'Koh Samui',     country: 'th', lat: 9.51,   lon: 100.06, gauge: null },
     kohlanta:       { name: 'Koh Lanta',                city: 'Koh Lanta',     country: 'th', lat: 7.62,   lon: 99.04,  gauge: null },
 
+    // --- Mekong slow boat, the classic two-day run into Laos
+    chiangkhong:    { name: 'Chiang Khong',             city: 'Chiang Khong',  country: 'th', lat: 20.27,  lon: 100.40, gauge: null },
+    huayxai:        { name: 'Huay Xai',                 city: 'Huay Xai',      country: 'la', lat: 20.28,  lon: 100.41, gauge: null },
+    pakbeng:        { name: 'Pakbeng',                  city: 'Pakbeng',       country: 'la', lat: 19.89,  lon: 101.13, gauge: null,
+                      warn: 'A one-street village that exists for the overnight stop. Rooms fill when the boat lands — book ahead in season.' },
+
+    // --- Gulf of Thailand islands
+    kohtao:         { name: 'Koh Tao',                  city: 'Koh Tao',       country: 'th', lat: 10.10,  lon: 99.84,  gauge: null },
+    kohphangan:     { name: 'Koh Phangan',              city: 'Koh Phangan',   country: 'th', lat: 9.75,   lon: 100.02, gauge: null },
+
+    // --- Andaman side
+    krabi:          { name: 'Krabi (Klong Jilad)',      city: 'Krabi',         country: 'th', lat: 8.09,   lon: 98.91,  gauge: null },
+    kohphiphi:      { name: 'Koh Phi Phi',              city: 'Koh Phi Phi',   country: 'th', lat: 7.74,   lon: 98.78,  gauge: null },
+    phuket:         { name: 'Phuket (Rassada)',         city: 'Phuket',        country: 'th', lat: 7.88,   lon: 98.39,  gauge: null,
+                      warn: 'No railway on the island and none nearby. Phuket is reached by boat from the Andaman chain, or by road from Surat Thani.' },
+    satun:          { name: 'Satun (Tammalang pier)',   city: 'Satun',         country: 'th', lat: 6.53,   lon: 100.06, gauge: null },
+
+    // --- Cambodia
+    siemreap:       { name: 'Siem Reap',                city: 'Siem Reap',     country: 'kh', lat: 13.36,  lon: 103.86, gauge: null,
+                      warn: 'Angkor has no railway. The nearest railhead is Sisophon, about two hours away by road.' },
+    kohrong:        { name: 'Koh Rong',                 city: 'Koh Rong',      country: 'kh', lat: 10.72,  lon: 103.24, gauge: null },
+
+    // --- Vietnam
+    catba:          { name: 'Cát Bà',                   city: 'Cát Bà',        country: 'vn', lat: 20.72,  lon: 107.05, gauge: null },
+    chaudoc:        { name: 'Châu Đốc',                 city: 'Châu Đốc',      country: 'vn', lat: 10.70,  lon: 105.11, gauge: null },
+
+    // --- Malaysia
+    kualakedah:     { name: 'Kuala Kedah pier',         city: 'Kuala Kedah',   country: 'my', lat: 6.11,   lon: 100.31, gauge: null, minor: true },
+    labuan:         { name: 'Labuan',                   city: 'Labuan',        country: 'my', lat: 5.28,   lon: 115.24, gauge: null },
+
+    // --- Brunei
+    bandarseri:     { name: 'Bandar Seri Begawan (Muara)', city: 'Bandar Seri Begawan', country: 'bn', lat: 4.94, lon: 114.95, gauge: null,
+                      warn: 'Brunei has no railway. The ferry chain from Sabah is the only way in that is not a road or a plane.' },
+
+    // --- Bali onward
+    padangbai:      { name: 'Padangbai',                city: 'Padangbai',     country: 'id', lat: -8.53,  lon: 115.51, gauge: null, minor: true },
+    mataram:        { name: 'Lombok (Lembar)',          city: 'Lombok',        country: 'id', lat: -8.58,  lon: 116.11, gauge: null },
+    gili:           { name: 'Gili Trawangan',           city: 'Gili Islands',  country: 'id', lat: -8.35,  lon: 116.04, gauge: null },
+
     // --- Myanmar (advisory)
     kawthaung:      { name: 'Kawthaung',                city: 'Kawthaung',     country: 'mm', lat: 9.98,   lon: 98.55,  gauge: null,
                       warn: 'Standing security advisories cover much of Myanmar, and there is no through rail to Thailand.' },
@@ -433,6 +472,60 @@ const NETWORK = {
     { from: 'semarang', to: 'surabaya', mode: 'rail', op: 'kai', service: 'KAI north-coast line', hours: 4, usd: 8, confidence: 'reported' },
     { from: 'surabaya', to: 'malang', mode: 'rail', op: 'kai', service: 'KAI (Surabaya – Malang)', hours: 2, usd: 4, scenic: true, confidence: 'reported' },
 
+    // === Mekong slow boat ==============================================
+    { from: 'chiangmai', to: 'chiangkhong', mode: 'road', op: 'road', service: 'Green Bus via Chiang Rai', hours: 6, usd: 12, essential: true, confidence: 'reported' },
+    { from: 'chiangkhong', to: 'huayxai', mode: 'road', op: 'road', service: 'Shuttle over the Fourth Thai–Lao Friendship Bridge', hours: 0.5, usd: 2, essential: true, border: 'huayxai', confidence: 'structural' },
+    { from: 'huayxai', to: 'pakbeng', mode: 'ferry', op: 'ferry', service: 'Mekong slow boat (day 1)', hours: 6, usd: 15, scenic: true, confidence: 'reported',
+      note: 'Two days downriver with a night at Pakbeng. The speedboat alternative does it in one day and has a genuinely bad safety record — take the slow boat.' },
+    { from: 'pakbeng', to: 'luangprabang', mode: 'ferry', op: 'ferry', service: 'Mekong slow boat (day 2)', hours: 8, usd: 15, scenic: true, confidence: 'reported' },
+
+    // === Gulf of Thailand islands ======================================
+    { from: 'chumphon', to: 'kohtao', mode: 'ferry', op: 'ferry', service: 'Lomprayah / Songserm catamaran', hours: 1.75, usd: 17, seasonal: 'gulf', confidence: 'reported',
+      note: 'The pier is at Thung Makham Noi, a short transfer from Chumphon station, and the boats are timed off the overnight trains from Bangkok.' },
+    { from: 'kohtao', to: 'kohphangan', mode: 'ferry', op: 'ferry', service: 'Lomprayah catamaran', hours: 1.5, usd: 12, seasonal: 'gulf', scenic: true, confidence: 'reported' },
+    { from: 'kohphangan', to: 'kohsamui', mode: 'ferry', op: 'ferry', service: 'Lomprayah / Raja ferry', hours: 0.5, usd: 9, seasonal: 'gulf', confidence: 'reported' },
+
+    // === Andaman islands ===============================================
+    { from: 'trang', to: 'krabi', mode: 'road', op: 'road', service: 'Minivan', hours: 2, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'krabi', to: 'kohphiphi', mode: 'ferry', op: 'ferry', service: 'Andaman Wave / Ao Nang Princess', hours: 2, usd: 14, seasonal: 'andaman', scenic: true, confidence: 'reported' },
+    { from: 'kohphiphi', to: 'kohlanta', mode: 'ferry', op: 'ferry', service: 'Island-hopper ferry', hours: 1.5, usd: 12, seasonal: 'andaman', confidence: 'verify',
+      note: 'Runs in high season only. Out of season the connection is back via Krabi by road.' },
+    { from: 'kohphiphi', to: 'phuket', mode: 'ferry', op: 'ferry', service: 'Phi Phi – Rassada ferry', hours: 2, usd: 14, seasonal: 'andaman', confidence: 'reported' },
+
+    // === Thailand ↔ Malaysia by sea ====================================
+    { from: 'hatyai', to: 'satun', mode: 'road', op: 'road', service: 'Minivan to Tammalang pier', hours: 2, usd: 7, essential: true, confidence: 'reported' },
+    { from: 'satun', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Tammalang – Kuah international ferry', hours: 1.5, usd: 12, border: 'satun', seasonal: 'andaman', confidence: 'verify',
+      note: 'A sea border, and the one way to reach Malaysia from Thailand without touching Padang Besar. Sailings are few per day and stop early — missing the last one strands you in Satun.' },
+
+    // === More Langkawi piers ===========================================
+    { from: 'alorsetar', to: 'kualakedah', mode: 'road', op: 'road', service: 'Taxi from Alor Setar station', hours: 0.4, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'kualakedah', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Kuala Kedah – Kuah ferry', hours: 1.75, usd: 6, seasonal: 'andaman', confidence: 'reported' },
+    { from: 'georgetown', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Penang – Langkawi ferry', hours: 2.75, usd: 18, seasonal: 'andaman', confidence: 'verify',
+      note: 'Operates seasonally and has suspended before. Verify it is running rather than assuming it.' },
+
+    // === Cambodia: Angkor, the Tonlé Sap and the islands ===============
+    { from: 'sisophon', to: 'siemreap', mode: 'road', op: 'road', service: 'Bus / shared taxi', hours: 2, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'phnompenh', to: 'siemreap', mode: 'ferry', op: 'ferry', service: 'Tonlé Sap fast boat', hours: 6, usd: 35, scenic: true, confidence: 'verify',
+      note: 'Only runs when the lake is high, roughly August to March, and it is a hot crowded six hours. People take it for the floating villages, not the comfort.' },
+    { from: 'sihanoukville', to: 'kohrong', mode: 'ferry', op: 'ferry', service: 'Speed Ferry Cambodia', hours: 0.75, usd: 12, scenic: true, confidence: 'reported' },
+
+    // === Vietnam by water ==============================================
+    { from: 'haiphong', to: 'catba', mode: 'ferry', op: 'ferry', service: 'Cát Bà fast ferry', hours: 1, usd: 10, scenic: true, confidence: 'reported',
+      note: 'The practical way into Hạ Long Bay from the railway, rather than a coach from Hanoi.' },
+    { from: 'saigon', to: 'chaudoc', mode: 'road', op: 'road', service: 'Coach into the Mekong Delta', hours: 6, usd: 12, confidence: 'reported' },
+    { from: 'chaudoc', to: 'phnompenh', mode: 'ferry', op: 'ferry', service: 'Mekong river boat (Hang Chau / Blue Cruiser)', hours: 5, usd: 35, border: 'chaudoc', scenic: true, confidence: 'verify',
+      note: 'The only Vietnam–Cambodia crossing that is not a road. Immigration happens on the riverbank at Vĩnh Xương and Kaam Samnor while the boat waits.' },
+
+    // === Sabah ↔ Brunei ================================================
+    { from: 'kotakinabalu', to: 'labuan', mode: 'ferry', op: 'ferry', service: 'Labuan express ferry', hours: 3, usd: 15, confidence: 'reported' },
+    { from: 'labuan', to: 'bandarseri', mode: 'ferry', op: 'ferry', service: 'Labuan – Muara ferry', hours: 1.5, usd: 12, border: 'brunei', confidence: 'verify' },
+
+    // === Bali onward ===================================================
+    { from: 'denpasar', to: 'padangbai', mode: 'road', op: 'road', service: 'Shuttle to the port', hours: 1.5, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'padangbai', to: 'mataram', mode: 'ferry', op: 'ferry', service: 'ASDP Padangbai – Lembar', hours: 4.5, usd: 4, scenic: true, confidence: 'reported',
+      note: 'Slow, cheap and rolls in the strait. The tourist fast boats do it in under two hours from Padangbai or Serangan.' },
+    { from: 'mataram', to: 'gili', mode: 'ferry', op: 'ferry', service: 'Bangsal – Gili public boat', hours: 0.75, usd: 3, scenic: true, confidence: 'reported' },
+
     // === Sabah (isolated) ==============================================
     { from: 'kotakinabalu', to: 'tenom', mode: 'rail', op: 'ktmb', service: 'Sabah State Railway', hours: 2.5, usd: 5, scenic: true, confidence: 'reported' },
   ],
@@ -520,6 +613,46 @@ const NETWORK = {
       visa: 'Vietnamese e-visa in advance. Confirm your chosen crossing point is one where e-visas are accepted.',
       cash: 'Small US dollar notes and Vietnamese dong.',
       trap: 'The crossing often happens in the small hours, and unofficial "stamping fees" are common here. It is the least comfortable border in this whole network, on the least comfortable leg.',
+    },
+    huayxai: {
+      name: 'Chiang Khong ↔ Huay Xai', countries: 'Thailand ↔ Laos', at: 'Fourth Thai–Lao Friendship Bridge, by shuttle bus',
+      minutes: 90,
+      stayOnTrain: 'No — you cannot walk the bridge, a shuttle bus carries you across',
+      luggage: 'Yes',
+      visa: 'Lao visa-on-arrival is normally available here, in US dollars cash. Confirm for your passport before relying on it.',
+      cash: 'Crisp, unmarked US dollar notes for the Lao visa fee, plus kip for the boat.',
+      trap: 'The bridge is several kilometres outside both towns, so the crossing is two tuk-tuk rides with a bus in between. Do it the afternoon before the boat, not the same morning — the slow boat leaves Huay Xai early and does not wait.',
+    },
+    satun: {
+      name: 'Tammalang ↔ Langkawi', countries: 'Thailand ↔ Malaysia (by sea)', at: 'Ferry terminal at each end',
+      minutes: 60,
+      stayOnTrain: 'n/a — immigration is in the terminal, not on the boat',
+      luggage: 'Yes',
+      visa: 'As at Padang Besar: Malaysian entry is visa-free for many nationalities. Confirm for your own passport.',
+      cash: 'Ringgit for Langkawi; the Thai side takes baht only.',
+      trap: 'Only a handful of sailings a day and they finish early in the afternoon. This is the one Thailand–Malaysia crossing where missing the last departure means a night in a town you had not planned to visit.',
+      verify: true,
+      verifyNote: 'Sailing times shift with the season and the operator has changed more than once. Confirm the current timetable before building a day around it.',
+    },
+    chaudoc: {
+      name: 'Vĩnh Xương ↔ Kaam Samnor', countries: 'Vietnam ↔ Cambodia (by river)', at: 'Riverbank posts, with the boat waiting alongside',
+      minutes: 120,
+      stayOnTrain: 'Off the boat at each post, then back on',
+      luggage: 'Yes',
+      visa: 'Cambodian e-visa in advance. Coming the other way, a Vietnamese e-visa must name a land or river crossing you are allowed to use.',
+      cash: 'US dollars in small notes for both sides.',
+      trap: 'Unofficial "processing" and "overtime" fees are routine at this crossing, and the boat operator often collects passports as a group. Know the correct official fee, and expect the whole thing to take longer than the schedule claims.',
+      verify: true,
+    },
+    brunei: {
+      name: 'Labuan ↔ Muara', countries: 'Malaysia ↔ Brunei (by sea)', at: 'Ferry terminal at each end',
+      minutes: 60,
+      stayOnTrain: 'n/a',
+      luggage: 'Yes',
+      visa: 'Brunei is visa-free for many nationalities on short visits. Confirm for your own passport.',
+      cash: 'Brunei dollars; Singapore dollars are accepted at par.',
+      trap: 'Muara is a working port well outside Bandar Seri Begawan, and onward transport thins out in the evening. Both this leg and the Kota Kinabalu one are weather-dependent.',
+      verify: true,
     },
     batam: {
       name: 'Singapore ↔ Batam', countries: 'Singapore ↔ Indonesia', at: 'Ferry terminal — immigration at the terminal, not on the boat',

@@ -44,19 +44,26 @@ const UI = (() => {
     const railLegs = plan.legs.filter(e => e.leg.mode === 'rail').length
     const seaLegs = plan.legs.filter(e => e.leg.mode === 'ferry').length
     const roadLegs = plan.legs.filter(e => e.leg.mode === 'road').length
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
     if (railLegs) modes.push(`${railLegs} on rails`)
     if (seaLegs) modes.push(`${seaLegs} by sea`)
     if (roadLegs) modes.push(`${roadLegs} by road`)
 
+    const total = Math.max(1, t.railHours + t.seaHours + t.roadHours)
+    const seaShare = t.seaHours / total
+    const scenicSea = plan.legs.filter(e => e.leg.mode === 'ferry' && e.leg.scenic).length
+
     let character
-    if (railShare > 0.85) character = 'a genuine rail journey almost end to end'
+    if (seaShare > 0.45 && scenicSea) character = 'as much a boat journey as an overland one'
+    else if (railShare > 0.85) character = 'a genuine rail journey almost end to end'
     else if (railShare > 0.6) character = 'a rail journey with the gaps bridged'
     else if (railShare > 0.25) character = 'a rail journey for part of its length and an honest slog for the rest'
+    else if (seaShare > 0.25) character = 'not a rail journey — the railways do not come here, and the water is the way through'
     else character = 'not really a rail journey at all — the railways do not go this way'
 
     const sentences = []
     sentences.push(
-      `${esc(from.city)} to ${esc(to.city)} is ${character}: ${t.legs} legs (${modes.join(', ')}) ` +
+      `${esc(from.city)} to ${esc(to.city)} is ${character}: ${plural(t.legs, 'leg')} (${modes.join(', ')}) ` +
         `across ${plan.countries.length} ${plan.countries.length === 1 ? 'country' : 'countries'}, ` +
         `with ${t.borders} ${t.borders === 1 ? 'frontier' : 'frontiers'} in between.`
     )
@@ -67,18 +74,27 @@ const UI = (() => {
     const longestRoad = plan.legs
       .filter(e => e.leg.mode === 'road' && !e.leg.essential)
       .sort((a, b) => b.leg.hours - a.leg.hours)[0]
-    const scenic = plan.legs.filter(e => e.leg.scenic).length
+    const scenicHours = plan.legs.filter(e => e.leg.scenic).reduce((n, e) => n + e.leg.hours, 0)
+    const scenicShare = scenicHours / total
 
-    if (longestRoad && longestRoad.leg.hours >= 10) {
+    if (scenicSea >= 2 || (scenicSea && seaShare > 0.45)) {
+      sentences.push(
+        'The water is the point here rather than a gap in the railway — this is a journey people ' +
+          'take deliberately, and the slow version is the good version.'
+      )
+    } else if (longestRoad && longestRoad.leg.hours >= 10) {
       sentences.push(
         `Be clear-eyed about the ${hours(longestRoad.leg.hours)} coach from ` +
           `${esc(longestRoad.fromCity)} to ${esc(longestRoad.toCity)} — there is no railway on that ` +
           `corridor and no way to dress the bus up as anything else.`
       )
-    } else if (scenic >= 3) {
+    } else if (scenicShare > 0.4) {
       sentences.push(
-        `It is genuinely enjoyable rather than merely possible: ${scenic} of these legs are worth ` +
-          `taking for their own sake, and the sleepers replace hotel nights rather than costing you days.`
+        `It is genuinely enjoyable rather than merely possible: ${hours(scenicHours)} of this is ` +
+          `worth riding for its own sake` +
+          (t.sleeperNights
+            ? ', and the sleepers replace hotel nights rather than costing you days.'
+            : '.')
       )
     } else if (t.roadHours > t.railHours) {
       sentences.push(
@@ -102,8 +118,8 @@ const UI = (() => {
       [`${t.legs}`, 'legs'],
       [`${t.borders}`, t.borders === 1 ? 'border' : 'borders'],
       [money(t.totalUsd), 'all in'],
-      [hours(t.railHours), 'on rails'],
     ]
+    if (t.railHours) bits.push([hours(t.railHours), 'on rails'])
     if (t.seaHours) bits.push([hours(t.seaHours), 'at sea'])
     if (t.roadHours) bits.push([hours(t.roadHours), 'by road'])
     return `<div class="stats">${bits

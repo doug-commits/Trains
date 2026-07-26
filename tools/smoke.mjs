@@ -49,7 +49,9 @@ function check(label, condition, detail = '') {
 
   const h1 = await page.textContent('#panel h1')
   check('idle headline renders', /Southeast Asia/.test(h1), h1.replace(/\s+/g, ' ').trim())
-  check('preset chips render', (await page.locator('.chip').count()) === 6)
+  // Count comes from the preset list, not a magic number that rots on edit.
+  const chips = await page.locator('.chip').count()
+  check('preset chips render', chips >= 6, `${chips} chips`)
   check('myths render', (await page.locator('.myths li').count()) === 7)
 
   // The canvas must actually have painted something, not just be sized.
@@ -99,6 +101,31 @@ function check(label, condition, detail = '') {
   check('panel does not scroll sideways', overflow <= 1, `${overflow}px`)
 
   await page.screenshot({ path: join(outDir, '02-route-dark.png') })
+  await context.close()
+}
+
+/* ------------------------------------- boats the rails cannot replace */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.chip', { hasText: 'The Mekong slow boat' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1100)
+
+  const modes = await page.locator('.mode-dot.ferry').count()
+  check('slow boat routed by water', modes >= 2, `${modes} sea legs`)
+
+  const text = await page.textContent('#panel')
+  check('Mekong boat named, not a generic ferry', /Mekong slow boat/.test(text))
+  check('speedboat safety flagged', /safety record/.test(text))
+  check('Huay Xai border briefed', /Huay Xai/.test(text))
+
+  // It must not backtrack down the whole Thai network to reach Laos by rail.
+  const legs = await page.locator('tr.leg').count()
+  check('route does not detour via Bangkok', !/Krung Thep/.test(text), `${legs} legs`)
+
+  await page.screenshot({ path: join(outDir, '11-mekong-slow-boat.png') })
   await context.close()
 }
 

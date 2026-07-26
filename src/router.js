@@ -1,18 +1,27 @@
 /* Rail-first routing.
  *
  * The graph is small enough that the algorithm is not the interesting part —
- * plain Dijkstra over ~90 edges. What matters is the cost function, because it
+ * plain Dijkstra over ~150 edges. What matters is the cost function, because it
  * encodes the whole thesis of the product: stay on rails as far as the rails
  * go, take a boat where the land ends, and use a road vehicle only where
  * neither exists.
  *
  * A shortest-time router would answer half these queries with a bus. This one
- * charges road time at three and a half times its face value, so it will
- * happily spend an extra six hours on a train to avoid two on a coach.
+ * charges substitute road time at three and a half times its face value, so it
+ * will happily spend an extra six hours on a train to avoid two on a coach —
+ * but it charges unavoidable road connectors far less, because penalising a gap
+ * nothing can route around just produces absurd detours.
  */
 
 const Router = (() => {
   const MODE_WEIGHT = { rail: 1, ferry: 1.5, road: 3.5 }
+
+  /* An `essential` road leg is a connector with no rail alternative — the bus to
+   * the pier, the shuttle over a frontier bridge. The 3.5x penalty exists to
+   * stop road *replacing* rail; charging it here instead punishes the traveller
+   * for a gap that no routing can avoid, and sends them hundreds of kilometres
+   * the wrong way down a railway to dodge a two-hour minivan. */
+  const ESSENTIAL_ROAD_WEIGHT = 1.5
 
   // Every leg carries a fixed penalty so the router doesn't assemble a chain of
   // ten short hops where one longer leg exists.
@@ -43,7 +52,11 @@ const Router = (() => {
   }
 
   function edgeCost(network, leg, opts) {
-    let cost = leg.hours * (MODE_WEIGHT[leg.mode] ?? 1) + LEG_PENALTY
+    const weight =
+      leg.mode === 'road' && leg.essential
+        ? ESSENTIAL_ROAD_WEIGHT
+        : (MODE_WEIGHT[leg.mode] ?? 1)
+    let cost = leg.hours * weight + LEG_PENALTY
 
     if (leg.border) {
       const border = network.borders[leg.border]
