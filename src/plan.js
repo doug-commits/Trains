@@ -1,0 +1,466 @@
+/* Turning a path through the graph into an itinerary you could defend.
+ *
+ * A route that exists on paper is not an itinerary. This module applies the
+ * connection buffers, punctuality realities, seasonality and border mechanics
+ * that decide whether the thing actually works — and it deliberately refuses to
+ * invent departure times, because the operators share no timetable and a
+ * remembered departure is how a traveller ends up stranded at Padang Besar.
+ */
+
+const Plan = (() => {
+  const UTC_OFFSET = { cn: 8, la: 7, th: 7, kh: 7, vn: 7, my: 8, sg: 8, id: 7, mm: 6.5 }
+  // Indonesia spans three zones; Bali is WITA, an hour ahead of Java.
+  const TZ_OVERRIDE = { denpasar: 8, gilimanuk: 8, banyuwangi: 7, kotakinabalu: 8, tenom: 8 }
+
+  const PACE_HOURS = { relaxed: 8, standard: 12, fast: 16 }
+  const HOTEL_USD = 35
+
+  // Worthwhile diversions, keyed by a station the route already passes through.
+  const DETOURS = {
+    butterworth: {
+      title: 'The Penang ferry into George Town',
+      cost: '+1 night, ~$2',
+      text: 'The boat berths beside the KTMB station. Step off the ETS, walk onto the ferry, and arrive in George Town by water — the single cheapest upgrade on the whole spine.',
+    },
+    hatyai: {
+      title: 'Break the journey at Hat Yai',
+      cost: '+1 night, ~$25',
+      text: 'Not a beauty spot, but the single most effective de-risking move on the spine. SRT southbound routinely runs 30 to 90 minutes late, and it is this arrival that feeds the Padang Besar connection. A night here converts a connection you might miss into one you cannot.',
+    },
+    arau: {
+      title: 'Langkawi, from Arau',
+      cost: '+2 nights, ~$15',
+      text: 'Taxi to Kuala Perlis, ferry to Langkawi. It puts a genuine rest day right at the Thai–Malaysian border, which is exactly where a long spine journey needs one — and it de-risks the Padang Besar connection by removing the pressure to make it on a fixed day.',
+    },
+    suratthani: {
+      title: 'Koh Samui, from Phun Phin',
+      cost: '+2 nights, ~$12',
+      text: 'Connecting bus to Donsak pier, then the Raja or Seatran ferry. Combined train-bus-ferry tickets are widely sold. Gulf side — check the October to December monsoon.',
+    },
+    gemas: {
+      title: 'The Jungle Railway north from Gemas',
+      cost: '+2 days, ~$12',
+      text: 'The Shuttle Timuran up the East Coast Line to Kuala Lipis and Wakaf Baharu. Slow, scenic, cult status. Take it because the journey is the point, not to get anywhere.',
+    },
+    hue: {
+      title: 'Ride Huế to Đà Nẵng in daylight',
+      cost: '+0 nights',
+      text: 'The Hải Vân pass is among the best rail scenery in Asia and it is wasted at night. Sit on the sea side and take a daytime train even if it costs you a connection.',
+    },
+    luangprabang: {
+      title: 'Break at Luang Prabang',
+      cost: '+2 nights',
+      text: 'Two hours from Vientiane on the LCR and the most rewarding stop on the northern half. The scarce inventory is the reason to book it early, not a reason to skip it.',
+    },
+    bkk_thonburi: {
+      title: 'The Death Railway to Nam Tok',
+      cost: '+1 day, ~$5',
+      text: 'From Bangkok Thonburi via Kanchanaburi. The Wampo viaduct clinging to the cliff above the river is the reason to go.',
+    },
+    banyuwangi: {
+      title: 'Take the dawn crossing to Bali',
+      cost: '+0 nights',
+      text: 'The Ketapang–Gilimanuk ferry runs around the clock, so you can choose your moment. Choose first light.',
+    },
+  }
+
+  const clone = obj => JSON.parse(JSON.stringify(obj))
+
+  function tzOf(network, stationId) {
+    if (TZ_OVERRIDE[stationId] != null) return TZ_OVERRIDE[stationId]
+    return UTC_OFFSET[network.stations[stationId].country] ?? 7
+  }
+
+  /* ------------------------------------------------------- merging legs
+   * The graph stores station-to-station segments, but a leg is one vehicle:
+   * one operator, one service, one continuous ride. Padang Besar to KL Sentral
+   * is a single ETS you book once, not five hops — and presenting it as five
+   * would invent four connections that do not exist and bury the two that do.
+   */
+  function mergeSegments(network, path) {
+    const runs = []
+    for (const step of path) {
+      const leg = step.leg
+      const open = runs[runs.length - 1]
+      const sameVehicle =
+        open && open.op === leg.op && open.mode === leg.mode && open.service === leg.service
+      if (sameVehicle) open.steps.push(step)
+      else runs.push({ op: leg.op, mode: leg.mode, service: leg.service, steps: [step] })
+    }
+
+    return runs.map(run => {
+      const parts = run.steps.map(s => s.leg)
+      const first = parts[0]
+      const last = parts[parts.length - 1]
+      const confidence = parts.some(l => l.confidence === 'verify')
+        ? 'verify'
+        : parts.some(l => l.confidence === 'reported')
+          ? 'reported'
+          : 'structural'
+
+      return {
+        mode: run.mode,
+        op: run.op,
+        service: run.service,
+        // Round away binary-float noise; these are indicative times anyway.
+        hours: Math.round(parts.reduce((n, l) => n + l.hours, 0) * 100) / 100,
+        usd: Math.round(parts.reduce((n, l) => n + (l.usd ?? 0), 0) * 100) / 100,
+        cls: parts.find(l => l.cls)?.cls,
+        sleeper: parts.some(l => l.sleeper),
+        scenic: parts.some(l => l.scenic),
+        essential: parts.every(l => l.essential),
+        advisory: parts.find(l => l.advisory)?.advisory,
+        confidence,
+        note: [...new Set(parts.map(l => l.note).filter(Boolean))].join(' '),
+        borderIds: parts.map(l => l.border).filter(Boolean),
+        // Only a frontier at the very start or end of a run governs the buffer
+        // at that junction; one in the middle is crossed aboard the train.
+        borderAtStart: first.border || null,
+        borderAtEnd: last.border || null,
+        steps: run.steps.map(s => ({ from: s.from, to: s.to, mode: run.mode, border: s.leg.border || null })),
+      }
+    })
+  }
+
+  /* ------------------------------------------------------------- buffers
+   * Every junction gets the largest applicable minimum from the rulebook.
+   * If the traveller's real gap is smaller than this, it is not a connection.
+   */
+  function bufferFor(network, prev, next) {
+    const rules = []
+    const prevLeg = prev.leg
+    const nextLeg = next.leg
+
+    // Call it a terminal when a boat is involved; "same station" reads wrong
+    // at a pier and undermines trust in everything around it.
+    const place =
+      prevLeg.mode === 'ferry' || nextLeg.mode === 'ferry' ? 'terminal' : 'station'
+
+    const shortTransfer = nextLeg.essential && nextLeg.mode === 'road' && nextLeg.hours <= 1
+
+    rules.push(
+      shortTransfer
+        ? { minutes: 30, rule: 'Step off and walk to the connecting transport' }
+        : prevLeg.op === nextLeg.op
+          ? { minutes: 30, rule: `Same ${place}, same operator, seat to seat` }
+          : {
+              minutes: 90,
+              rule: `Same ${place}, different operators — no through ticketing, no held connection`,
+            }
+    )
+
+    if (nextLeg.mode === 'ferry') {
+      const label =
+        prevLeg.mode === 'road'
+          ? 'Onward ferry reached by road transfer'
+          : prevLeg.mode === 'ferry'
+            ? 'Ferry to ferry at the same terminal'
+            : 'Rail to ferry in the same town'
+      rules.push({ minutes: prevLeg.mode === 'road' ? 240 : 120, rule: label })
+    }
+
+    const border = network.borders[nextLeg.borderAtStart] || network.borders[prevLeg.borderAtEnd]
+    if (border) {
+      const onFoot = (border.minutes ?? 60) >= 180
+      rules.push({
+        minutes: onFoot ? 240 : 120,
+        rule: onFoot
+          ? 'International border crossed on foot'
+          : 'International border with a change of train',
+      })
+    }
+
+    // The Vientiane problem: two railways, two gauges, fifteen kilometres and
+    // no track between them.
+    const a = network.stations[next.fromId]
+    const b = network.stations[next.toId]
+    if (
+      nextLeg.essential &&
+      nextLeg.mode === 'road' &&
+      a && b &&
+      a.city === b.city &&
+      a.gauge && b.gauge &&
+      a.gauge !== b.gauge
+    ) {
+      rules.push({ minutes: 180, rule: 'Cross-city transfer between two unconnected stations' })
+    }
+
+    if (prevLeg.sleeper && prevLeg.hours >= 7) {
+      rules.push({ minutes: 120, rule: 'Arriving off a sleeper onto a long-distance departure' })
+    }
+
+    const governing = rules.reduce((m, r) => (r.minutes > m.minutes ? r : m), rules[0])
+    const chained = prevLeg.sleeper && nextLeg.sleeper && prevLeg.hours >= 7 && nextLeg.hours >= 7
+
+    return {
+      minutes: governing.minutes,
+      rule: governing.rule,
+      chainedSleepers: chained,
+      unpunctual: network.operators[prevLeg.op]?.punctual === 'poor',
+    }
+  }
+
+  /* ---------------------------------------------------------- seasonality */
+  function seasonHits(network, dateStr) {
+    if (!dateStr) return []
+    const md = dateStr.slice(5, 10)
+    return network.seasons.filter(s => {
+      // Ranges here never wrap the year end, so a plain string compare is safe.
+      return md >= s.from && md <= s.to
+    })
+  }
+
+  function countriesOn(network, stationIds) {
+    return [...new Set(stationIds.map(id => network.stations[id].country))]
+  }
+
+  /* --------------------------------------------------------------- costs */
+  function flightComparison(network, fromId, toId) {
+    const a = network.stations[fromId]
+    const b = network.stations[toId]
+    const km = Proj.haversine(a, b)
+    // Cruise plus taxi, climb and descent — gate to gate, not airport to
+    // airport, and deliberately not counting the two hours before the gate.
+    const hours = km / 800 + 0.75
+    const mid = 45 + km * 0.055
+    return {
+      km: Math.round(km),
+      hours,
+      low: Math.round(mid * 0.65),
+      high: Math.round(mid * 1.35),
+    }
+  }
+
+  /* -------------------------------------------------------------- risks */
+  function buildRisks(network, legs, junctions, seasons, opts) {
+    const risks = []
+    const seenBorders = new Set()
+
+    for (const s of seasons) {
+      risks.push({
+        severity: 'critical',
+        title: `Your dates fall in ${s.name}`,
+        text: s.text + (s.fixed ? '' : ' These dates move each year — the window shown here is approximate.'),
+        fix: 'Move the trip by a week either side if you possibly can. If you cannot, book the moment every window opens and accept that some legs will be unobtainable in your preferred class.',
+      })
+    }
+
+    legs.forEach((entry, i) => {
+      const leg = entry.leg
+
+      if (leg.advisory) {
+        risks.push({
+          severity: 'critical',
+          title: `Security advisory on the ${entry.fromName} – ${entry.toName} leg`,
+          text: network.advisories[leg.advisory],
+          fix: 'Check your own government\'s current travel advice and decide deliberately. There is a west-coast alternative via Padang Besar that avoids this entirely.',
+          legIndex: i,
+        })
+      }
+
+      for (const borderId of leg.borderIds) {
+        const border = network.borders[borderId]
+        if (!border || seenBorders.has(borderId)) continue
+        seenBorders.add(borderId)
+        if (border.hard) {
+          risks.push({
+            severity: 'critical',
+            title: `${border.name} needs a visa you cannot get at the border`,
+            text: border.visa + ' ' + border.trap,
+            fix: 'Obtain the visa before you leave. If you cannot, this half of the route is closed to you and the itinerary should be replanned to stop short of the frontier.',
+            legIndex: i,
+          })
+        } else if (border.verify) {
+          risks.push({
+            severity: 'caution',
+            title: `${border.name} has a moving part`,
+            text: border.verifyNote || border.trap,
+            fix: 'Confirm the current position before you book anything that depends on it.',
+            legIndex: i,
+          })
+        }
+      }
+
+      if (leg.confidence === 'verify') {
+        risks.push({
+          severity: 'caution',
+          title: `${entry.fromName} to ${entry.toName} is not a service we can stand behind`,
+          text: leg.note || 'This service has a history of changing, suspending or running on limited days.',
+          fix: 'Verify it is running on your date before you build the rest of the itinerary around it.',
+          legIndex: i,
+        })
+      }
+
+      if (leg.mode === 'ferry' && !leg.essential) {
+        risks.push({
+          severity: 'note',
+          title: `The ${entry.fromName} – ${entry.toName} boat is weather-dependent`,
+          text: 'Ferries are cancelled rather than delayed, and a cancellation costs a day rather than an afternoon.',
+          fix: 'Never make this crossing the only path to a fixed commitment. Leave a slack day between it and any flight home.',
+          legIndex: i,
+        })
+      }
+    })
+
+    junctions.forEach(j => {
+      if (j.chainedSleepers) {
+        risks.push({
+          severity: 'caution',
+          title: `Two sleepers back to back at ${j.stationName}`,
+          text: 'Chaining overnight trains looks efficient on paper and is punishing in practice. Two nights of broken sleep with a border in between is how people abandon an itinerary halfway.',
+          fix: 'Insert a hotel night here. It costs one night and rescues the rest of the trip.',
+        })
+      } else if (j.minutes >= 180) {
+        risks.push({
+          severity: 'caution',
+          title: `${j.stationName} needs ${Math.round(j.minutes / 60)} hours, not a connection`,
+          text: `${j.rule}. A gap smaller than this is not a connection — it is a missed train with a plausible-looking timetable behind it.`,
+          fix: j.minutes >= 240
+            ? 'Plan an overnight stop here rather than trying to make it in one day.'
+            : 'Allow the full window, and prefer a later onward service over the tightest one that appears to work.',
+        })
+      } else if (j.unpunctual && j.minutes >= 120) {
+        risks.push({
+          severity: 'caution',
+          title: `${j.stationName} depends on an SRT arrival being roughly on time`,
+          text: 'SRT long-distance services routinely run 30 to 90 minutes late, and southbound to Hat Yai is the worst offender. It is the arrival that feeds this connection.',
+          fix: 'Take the later onward departure, not the first one that appears to connect. An overnight in Hat Yai removes the problem entirely.',
+        })
+      }
+    })
+
+    if (opts.railOnly) {
+      const forced = legs.filter(e => e.leg.mode === 'road')
+      if (forced.length) {
+        risks.push({
+          severity: 'note',
+          title: `${forced.length} road ${forced.length === 1 ? 'leg is' : 'legs are'} unavoidable even in rail-only mode`,
+          text: 'These are station transfers and pier shuttles with no rail alternative — a taxi across Vientiane, a walk between two railheads at a border. Excluding them would not route around the gap; it would just make the journey impossible.',
+          fix: 'None needed. They are part of the rail journey, not a substitute for it.',
+        })
+      }
+    }
+
+    const order = { critical: 0, caution: 1, note: 2 }
+    return risks.sort((a, b) => order[a.severity] - order[b.severity])
+  }
+
+  /* ------------------------------------------------------- booking order */
+  function bookingOrder(network, legs) {
+    const usedOps = new Set(legs.map(e => e.leg.op))
+    const usedServices = new Set(legs.map(e => e.leg.service))
+    const out = []
+
+    for (const item of network.scarcity) {
+      if (!usedOps.has(item.op)) continue
+      if (item.service && ![...usedServices].some(s => s && s.includes(item.service))) continue
+      out.push({ ...item, operator: network.operators[item.op] })
+    }
+    return out.sort((a, b) => a.rank - b.rank)
+  }
+
+  /* --------------------------------------------------------------- build */
+  function build(network, routed, opts = {}) {
+    const legs = mergeSegments(network, routed.path).map(leg => {
+      const fromId = leg.steps[0].from
+      const toId = leg.steps[leg.steps.length - 1].to
+      const from = network.stations[fromId]
+      const to = network.stations[toId]
+      const via = [...new Set(leg.steps.slice(0, -1).map(s => network.stations[s.to].city))].filter(
+        c => c !== from.city && c !== to.city
+      )
+      return {
+        leg,
+        fromId,
+        toId,
+        via,
+        fromName: from.name,
+        toName: to.name,
+        fromCity: from.city,
+        toCity: to.city,
+        operator: network.operators[leg.op],
+      }
+    })
+
+    const junctions = []
+    for (let i = 0; i < legs.length - 1; i++) {
+      const buf = bufferFor(network, legs[i], legs[i + 1])
+      junctions.push({
+        ...buf,
+        afterLeg: i,
+        stationId: legs[i].toId,
+        stationName: legs[i].toName,
+      })
+    }
+
+    const railHours = legs.filter(e => e.leg.mode === 'rail').reduce((n, e) => n + e.leg.hours, 0)
+    const seaHours = legs.filter(e => e.leg.mode === 'ferry').reduce((n, e) => n + e.leg.hours, 0)
+    const roadHours = legs.filter(e => e.leg.mode === 'road').reduce((n, e) => n + e.leg.hours, 0)
+    const bufferHours = junctions.reduce((n, j) => n + j.minutes / 60, 0)
+    const movingHours = railHours + seaHours + roadHours + bufferHours
+
+    const pace = PACE_HOURS[opts.pace] ?? PACE_HOURS.standard
+    const days = Math.max(1, Math.ceil(movingHours / pace))
+    const sleeperNights = legs.filter(e => e.leg.sleeper && e.leg.hours >= 7).length
+    const hotelNights = Math.max(0, days - 1 - sleeperNights)
+
+    const transportUsd = legs.reduce((n, e) => n + (e.leg.usd ?? 0), 0)
+    const lodgingUsd = hotelNights * HOTEL_USD
+
+    const stationIds = routed.stations
+    const stopIds = [legs[0].fromId, ...legs.map(e => e.toId)]
+
+    const borders = []
+    const seen = new Set()
+    for (const entry of legs) {
+      for (const id of entry.leg.borderIds) {
+        if (seen.has(id)) continue
+        seen.add(id)
+        borders.push({ ...network.borders[id], id, atLeg: entry })
+      }
+    }
+
+    const zones = [...new Set(stationIds.map(id => tzOf(network, id)))].sort((a, b) => a - b)
+    const seasons = seasonHits(network, opts.date)
+
+    const detours = Object.entries(DETOURS)
+      .filter(([id]) => stationIds.includes(id))
+      .map(([id, d]) => ({ ...d, stationId: id }))
+
+    const verifyCount = legs.filter(e => e.leg.confidence === 'verify').length
+
+    return {
+      legs,
+      junctions,
+      borders,
+      stationIds,
+      stopIds,
+      countries: countriesOn(network, stationIds),
+      zones,
+      seasons,
+      detours,
+      risks: buildRisks(network, legs, junctions, seasons, opts),
+      booking: bookingOrder(network, legs),
+      totals: {
+        railHours,
+        seaHours,
+        roadHours,
+        bufferHours,
+        movingHours,
+        days,
+        sleeperNights,
+        hotelNights,
+        transportUsd,
+        lodgingUsd,
+        totalUsd: transportUsd + lodgingUsd,
+        borders: borders.length,
+        legs: legs.length,
+        verifyCount,
+      },
+      flight: flightComparison(network, stationIds[0], stationIds[stationIds.length - 1]),
+      opts,
+    }
+  }
+
+  return { build, bufferFor, seasonHits, DETOURS, HOTEL_USD, clone }
+})()

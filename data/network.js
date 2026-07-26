@@ -1,0 +1,497 @@
+/* Southeast Asian overland network — stations, legs, borders.
+ *
+ * This is the product. The routing code is twenty lines; the value is in the
+ * accuracy of what follows, so every claim here is either structural (gauges,
+ * which stations exist, who stamps where) or explicitly labelled as indicative.
+ *
+ * Durations are typical scheduled running times, NOT departure times. The app
+ * never invents a departure time — the operators share no timetable and a
+ * remembered departure is the fastest way to strand someone at Padang Besar.
+ *
+ * confidence:
+ *   'structural' — physical/administrative fact, stable for years
+ *   'reported'   — consistent across Seat61 / Barrow / operator pages
+ *   'verify'     — volatile; the UI surfaces this as a warning
+ *
+ * Last reviewed against the network atlas: 2026-07.
+ */
+
+const NETWORK = {
+  reviewed: '2026-07',
+
+  intro:
+    'There is exactly one long continuous passenger rail spine in mainland Southeast Asia: ' +
+    'Kunming to Vientiane, a taxi across Vientiane, then Nong Khai to Bangkok to Hat Yai to ' +
+    'Padang Besar to Kuala Lumpur to JB Sentral to Singapore. Everything else is a branch or ' +
+    'an island. Cambodia hangs off that spine at Aranyaprathet. Vietnam is a self-contained ' +
+    'north-south line touching no neighbour\'s passenger network. Indonesia is reachable only ' +
+    'by sea. Myanmar is isolated.',
+
+  myths: [
+    { belief: 'You can take a train from Singapore to Beijing.',
+      reality: 'Five journeys, three transfers between unconnected stations, one of them a 15 km taxi in Vientiane. Possible as a project, not as a ticket.' },
+    { belief: 'There\'s a train from Bangkok to Hanoi.',
+      reality: 'No. Rail to Vientiane, then a 20-hour bus. Or rail via Cambodia, then a bus.' },
+    { belief: 'I\'ll get the train from Laos to Vietnam.',
+      reality: 'No such railway exists. None is built and none is imminent.' },
+    { belief: 'Penang has a train station.',
+      reality: 'Butterworth does, on the mainland. George Town is a ferry away — a good ferry, but a ferry.' },
+    { belief: 'KL to JB needs a change at Gemas.',
+      reality: 'Not since December 2025. Through ETS runs the whole way, some services direct from Padang Besar.' },
+    { belief: 'I\'ll change trains at Thanaleng.',
+      reality: 'Closed to passengers since 2024. It is a freight dry port now. Khamsavath is the station.' },
+    { belief: '"Vientiane station"',
+      reality: 'There are two, 15 km apart, on different gauges, serving opposite directions. Always name which one.' },
+  ],
+
+  operators: {
+    lcr:   { name: 'Laos–China Railway',      short: 'LCR',   gauge: 'standard', book: 'https://www.laoschinarailway.com', punctual: 'good',  note: 'Chinese-operated, keeps time. The risk is ticket availability, not delay.' },
+    cr:    { name: 'China Railway',           short: 'CR',    gauge: 'standard', book: 'https://www.12306.cn',              punctual: 'good',  note: '' },
+    srt:   { name: 'State Railway of Thailand', short: 'SRT', gauge: 'metre',    book: 'https://dticket.railway.co.th',     punctual: 'poor',  note: 'Long-distance services routinely run 30–90 min late. Southbound to Hat Yai is the worst offender.' },
+    ktmb:  { name: 'KTMB',                    short: 'KTMB',  gauge: 'metre',    book: 'https://online.ktmb.com.my',        punctual: 'good',  note: 'Genuinely punctual. You can plan to it.' },
+    rrc:   { name: 'Royal Railway Cambodia',  short: 'RRC',   gauge: 'metre',    book: 'https://www.royal-railway.com',     punctual: 'poor',  note: 'Limited frequency — often weekends plus selected days, not daily. Verify the train runs at all on your date.' },
+    dsvn:  { name: 'Vietnam Railways',        short: 'DSVN',  gauge: 'metre',    book: 'https://dsvn.vn',                   punctual: 'fair',  note: 'dsvn.vn is the genuine official site; several convincing lookalike domains are resellers.' },
+    kai:   { name: 'KAI (Indonesia)',         short: 'KAI',   gauge: 'metre',    book: 'https://booking.kai.id',            punctual: 'good',  note: 'The best rail in Southeast Asia — punctual, cheap, scenic.' },
+    ferry: { name: 'Ferry operator',          short: 'Ferry', gauge: null,       book: null,                                punctual: 'weather', note: 'Ferries are weather-cancelled rather than late. A cancellation costs a day.' },
+    road:  { name: 'Bus / taxi',              short: 'Road',  gauge: null,       book: null,                                punctual: 'fair',  note: '' },
+  },
+
+  /* ---------------------------------------------------------------- stations
+   * gauge: which network the platform physically belongs to. Two stations in
+   * the same city on different gauges are two different journeys.
+   */
+  stations: {
+    // --- China / Laos, standard gauge
+    kunming:        { name: 'Kunming South',            city: 'Kunming',       country: 'cn', lat: 24.92,  lon: 102.77, gauge: 'standard' },
+    mohan:          { name: 'Mohan',                    city: 'Mohan',         country: 'cn', lat: 21.18,  lon: 101.68, gauge: 'standard', minor: true },
+    boten:          { name: 'Boten',                    city: 'Boten',         country: 'la', lat: 21.13,  lon: 101.66, gauge: 'standard', minor: true },
+    nateuy:         { name: 'Luang Namtha (Nateuy)',    city: 'Luang Namtha',  country: 'la', lat: 20.95,  lon: 101.40, gauge: 'standard', minor: true },
+    oudomxay:       { name: 'Oudomxay',                 city: 'Muang Xay',     country: 'la', lat: 20.69,  lon: 101.99, gauge: 'standard', minor: true },
+    luangprabang:   { name: 'Luang Prabang',            city: 'Luang Prabang', country: 'la', lat: 19.94,  lon: 102.17, gauge: 'standard' },
+    vangvieng:      { name: 'Vang Vieng',               city: 'Vang Vieng',    country: 'la', lat: 18.92,  lon: 102.44, gauge: 'standard', minor: true },
+    vte_banthen:    { name: 'Vientiane (Banthen)',      city: 'Vientiane',     country: 'la', lat: 18.05,  lon: 102.52, gauge: 'standard',
+                      warn: 'Serves ONLY northbound LCR trains to Luang Prabang and China. Not the station for Thailand.' },
+
+    // --- Laos / Thailand, metre gauge
+    vte_khamsavath: { name: 'Vientiane (Khamsavath)',   city: 'Vientiane',     country: 'la', lat: 17.94,  lon: 102.68, gauge: 'metre',
+                      warn: 'Serves ONLY southbound trains to Thailand. 15 km from Banthen, no rail link between them.' },
+    nongkhai:       { name: 'Nong Khai',                city: 'Nong Khai',     country: 'th', lat: 17.87,  lon: 102.74, gauge: 'metre' },
+    udonthani:      { name: 'Udon Thani',               city: 'Udon Thani',    country: 'th', lat: 17.41,  lon: 102.79, gauge: 'metre' },
+    khonkaen:       { name: 'Khon Kaen',                city: 'Khon Kaen',     country: 'th', lat: 16.44,  lon: 102.83, gauge: 'metre' },
+    korat:          { name: 'Nakhon Ratchasima',        city: 'Korat',         country: 'th', lat: 14.97,  lon: 102.10, gauge: 'metre' },
+    ubon:           { name: 'Ubon Ratchathani',         city: 'Ubon',          country: 'th', lat: 15.24,  lon: 104.87, gauge: 'metre' },
+
+    // --- Thailand core
+    bkk_aphiwat:    { name: 'Krung Thep Aphiwat',       city: 'Bangkok',       country: 'th', lat: 13.80,  lon: 100.54, gauge: 'metre', hub: true,
+                      warn: 'Bangkok\'s long-distance terminal since 2023 — not the old Hua Lamphong. Confirm which terminal your specific train uses.' },
+    bkk_hualamphong:{ name: 'Hua Lamphong',             city: 'Bangkok',       country: 'th', lat: 13.74,  lon: 100.52, gauge: 'metre',
+                      warn: 'Now mostly local services, but some eastern trains (Aranyaprathet) still start here.' },
+    bkk_thonburi:   { name: 'Bangkok Thonburi',         city: 'Bangkok',       country: 'th', lat: 13.72,  lon: 100.47, gauge: 'metre', minor: true },
+    ayutthaya:      { name: 'Ayutthaya',                city: 'Ayutthaya',     country: 'th', lat: 14.36,  lon: 100.58, gauge: 'metre' },
+    phitsanulok:    { name: 'Phitsanulok',              city: 'Phitsanulok',   country: 'th', lat: 16.83,  lon: 100.27, gauge: 'metre' },
+    chiangmai:      { name: 'Chiang Mai',               city: 'Chiang Mai',    country: 'th', lat: 18.79,  lon: 98.98,  gauge: 'metre' },
+    kanchanaburi:   { name: 'Kanchanaburi',             city: 'Kanchanaburi',  country: 'th', lat: 14.02,  lon: 99.53,  gauge: 'metre' },
+    namtok:         { name: 'Nam Tok',                  city: 'Nam Tok',       country: 'th', lat: 14.24,  lon: 99.07,  gauge: 'metre', minor: true },
+    aranyaprathet:  { name: 'Aranyaprathet',            city: 'Aranyaprathet', country: 'th', lat: 13.69,  lon: 102.50, gauge: 'metre' },
+    huahin:         { name: 'Hua Hin',                  city: 'Hua Hin',       country: 'th', lat: 12.57,  lon: 99.96,  gauge: 'metre' },
+    chumphon:       { name: 'Chumphon',                 city: 'Chumphon',      country: 'th', lat: 10.50,  lon: 99.18,  gauge: 'metre' },
+    suratthani:     { name: 'Surat Thani (Phun Phin)',  city: 'Surat Thani',   country: 'th', lat: 9.14,   lon: 99.27,  gauge: 'metre',
+                      warn: 'The station is at Phun Phin, 13 km from Surat Thani town and a long way from any pier.' },
+    trang:          { name: 'Trang',                    city: 'Trang',         country: 'th', lat: 7.55,   lon: 99.61,  gauge: 'metre' },
+    hatyai:         { name: 'Hat Yai Junction',         city: 'Hat Yai',       country: 'th', lat: 7.01,   lon: 100.47, gauge: 'metre', hub: true },
+    padangbesar:    { name: 'Padang Besar',             city: 'Padang Besar',  country: 'th', lat: 6.66,   lon: 100.32, gauge: 'metre', hub: true,
+                      warn: 'Joint station. SRT publishes departures in Thai time (UTC+7), KTMB in Malaysian time (UTC+8). Read both and you will build a connection that is an hour off.' },
+    sungaikolok:    { name: 'Sungai Kolok',             city: 'Sungai Kolok',  country: 'th', lat: 6.02,   lon: 101.97, gauge: 'metre',
+                      warn: 'Standing security advisories cover Narathiwat, Yala and Pattani provinces.' },
+    ranong:         { name: 'Ranong',                   city: 'Ranong',        country: 'th', lat: 9.96,   lon: 98.63,  gauge: null, minor: true },
+
+    // --- Cambodia
+    poipet:         { name: 'Poipet',                   city: 'Poipet',        country: 'kh', lat: 13.66,  lon: 102.56, gauge: 'metre' },
+    battambang:     { name: 'Battambang',               city: 'Battambang',    country: 'kh', lat: 13.10,  lon: 103.20, gauge: 'metre' },
+    phnompenh:      { name: 'Phnom Penh',               city: 'Phnom Penh',    country: 'kh', lat: 11.57,  lon: 104.92, gauge: 'metre', hub: true },
+    takeo:          { name: 'Takeo',                    city: 'Takeo',         country: 'kh', lat: 10.99,  lon: 104.79, gauge: 'metre', minor: true },
+    kampot:         { name: 'Kampot',                   city: 'Kampot',        country: 'kh', lat: 10.61,  lon: 104.18, gauge: 'metre' },
+    sihanoukville:  { name: 'Sihanoukville',            city: 'Sihanoukville', country: 'kh', lat: 10.63,  lon: 103.52, gauge: 'metre' },
+
+    // --- Vietnam
+    hanoi:          { name: 'Hanoi',                    city: 'Hanoi',         country: 'vn', lat: 21.02,  lon: 105.84, gauge: 'metre', hub: true },
+    laocai:         { name: 'Lào Cai',                  city: 'Lào Cai',       country: 'vn', lat: 22.49,  lon: 103.97, gauge: 'metre' },
+    haiphong:       { name: 'Hải Phòng',                city: 'Hải Phòng',     country: 'vn', lat: 20.86,  lon: 106.68, gauge: 'metre' },
+    dongdang:       { name: 'Đồng Đăng',                city: 'Đồng Đăng',     country: 'vn', lat: 21.95,  lon: 106.71, gauge: 'metre', minor: true },
+    vinh:           { name: 'Vinh',                     city: 'Vinh',          country: 'vn', lat: 18.68,  lon: 105.68, gauge: 'metre' },
+    hue:            { name: 'Huế',                      city: 'Huế',           country: 'vn', lat: 16.46,  lon: 107.59, gauge: 'metre' },
+    danang:         { name: 'Đà Nẵng',                  city: 'Đà Nẵng',       country: 'vn', lat: 16.07,  lon: 108.22, gauge: 'metre' },
+    nhatrang:       { name: 'Nha Trang',                city: 'Nha Trang',     country: 'vn', lat: 12.25,  lon: 109.19, gauge: 'metre' },
+    saigon:         { name: 'Sài Gòn',                  city: 'Ho Chi Minh City', country: 'vn', lat: 10.78, lon: 106.68, gauge: 'metre', hub: true },
+
+    // --- Malaysia
+    arau:           { name: 'Arau',                     city: 'Arau',          country: 'my', lat: 6.43,   lon: 100.27, gauge: 'metre' },
+    kualaperlis:    { name: 'Kuala Perlis pier',        city: 'Kuala Perlis',  country: 'my', lat: 6.40,   lon: 100.13, gauge: null, minor: true },
+    langkawi:       { name: 'Langkawi (Kuah)',          city: 'Langkawi',      country: 'my', lat: 6.32,   lon: 99.85,  gauge: null },
+    alorsetar:      { name: 'Alor Setar',               city: 'Alor Setar',    country: 'my', lat: 6.12,   lon: 100.37, gauge: 'metre' },
+    butterworth:    { name: 'Butterworth',              city: 'Butterworth',   country: 'my', lat: 5.39,   lon: 100.36, gauge: 'metre',
+                      warn: 'This is the station for Penang. George Town is across the water — the ferry berths beside the station.' },
+    georgetown:     { name: 'George Town',              city: 'Penang',        country: 'my', lat: 5.42,   lon: 100.34, gauge: null },
+    ipoh:           { name: 'Ipoh',                     city: 'Ipoh',          country: 'my', lat: 4.60,   lon: 101.09, gauge: 'metre' },
+    klsentral:      { name: 'KL Sentral',               city: 'Kuala Lumpur',  country: 'my', lat: 3.13,   lon: 101.69, gauge: 'metre', hub: true },
+    portklang:      { name: 'Port Klang',               city: 'Port Klang',    country: 'my', lat: 3.00,   lon: 101.39, gauge: 'metre', minor: true },
+    tampin:         { name: 'Tampin / Pulau Sebang',    city: 'Tampin',        country: 'my', lat: 2.46,   lon: 102.23, gauge: 'metre', minor: true },
+    melaka:         { name: 'Melaka ferry terminal',    city: 'Melaka',        country: 'my', lat: 2.19,   lon: 102.25, gauge: null },
+    gemas:          { name: 'Gemas',                    city: 'Gemas',         country: 'my', lat: 2.59,   lon: 102.61, gauge: 'metre',
+                      warn: 'Junction for the East Coast "Jungle Railway". No longer a forced change for KL–JB since the Dec 2025 electrification.' },
+    kualalipis:     { name: 'Kuala Lipis',              city: 'Kuala Lipis',   country: 'my', lat: 4.18,   lon: 102.05, gauge: 'metre' },
+    wakafbaharu:    { name: 'Wakaf Baharu',             city: 'Kota Bharu',    country: 'my', lat: 6.16,   lon: 102.22, gauge: 'metre' },
+    rantaupanjang:  { name: 'Rantau Panjang',           city: 'Rantau Panjang',country: 'my', lat: 6.03,   lon: 101.98, gauge: null, minor: true },
+    jbsentral:      { name: 'JB Sentral',               city: 'Johor Bahru',   country: 'my', lat: 1.46,   lon: 103.76, gauge: 'metre', hub: true },
+    kotakinabalu:   { name: 'Kota Kinabalu (Tanjung Aru)', city: 'Kota Kinabalu', country: 'my', lat: 5.94, lon: 116.05, gauge: 'metre',
+                      warn: 'Sabah\'s 130 km line is isolated from every other railway in Asia. It connects to nothing.' },
+    tenom:          { name: 'Tenom',                    city: 'Tenom',         country: 'my', lat: 5.13,   lon: 115.94, gauge: 'metre', minor: true },
+
+    // --- Singapore
+    woodlands:      { name: 'Woodlands CIQ',            city: 'Singapore',     country: 'sg', lat: 1.45,   lon: 103.79, gauge: 'metre' },
+    singapore:      { name: 'Singapore (HarbourFront)', city: 'Singapore',     country: 'sg', lat: 1.265,  lon: 103.82, gauge: null, hub: true,
+                      warn: 'Rail dead end. Everything onward from here is a boat.' },
+
+    // --- Indonesia
+    batam:          { name: 'Batam Centre',             city: 'Batam',         country: 'id', lat: 1.13,   lon: 104.05, gauge: null },
+    dumai:          { name: 'Dumai',                    city: 'Dumai',         country: 'id', lat: 1.67,   lon: 101.44, gauge: null },
+    pekanbaru:      { name: 'Pekanbaru',                city: 'Pekanbaru',     country: 'id', lat: 0.51,   lon: 101.45, gauge: null, minor: true },
+    belawan:        { name: 'Belawan',                  city: 'Belawan',       country: 'id', lat: 3.78,   lon: 98.69,  gauge: null, minor: true },
+    medan:          { name: 'Medan',                    city: 'Medan',         country: 'id', lat: 3.59,   lon: 98.68,  gauge: 'metre',
+                      warn: 'North Sumatra\'s rail fragment reaches nothing else. It does not join the southern Sumatra network or Java.' },
+    palembang:      { name: 'Palembang (Kertapati)',    city: 'Palembang',     country: 'id', lat: -3.02,  lon: 104.75, gauge: 'metre' },
+    bandarlampung:  { name: 'Bandar Lampung (Tanjungkarang)', city: 'Bandar Lampung', country: 'id', lat: -5.42, lon: 105.26, gauge: 'metre' },
+    bakauheni:      { name: 'Bakauheni',                city: 'Bakauheni',     country: 'id', lat: -5.87,  lon: 105.75, gauge: null, minor: true },
+    merak:          { name: 'Merak',                    city: 'Merak',         country: 'id', lat: -5.93,  lon: 106.00, gauge: 'metre', minor: true },
+    jakarta:        { name: 'Jakarta (Gambir)',         city: 'Jakarta',       country: 'id', lat: -6.18,  lon: 106.83, gauge: 'metre', hub: true },
+    bandung:        { name: 'Bandung',                  city: 'Bandung',       country: 'id', lat: -6.91,  lon: 107.60, gauge: 'metre' },
+    yogyakarta:     { name: 'Yogyakarta (Tugu)',        city: 'Yogyakarta',    country: 'id', lat: -7.78,  lon: 110.36, gauge: 'metre' },
+    surabaya:       { name: 'Surabaya (Gubeng)',        city: 'Surabaya',      country: 'id', lat: -7.27,  lon: 112.75, gauge: 'metre' },
+    banyuwangi:     { name: 'Banyuwangi (Ketapang)',    city: 'Banyuwangi',    country: 'id', lat: -8.14,  lon: 114.39, gauge: 'metre',
+                      warn: 'The ferry pier is beside the station. This is what makes "Singapore to Bali overland" literally true.' },
+    gilimanuk:      { name: 'Gilimanuk',                city: 'Gilimanuk',     country: 'id', lat: -8.16,  lon: 114.44, gauge: null, minor: true },
+    denpasar:       { name: 'Denpasar',                 city: 'Bali',          country: 'id', lat: -8.67,  lon: 115.22, gauge: null },
+
+    // --- Thailand islands
+    donsak:         { name: 'Donsak pier',              city: 'Donsak',        country: 'th', lat: 9.31,   lon: 99.68,  gauge: null, minor: true },
+    kohsamui:       { name: 'Koh Samui',                city: 'Koh Samui',     country: 'th', lat: 9.51,   lon: 100.06, gauge: null },
+    kohlanta:       { name: 'Koh Lanta',                city: 'Koh Lanta',     country: 'th', lat: 7.62,   lon: 99.04,  gauge: null },
+
+    // --- Myanmar (advisory)
+    kawthaung:      { name: 'Kawthaung',                city: 'Kawthaung',     country: 'mm', lat: 9.98,   lon: 98.55,  gauge: null,
+                      warn: 'Standing security advisories cover much of Myanmar, and there is no through rail to Thailand.' },
+  },
+
+  /* -------------------------------------------------------------------- legs
+   * mode:      rail | ferry | road
+   * essential: a road/ferry leg with no rail alternative that is part of the
+   *            rail journey (a station transfer, a pier shuttle). Kept even in
+   *            hard rail-only mode, because excluding it doesn't route around
+   *            the gap — it just makes the journey impossible.
+   * hours:     typical scheduled running time, excluding border formalities.
+   * usd:       indicative one-way fare in the class named.
+   */
+  legs: [
+    // === Laos–China Railway (standard gauge) ============================
+    { from: 'kunming', to: 'mohan', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 4.5, usd: 40, cls: '2nd class seat', confidence: 'reported' },
+    { from: 'mohan', to: 'boten', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.4, usd: 3, border: 'boten', confidence: 'structural' },
+    { from: 'boten', to: 'nateuy', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
+    { from: 'nateuy', to: 'oudomxay', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.6, usd: 5, confidence: 'reported' },
+    { from: 'oudomxay', to: 'luangprabang', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 1.0, usd: 8, confidence: 'reported' },
+    { from: 'luangprabang', to: 'vangvieng', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 1.0, usd: 8, scenic: true, confidence: 'reported' },
+    { from: 'vangvieng', to: 'vte_banthen', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 1.0, usd: 8, confidence: 'reported' },
+
+    // === The Vientiane gauge break =====================================
+    { from: 'vte_banthen', to: 'vte_khamsavath', mode: 'road', op: 'road', service: 'Taxi across Vientiane', hours: 0.75, usd: 12, essential: true, km: 15,
+      confidence: 'structural',
+      note: 'Two unconnected railways on two gauges, 15 km apart. There is no rail link and there will not be one soon. Expect a taxi queue when a full train empties out.' },
+
+    // === Thai–Lao metre gauge ==========================================
+    { from: 'vte_khamsavath', to: 'nongkhai', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 0.4, usd: 2, border: 'nongkhai', confidence: 'structural' },
+
+    // === SRT northeast =================================================
+    { from: 'nongkhai', to: 'udonthani', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 1.0, usd: 3, confidence: 'reported' },
+    { from: 'udonthani', to: 'khonkaen', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 2.0, usd: 6, confidence: 'reported' },
+    { from: 'khonkaen', to: 'korat', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 3.0, usd: 9, confidence: 'reported' },
+    { from: 'korat', to: 'bkk_aphiwat', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 4.5, usd: 14, sleeper: true, confidence: 'reported' },
+    { from: 'korat', to: 'ubon', mode: 'rail', op: 'srt', service: 'Special Express / Rapid', hours: 5.5, usd: 13, confidence: 'reported' },
+
+    // === SRT north =====================================================
+    { from: 'bkk_aphiwat', to: 'ayutthaya', mode: 'rail', op: 'srt', service: 'Most northern services', hours: 1.3, usd: 2, confidence: 'reported' },
+    { from: 'ayutthaya', to: 'phitsanulok', mode: 'rail', op: 'srt', service: 'Special Express 9/10', hours: 3.5, usd: 11, confidence: 'reported' },
+    { from: 'phitsanulok', to: 'chiangmai', mode: 'rail', op: 'srt', service: 'Special Express 9/10 (overnight)', hours: 7.5, usd: 22, sleeper: true, scenic: true, confidence: 'reported',
+      note: 'Trains 9/10 are the best sleeper in the region. 2nd class A/C lower berth is the value sweet spot.' },
+
+    // === Death Railway branch ==========================================
+    { from: 'bkk_aphiwat', to: 'bkk_thonburi', mode: 'road', op: 'road', service: 'Taxi / MRT across Bangkok', hours: 0.6, usd: 5, essential: true, confidence: 'structural' },
+    { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, confidence: 'reported' },
+    { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, confidence: 'reported',
+      note: 'The Death Railway. The Wampo viaduct section is the reason to take it.' },
+
+    // === SRT east — Cambodia ===========================================
+    { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'road', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
+    { from: 'bkk_hualamphong', to: 'aranyaprathet', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 5.5, usd: 2, cls: '3rd class fan', confidence: 'reported' },
+    { from: 'aranyaprathet', to: 'poipet', mode: 'road', op: 'road', service: 'Tuk-tuk / on foot through the border complex', hours: 0.5, usd: 2, essential: true, border: 'poipet', confidence: 'structural' },
+    { from: 'poipet', to: 'battambang', mode: 'rail', op: 'rrc', service: 'Royal Railway northern line', hours: 4.0, usd: 6, confidence: 'verify',
+      note: 'Verify the train runs at all on your date — frequency is often weekends plus selected days.' },
+    { from: 'battambang', to: 'phnompenh', mode: 'rail', op: 'rrc', service: 'Royal Railway northern line', hours: 7.0, usd: 8, confidence: 'verify' },
+    { from: 'phnompenh', to: 'takeo', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 1.5, usd: 3, confidence: 'verify' },
+    { from: 'takeo', to: 'kampot', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 2.5, usd: 4, confidence: 'verify' },
+    { from: 'kampot', to: 'sihanoukville', mode: 'rail', op: 'rrc', service: 'Royal Railway southern line', hours: 2.0, usd: 4, scenic: true, confidence: 'verify' },
+    { from: 'phnompenh', to: 'saigon', mode: 'road', op: 'road', service: 'Giant Ibis / Mekong Express coach', hours: 7.0, usd: 15, border: 'bavet', confidence: 'reported',
+      note: 'No railway exists on this corridor and none is under construction. This is a bus, and calling it anything else would be dishonest.' },
+
+    // === SRT south =====================================================
+    { from: 'bkk_aphiwat', to: 'huahin', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 3.5, usd: 9, confidence: 'reported' },
+    { from: 'huahin', to: 'chumphon', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 4.0, usd: 11, sleeper: true, confidence: 'reported' },
+    { from: 'chumphon', to: 'suratthani', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 2.5, usd: 7, confidence: 'reported' },
+    { from: 'suratthani', to: 'hatyai', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 5.0, usd: 13, confidence: 'reported' },
+    { from: 'suratthani', to: 'trang', mode: 'rail', op: 'srt', service: 'Trang branch via Thung Song', hours: 3.5, usd: 9, confidence: 'reported' },
+    { from: 'hatyai', to: 'padangbesar', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 1.0, usd: 3, border: 'padangbesar', confidence: 'reported' },
+    { from: 'hatyai', to: 'sungaikolok', mode: 'rail', op: 'srt', service: 'Rapid / Ordinary', hours: 4.0, usd: 6, advisory: 'deepsouth', confidence: 'reported' },
+
+    // === Thai island branches ==========================================
+    { from: 'suratthani', to: 'donsak', mode: 'road', op: 'road', service: 'Connecting bus from Phun Phin station', hours: 1.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'donsak', to: 'kohsamui', mode: 'ferry', op: 'ferry', service: 'Raja / Seatran vehicle ferry', hours: 1.5, usd: 6, seasonal: 'gulf', confidence: 'reported',
+      note: 'Combined train + bus + ferry tickets are widely sold and remove most of the friction.' },
+    { from: 'trang', to: 'kohlanta', mode: 'ferry', op: 'ferry', service: 'Minivan to pier, then ferry', hours: 3.0, usd: 15, seasonal: 'andaman', confidence: 'verify' },
+    { from: 'chumphon', to: 'ranong', mode: 'road', op: 'road', service: 'Local bus', hours: 3.0, usd: 5, confidence: 'reported' },
+    { from: 'ranong', to: 'kawthaung', mode: 'ferry', op: 'ferry', service: 'Longtail across the estuary', hours: 0.75, usd: 10, advisory: 'myanmar', confidence: 'verify' },
+
+    // === Thailand ↔ Malaysia east coast ================================
+    { from: 'sungaikolok', to: 'rantaupanjang', mode: 'road', op: 'road', service: 'On foot across the frontier bridge', hours: 0.5, usd: 1, essential: true, border: 'sungaikolok', advisory: 'deepsouth', confidence: 'structural' },
+    { from: 'rantaupanjang', to: 'wakafbaharu', mode: 'road', op: 'road', service: 'Local taxi / bus', hours: 0.75, usd: 6, essential: true, confidence: 'reported' },
+    { from: 'wakafbaharu', to: 'kualalipis', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 7.0, usd: 6, scenic: true, confidence: 'reported' },
+    { from: 'kualalipis', to: 'gemas', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 6.0, usd: 6, scenic: true, confidence: 'reported',
+      note: 'Slow, scenic, cult status. Take it because the journey is the point, not to get anywhere.' },
+
+    // === KTMB west coast spine =========================================
+    { from: 'padangbesar', to: 'arau', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.4, usd: 2, confidence: 'reported' },
+    { from: 'arau', to: 'alorsetar', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.6, usd: 2, confidence: 'reported' },
+    { from: 'alorsetar', to: 'butterworth', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 1.3, usd: 4, confidence: 'reported' },
+    { from: 'butterworth', to: 'ipoh', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 1.8, usd: 7, confidence: 'reported' },
+    { from: 'ipoh', to: 'klsentral', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 2.3, usd: 10, confidence: 'reported' },
+    { from: 'klsentral', to: 'gemas', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 2.2, usd: 8, confidence: 'reported' },
+    { from: 'gemas', to: 'jbsentral', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 1.9, usd: 9, confidence: 'reported',
+      note: 'Electrified December 2025. KL–JB is now about 4h10 end to end; guides written before then still say 7 hours and a change at Gemas.' },
+    { from: 'klsentral', to: 'tampin', mode: 'rail', op: 'ktmb', service: 'ETS (via Tampin)', hours: 1.5, usd: 6, confidence: 'reported' },
+    { from: 'tampin', to: 'gemas', mode: 'rail', op: 'ktmb', service: 'ETS (via Tampin)', hours: 0.7, usd: 3, confidence: 'reported' },
+    { from: 'klsentral', to: 'portklang', mode: 'rail', op: 'ktmb', service: 'KTM Komuter', hours: 1.2, usd: 2, confidence: 'reported' },
+
+    // === Malaysian sea branches ========================================
+    { from: 'butterworth', to: 'georgetown', mode: 'ferry', op: 'ferry', service: 'Penang ferry', hours: 0.25, usd: 1, essential: true, scenic: true, confidence: 'structural',
+      note: 'Berths beside the KTMB station. Take it over the bridge bus every time — the approach to George Town by water is one of the better moments on the whole spine.' },
+    { from: 'arau', to: 'kualaperlis', mode: 'road', op: 'road', service: 'Taxi from Arau station', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'kualaperlis', to: 'langkawi', mode: 'ferry', op: 'ferry', service: 'Langkawi fast ferry', hours: 1.25, usd: 5, seasonal: 'andaman', confidence: 'reported',
+      note: 'Puts a genuine rest day right at the Thai–Malaysian border, which is exactly where a long spine journey needs one.' },
+    { from: 'tampin', to: 'melaka', mode: 'road', op: 'road', service: 'Bus / taxi from Pulau Sebang', hours: 0.75, usd: 5, essential: true, confidence: 'reported' },
+
+    // === Malaysia ↔ Singapore ==========================================
+    { from: 'jbsentral', to: 'woodlands', mode: 'rail', op: 'ktmb', service: 'Shuttle Tebrau', hours: 0.1, usd: 1.2, border: 'woodlands', confidence: 'structural',
+      note: 'Five minutes of track and the most reliably sold-out service in Southeast Asia. Book it the instant the window opens.' },
+    { from: 'woodlands', to: 'singapore', mode: 'road', op: 'road', service: 'MRT Thomson–East Coast Line', hours: 0.5, usd: 1.5, essential: true, confidence: 'structural' },
+
+    // === Singapore / Malaysia ↔ Indonesia ==============================
+    { from: 'singapore', to: 'batam', mode: 'ferry', op: 'ferry', service: 'HarbourFront or Tanah Merah fast ferry', hours: 1.0, usd: 18, border: 'batam', confidence: 'reported',
+      note: 'This is how you get past Singapore\'s dead end. Full immigration both ends.' },
+    { from: 'batam', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Riau inter-island ferry', hours: 6.0, usd: 30, confidence: 'verify',
+      note: 'Schedules and operators on the Riau routes change often. Verify before you rely on it.' },
+    { from: 'melaka', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Melaka–Dumai international ferry', hours: 3.0, usd: 40, border: 'dumai', confidence: 'verify',
+      note: 'The elegant Malaysia→Sumatra continuation when it runs — but this route has suspended and resumed repeatedly. Verify, and have the Batam routing as fallback.' },
+    { from: 'portklang', to: 'dumai', mode: 'ferry', op: 'ferry', service: 'Port Klang–Dumai international ferry', hours: 5.0, usd: 45, border: 'dumai', confidence: 'verify' },
+    { from: 'georgetown', to: 'belawan', mode: 'ferry', op: 'ferry', service: 'Penang–Belawan ferry', hours: 5.0, usd: 50, border: 'belawan', confidence: 'verify',
+      note: 'Historically operated, intermittent. When running it shortcuts the whole peninsula.' },
+
+    // === Sumatra =======================================================
+    { from: 'belawan', to: 'medan', mode: 'road', op: 'road', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'medan', to: 'pekanbaru', mode: 'road', op: 'road', service: 'Long-distance coach', hours: 14.0, usd: 20, confidence: 'reported',
+      note: 'North Sumatra\'s railway does not reach south Sumatra\'s. This gap is road, and it is the least pleasant day of any Singapore–Bali itinerary.' },
+    { from: 'dumai', to: 'pekanbaru', mode: 'road', op: 'road', service: 'Coach', hours: 3.0, usd: 8, confidence: 'reported' },
+    { from: 'pekanbaru', to: 'palembang', mode: 'road', op: 'road', service: 'Long-distance coach', hours: 12.0, usd: 20, confidence: 'reported' },
+    { from: 'palembang', to: 'bandarlampung', mode: 'rail', op: 'kai', service: 'Rajabasa / Sriwijaya', hours: 9.0, usd: 8, sleeper: true, confidence: 'reported',
+      note: 'South Sumatra\'s isolated network. Pleasant, and a relief after the coaches.' },
+    { from: 'bandarlampung', to: 'bakauheni', mode: 'road', op: 'road', service: 'Damri bus', hours: 2.0, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'bakauheni', to: 'merak', mode: 'ferry', op: 'ferry', service: 'ASDP ferry', hours: 2.0, usd: 1.5, essential: true, confidence: 'reported',
+      note: 'Very frequent, around the clock. Usually taken as a through bus-plus-ferry ticket.' },
+
+    // === Java ==========================================================
+    { from: 'merak', to: 'jakarta', mode: 'rail', op: 'kai', service: 'KAI Commuter via Rangkasbitung', hours: 3.5, usd: 1, confidence: 'reported' },
+    { from: 'jakarta', to: 'bandung', mode: 'rail', op: 'kai', service: 'Whoosh high-speed', hours: 0.75, usd: 15, confidence: 'reported',
+      note: 'Whoosh runs Halim–Tegalluar in about 45 minutes. The conventional Argo Parahyangan from Gambir takes ~3 h and is the prettier ride.' },
+    { from: 'bandung', to: 'yogyakarta', mode: 'rail', op: 'kai', service: 'Argo Wilis / Turangga', hours: 6.5, usd: 12, scenic: true, confidence: 'reported' },
+    { from: 'yogyakarta', to: 'surabaya', mode: 'rail', op: 'kai', service: 'Argo / Bima', hours: 4.5, usd: 10, confidence: 'reported' },
+    { from: 'surabaya', to: 'banyuwangi', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 6.5, usd: 8, scenic: true, confidence: 'reported' },
+    { from: 'banyuwangi', to: 'gilimanuk', mode: 'ferry', op: 'ferry', service: 'ASDP Ketapang–Gilimanuk', hours: 0.75, usd: 1, essential: true, confidence: 'structural',
+      note: 'Runs around the clock, pier beside the station. The dawn crossing is the one people remember.' },
+    { from: 'gilimanuk', to: 'denpasar', mode: 'road', op: 'road', service: 'Bus / private car', hours: 4.0, usd: 10, essential: true, confidence: 'reported' },
+
+    // === Vietnam =======================================================
+    { from: 'vte_khamsavath', to: 'hanoi', mode: 'road', op: 'road', service: 'Sleeper coach via Nam Phao / Cau Treo', hours: 20.0, usd: 30, border: 'namphao', confidence: 'reported',
+      note: 'There is no railway between Laos and Vietnam. None is built and none is imminent. This is a twenty-hour bus and it should be planned as one — the coach leaves from Vientiane\'s bus terminal, not from either railway station.' },
+    { from: 'hanoi', to: 'vinh', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 6.0, usd: 12, sleeper: true, confidence: 'reported' },
+    { from: 'vinh', to: 'hue', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 7.0, usd: 15, sleeper: true, confidence: 'reported' },
+    { from: 'hue', to: 'danang', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3.0, usd: 5, scenic: true, confidence: 'reported',
+      note: 'The Hải Vân pass. Among the best rail scenery in Asia — take a daytime train and sit on the sea side.' },
+    { from: 'danang', to: 'nhatrang', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 10.0, usd: 22, sleeper: true, confidence: 'reported' },
+    { from: 'nhatrang', to: 'saigon', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 8.0, usd: 18, sleeper: true, confidence: 'reported' },
+    { from: 'hanoi', to: 'laocai', mode: 'rail', op: 'dsvn', service: 'SP1–SP4 (overnight, for Sapa)', hours: 8.0, usd: 20, sleeper: true, confidence: 'reported' },
+    { from: 'hanoi', to: 'haiphong', mode: 'rail', op: 'dsvn', service: 'HP1/HP2/LP3', hours: 2.5, usd: 4, confidence: 'reported' },
+    { from: 'hanoi', to: 'dongdang', mode: 'rail', op: 'dsvn', service: 'DD3/DD4', hours: 4.0, usd: 6, confidence: 'verify',
+      note: 'Cross-border passenger service to China from here has been intermittent for years. Treat the frontier as closed unless you have confirmed otherwise.' },
+
+    // === Sabah (isolated) ==============================================
+    { from: 'kotakinabalu', to: 'tenom', mode: 'rail', op: 'ktmb', service: 'Sabah State Railway', hours: 2.5, usd: 5, scenic: true, confidence: 'reported' },
+  ],
+
+  /* ----------------------------------------------------------------- borders
+   * The part of the product nobody else writes. Mechanics first, then the trap.
+   */
+  borders: {
+    boten: {
+      name: 'Boten ↔ Mohan', countries: 'Laos ↔ China', at: 'On the train, stopping at both stations',
+      minutes: 90,
+      stayOnTrain: 'Off and on — Lao exit at Boten, re-board, Chinese entry at Mohan',
+      luggage: 'Partial — off for scanning at Mohan',
+      visa: 'A Chinese visa must already be in your passport. There is no reliable visa-on-arrival at the Mohan railway checkpoint.',
+      hard: true,
+      cash: 'Carry a small amount of Chinese yuan — border ATMs fail routinely.',
+      trap: 'China\'s transit-visa-free and unilateral visa-free arrangements are usually air-arrival specific. Do not assume a policy that works at an airport works at a land rail crossing. This is the crossing that most often defeats travellers, and it defeats them on documents rather than logistics.',
+      verify: true,
+    },
+    nongkhai: {
+      name: 'Khamsavath ↔ Nong Khai', countries: 'Laos ↔ Thailand', at: 'Lao formalities at Khamsavath, Thai immigration and customs at Nong Khai',
+      minutes: 60,
+      stayOnTrain: 'Yes, on the through sleeper',
+      luggage: 'Yes — all luggage comes off the train at Nong Khai for customs',
+      visa: 'Lao visa-on-arrival is generally available; Thai entry is visa-exempt for many nationalities. Confirm for your passport.',
+      cash: 'Small amounts of Thai baht and Lao kip.',
+      trap: 'You must take every bag off the train at Nong Khai for customs. Travellers who do not know this get caught out at night, half asleep, and hold up the carriage. Separately: arriving at Khamsavath does not put you on the Laos–China Railway — that is Banthen, 15 km away, different gauge, separate ticket.',
+    },
+    padangbesar: {
+      name: 'Padang Besar', countries: 'Thailand ↔ Malaysia', at: 'Joint station — both countries\' immigration inside the same building, at platform level',
+      minutes: 90,
+      stayOnTrain: 'No — you change trains here',
+      luggage: 'Yes',
+      visa: 'Malaysian entry is visa-free for many nationalities and generally quick. The queue depends entirely on whether a full SRT train just arrived.',
+      cash: 'Malaysian ringgit for the ETS ticket if you have not pre-booked.',
+      trap: 'Malaysia is UTC+8, Thailand UTC+7. SRT publishes Padang Besar departures in Thai time; KTMB publishes them in Malaysian time. Read both operators\' sites and you will construct a connection exactly one hour different from reality — in the direction that makes you miss it. Convert everything to one clock before you book.',
+      buffer: 'Minimum 90 minutes between scheduled SRT arrival and ETS departure. Given SRT\'s southbound punctuality, prefer two hours or an overnight in Hat Yai.',
+    },
+    woodlands: {
+      name: 'JB Sentral ↔ Woodlands', countries: 'Malaysia ↔ Singapore', at: 'Southbound: both Malaysian exit and Singaporean entry cleared at JB Sentral before boarding',
+      minutes: 45,
+      stayOnTrain: 'Cleared before boarding — you arrive in Singapore already admitted',
+      luggage: 'Yes',
+      visa: 'Singapore entry is visa-free for most nationalities; an SG Arrival Card must be submitted online before arrival.',
+      cash: 'Nothing needed — the leg is a few ringgit.',
+      trap: 'The ticket, not the border. Five minutes of track and the most reliably sold-out service in the region. The road causeway is the fallback and can mean hours in traffic.',
+      verify: true,
+      verifyNote: 'Check whether the RTS Link (JB–Woodlands North metro) has opened — it was targeted for end-2026 and changes this crossing\'s capacity and mechanics entirely.',
+    },
+    poipet: {
+      name: 'Aranyaprathet ↔ Poipet', countries: 'Thailand ↔ Cambodia', at: 'Border complex between the two railheads, crossed on foot or by short tuk-tuk',
+      minutes: 180,
+      stayOnTrain: 'No — SRT terminates at Aranyaprathet, Royal Railway starts at Poipet',
+      luggage: 'Yes, carried across',
+      visa: 'Get the Cambodian e-visa in advance. It removes most of the friction and most of the scam surface.',
+      cash: 'US dollars in small notes — Cambodia runs on them, and border ATMs are unreliable.',
+      trap: 'The region\'s most scam-prone crossing: fake "visa offices" positioned before the real one, inflated e-visa fees, invented "processing" charges. Use only the official immigration building and know the correct official fee before you arrive. Budget 2–3 hours end to end, more at weekends.',
+      verify: true,
+      verifyNote: 'Verify whether a Royal Railway train runs at all on your arrival day, or plan a night in Poipet or Battambang.',
+    },
+    sungaikolok: {
+      name: 'Sungai Kolok ↔ Rantau Panjang', countries: 'Thailand ↔ Malaysia (east coast)', at: 'Frontier bridge, crossed on foot',
+      minutes: 90,
+      stayOnTrain: 'No — walk across, then local transport to Wakaf Baharu',
+      luggage: 'Yes',
+      visa: 'As Padang Besar. Malaysian entry generally straightforward.',
+      cash: 'Ringgit for the taxi to Wakaf Baharu.',
+      trap: 'Standing security advisories cover Thailand\'s far-southern provinces — Narathiwat, Yala and Pattani. Many governments advise against non-essential travel there. Check your own government\'s current position and decide deliberately. Only worth it if the Jungle Railway is the point of the trip.',
+      advisory: true,
+    },
+    bavet: {
+      name: 'Bavet ↔ Moc Bai', countries: 'Cambodia ↔ Vietnam', at: 'Road border — the coach handles the paperwork',
+      minutes: 90,
+      stayOnTrain: 'Bus stops, everyone off and back on',
+      luggage: 'Yes',
+      visa: 'Vietnamese e-visa should be obtained in advance — land borders do not reliably issue on arrival.',
+      cash: 'Vietnamese dong for onward transport.',
+      trap: 'There is no railway here and no prospect of one. Reputable operators (Giant Ibis, Mekong Express) handle the formalities as a group and are worth the small premium over local buses.',
+    },
+    namphao: {
+      name: 'Nam Phao ↔ Cau Treo', countries: 'Laos ↔ Vietnam', at: 'Mountain road border, mid-journey on the sleeper coach',
+      minutes: 120,
+      stayOnTrain: 'Bus stops, everyone off and back on',
+      luggage: 'Yes',
+      visa: 'Vietnamese e-visa in advance. Confirm your chosen crossing point is one where e-visas are accepted.',
+      cash: 'Small US dollar notes and Vietnamese dong.',
+      trap: 'The crossing often happens in the small hours, and unofficial "stamping fees" are common here. It is the least comfortable border in this whole network, on the least comfortable leg.',
+    },
+    batam: {
+      name: 'Singapore ↔ Batam', countries: 'Singapore ↔ Indonesia', at: 'Ferry terminal — immigration at the terminal, not on the boat',
+      minutes: 60,
+      stayOnTrain: 'n/a',
+      luggage: 'Yes',
+      visa: 'Indonesian visa-on-arrival or e-VOA is available to many nationalities at the main Batam terminals. Confirm the specific terminal is an international checkpoint.',
+      cash: 'Indonesian rupiah.',
+      trap: 'Some Riau ferry terminals are domestic-only. Arriving at the wrong one wastes a day.',
+    },
+    dumai: {
+      name: 'Melaka / Port Klang ↔ Dumai', countries: 'Malaysia ↔ Indonesia', at: 'Ferry terminal',
+      minutes: 90, stayOnTrain: 'n/a', luggage: 'Yes',
+      visa: 'Indonesian VOA / e-VOA availability at Dumai is narrower than at the airports. Verify before committing.',
+      cash: 'Indonesian rupiah.',
+      trap: 'This route has suspended and resumed repeatedly. Do not build an itinerary on it without confirming it is currently running, and keep the Singapore–Batam routing as your fallback.',
+      verify: true,
+    },
+    belawan: {
+      name: 'Penang ↔ Belawan', countries: 'Malaysia ↔ Indonesia', at: 'Ferry terminal, Belawan (port for Medan)',
+      minutes: 90, stayOnTrain: 'n/a', luggage: 'Yes',
+      visa: 'Confirm Belawan is currently an international checkpoint issuing VOA.',
+      cash: 'Indonesian rupiah.',
+      trap: 'Historically operated, intermittent. Treat as unavailable until confirmed.',
+      verify: true,
+    },
+  },
+
+  /* -------------------------------------------------------------- advisories */
+  advisories: {
+    deepsouth: 'Thailand\'s far-southern provinces (Narathiwat, Yala, Pattani) carry standing security advisories, and many governments advise against non-essential travel there. The Sungai Kolok route passes through them. Check your own government\'s current position.',
+    myanmar: 'Standing security advisories cover much of Myanmar. There is no through rail to Thailand in any case.',
+  },
+
+  /* -------------------------------------------------------------- seasonality
+   * Dates that make sleepers genuinely unobtainable rather than merely dear.
+   * Moveable feasts are approximate — the app labels them as such.
+   */
+  seasons: [
+    { id: 'songkran', name: 'Songkran', from: '04-11', to: '04-17', fixed: true,
+      hits: ['th'], text: 'The single worst week for Thai rail. Everything full, roads gridlocked, and it is not a queue you can talk your way through.' },
+    { id: 'cny', name: 'Chinese New Year', from: '02-10', to: '02-24', fixed: false,
+      hits: ['my', 'sg', 'cn'], text: 'Malaysian, Singaporean and every China-bound LCR service saturates. Dates move each year — check the actual date for your travel year.' },
+    { id: 'eid', name: 'Hari Raya Aidilfitri', from: '03-18', to: '03-28', fixed: false,
+      hits: ['my', 'id'], text: 'Malaysian and Indonesian rail is saturated for days either side. Dates shift ~11 days earlier each year — verify for your year.' },
+    { id: 'thaipusam', name: 'Thaipusam', from: '01-28', to: '02-05', fixed: false,
+      hits: ['my'], text: 'Malaysian peninsular services fill up. Moves with the lunar calendar.' },
+    { id: 'tet', name: 'Tết', from: '02-10', to: '02-24', fixed: false,
+      hits: ['vn'], text: 'Vietnamese rail effectively closes to tourists for a week either side. Dates move each year.' },
+    { id: 'gulf', name: 'Gulf of Thailand monsoon', from: '10-15', to: '12-31', fixed: true,
+      hits: ['th'], text: 'Roughest on the Gulf side. The Samui and Phangan ferries are the affected legs; cancellations cost a day.' },
+    { id: 'andaman', name: 'Andaman monsoon', from: '05-01', to: '10-15', fixed: true,
+      hits: ['th', 'my'], text: 'Andaman-side ferries (Lanta, Phi Phi, Langkawi) see rough crossings and occasional cancellation.' },
+  ],
+
+  /* ---------------------------------------------------- booking scarcity rank
+   * Book in order of scarcity × window length, not chronological order.
+   */
+  scarcity: [
+    { op: 'ktmb', service: 'Shuttle Tebrau', rank: 1, window: 'Short and brutal — book at the moment the window opens', why: 'The most reliably sold-out service in the region, despite being the shortest.' },
+    { op: 'lcr', service: null, rank: 2, window: 'Historically days rather than weeks — verify the current window', why: 'Scarcest inventory in the region and the hardest to book independently from abroad.' },
+    { op: 'srt', service: null, rank: 3, window: '~90 days', why: 'Sleepers on trains 9/10 and the southern overnights sell out first.' },
+    { op: 'dsvn', service: null, rank: 4, window: '~60 days', why: 'Book on dsvn.vn — the lookalike domains are resellers.' },
+    { op: 'rrc', service: null, rank: 5, window: 'Limited and short', why: 'Verify the train runs at all on your date before anything else.' },
+    { op: 'kai', service: null, rank: 6, window: '~45 days', why: 'Plentiful, but the Bandung and Yogyakarta services fill at weekends.' },
+    { op: 'ktmb', service: null, rank: 7, window: '~30 days, extended to ~6 months around major festivals', why: 'ETS is plentiful outside festival periods.' },
+    { op: 'ferry', service: null, rank: 8, window: 'Mostly turn-up-and-go', why: 'Langkawi and Samui routes are worth pre-booking in season.' },
+  ],
+}

@@ -1,0 +1,11 @@
+{
+  "name": "overland-sea",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rail-first overland journey planner for Southeast Asia, drawn on a map",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node tools/build.mjs && node tools/smoke.mjs"
+  }
+}

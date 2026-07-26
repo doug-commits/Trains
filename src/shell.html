@@ -1,0 +1,65 @@
+<div class="app">
+    <form class="controls" onsubmit="return false">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brandtext">Overland<b>SEA</b></span>
+      </div>
+
+      <div class="row">
+        <label class="field">
+          <span>From</span>
+          <select id="from"></select>
+        </label>
+        <button type="button" id="swap" class="swap" title="Swap origin and destination" aria-label="Swap origin and destination">⇅</button>
+        <label class="field">
+          <span>To</span>
+          <select id="to"></select>
+        </label>
+      </div>
+
+      <div class="row tight">
+        <label class="field">
+          <span>Departing</span>
+          <input type="date" id="date">
+        </label>
+        <label class="field">
+          <span>Passport</span>
+          <input type="text" id="nationality" placeholder="e.g. British" autocomplete="country-name">
+        </label>
+        <label class="field">
+          <span>Pace</span>
+          <select id="pace">
+            <option value="relaxed">Relaxed</option>
+            <option value="standard">Standard</option>
+            <option value="fast">Hard running</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="toggle">
+        <input type="checkbox" id="railonly">
+        <span class="track" aria-hidden="true"><span class="knob"></span></span>
+        <span class="toggle-text">
+          <b>Hard rail-only</b>
+          <em>Refuse substitute road legs. Station transfers and pier shuttles stay — excluding those wouldn't route around a gap, it would just make the journey impossible.</em>
+        </span>
+      </label>
+    </form>
+
+  <div class="mapwrap">
+    <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
+    <div id="tip" class="tip" role="status" hidden></div>
+
+    <div class="mapfoot">
+      <div class="legend">
+        <span class="key"><i class="line rail"></i>Rail</span>
+        <span class="key"><i class="line ferry"></i>Sea</span>
+        <span class="key"><i class="line road"></i>Road</span>
+        <span class="key"><i class="bmark"></i>Border</span>
+      </div>
+      <button type="button" id="reset" class="ghost">Reset view</button>
+    </div>
+  </div>
+
+  <aside id="panel" class="panel" aria-live="polite"></aside>
+</div>
