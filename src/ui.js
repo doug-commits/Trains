@@ -127,6 +127,16 @@ const UI = (() => {
       .join('')}</div>`
   }
 
+  /* A destination image. A real photograph wins; the drawn illustration is the
+   * fallback, so a half-populated photo set still looks finished. */
+  function destinationArt(network, stationId, alt) {
+    const photo = typeof Photos !== 'undefined' ? Photos.forStation(stationId) : null
+    if (photo) return Photos.figure(photo, alt)
+    const kind = typeof Scene !== 'undefined' ? Scene.kindFor(network, LANDMARKS, stationId) : null
+    if (!kind) return ''
+    return `<canvas class="scene" data-scene="${esc(kind)}" data-seed="${esc(stationId)}"></canvas>`
+  }
+
   /* An operator plate: our own mark in the operator's approximate livery, not
    * their logo. Legible on both grounds because it carries its own ink colour. */
   function plate(op) {
@@ -427,10 +437,9 @@ const UI = (() => {
       .join('')
 
     const labels = opts.labels && opts.labels.from && opts.labels.to ? opts.labels : null
-    const scene = typeof Scene !== 'undefined' ? Scene.kindFor(network, LANDMARKS, toId) : null
-    const banner = scene
-      ? `<div class="banner"><canvas class="scene" data-scene="${esc(scene)}" data-seed="${esc(toId)}"></canvas>
-         <span class="banner-cap">${esc(to.city)}</span></div>`
+    const art = destinationArt(network, toId, to.city)
+    const banner = art
+      ? `<div class="banner">${art}<span class="banner-cap">${esc(to.city)}</span></div>`
       : ''
 
     return `
@@ -462,6 +471,7 @@ const UI = (() => {
       ${bookingSection(network, plan)}
       ${costSection(network, plan)}
       ${detourSection(plan)}
+      ${typeof Photos !== 'undefined' ? Photos.creditBlock(plan.stationIds) : ''}
       <footer class="foot-note">
         <p>Network reviewed ${esc(network.reviewed)}. ${
           t.verifyCount
@@ -528,9 +538,13 @@ const UI = (() => {
                <span><b>${esc(money(st.usd))}</b>all in</span>
              </span>`
           : ''
-        const art = p.scene
-          ? `<span class="corridor-art"><canvas class="scene" data-scene="${esc(p.scene)}" data-seed="${esc(p.sceneSeed || p.to)}"></canvas></span>`
-          : ''
+        const photo = typeof Photos !== 'undefined' ? Photos.forStation(p.to) : null
+        const inner = photo
+          ? Photos.figure(photo, p.label)
+          : p.scene
+            ? `<canvas class="scene" data-scene="${esc(p.scene)}" data-seed="${esc(p.sceneSeed || p.to)}"></canvas>`
+            : ''
+        const art = inner ? `<span class="corridor-art">${inner}</span>` : ''
         return `<button type="button" class="corridor" data-preset="${i}">
             ${art}
             <span class="corridor-name">${esc(p.label)}<em aria-hidden="true">→</em></span>

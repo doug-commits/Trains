@@ -12,7 +12,7 @@
  *   dist/planner.html   the same page as a fragment, for publishing
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,11 +32,63 @@ const SCRIPTS = [
   'src/router.js',
   'src/plan.js',
   'src/scene.js',
+  'src/photos.js',
   'src/ask.js',
   'src/map.js',
   'src/ui.js',
   'src/app.js',
 ]
+
+/* Photographs, if tools/fetch-photos.mjs has been run. They are inlined so the
+ * page stays a single self-contained file — which is what lets it work offline,
+ * survive the Artifact CSP, and deploy without an asset pipeline.
+ *
+ * That only holds while the set is small. The budget below is the tripwire: if
+ * you blow past it, stop inlining and serve data/photos/ as static assets
+ * instead, adding them to the Vercel output directory alongside index.html. */
+const PHOTO_BUDGET_KB = Number(process.env.PHOTO_BUDGET_KB || 3000)
+
+function loadPhotos() {
+  const manifestPath = join(root, 'data/photos.json')
+  if (!existsSync(manifestPath)) return { js: 'const PHOTOS = {};', used: 0, skipped: 0, kb: 0 }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const out = {}
+  let bytes = 0
+  let skipped = 0
+
+  for (const [id, entry] of Object.entries(manifest)) {
+    const file = join(root, 'data/photos', entry.file)
+    if (!existsSync(file)) {
+      skipped++
+      continue
+    }
+    const buf = readFileSync(file)
+    if ((bytes + buf.length) / 1024 > PHOTO_BUDGET_KB) {
+      skipped++
+      continue
+    }
+    bytes += buf.length
+    const mime = entry.file.endsWith('.png') ? 'image/png' : entry.file.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+    out[id] = {
+      src: `data:${mime};base64,${buf.toString('base64')}`,
+      station: entry.station,
+      landmark: entry.landmark,
+      credit: entry.credit,
+      licence: entry.licence,
+      licenceUrl: entry.licenceUrl,
+      source: entry.source,
+    }
+  }
+  return {
+    js: `const PHOTOS = ${JSON.stringify(out)};`,
+    used: Object.keys(out).length,
+    skipped,
+    kb: bytes / 1024,
+  }
+}
+
+const photos = loadPhotos()
 
 const basemap = readFileSync(join(root, 'data/basemap.json'), 'utf8').trim()
 const fonts = read('src/fonts.css')
@@ -46,6 +98,7 @@ const shell = read('src/shell.html')
 const js = [
   '/* Built by tools/build.mjs — edit the files in src/ and data/, not this. */',
   `const BASEMAP = ${basemap};`,
+  photos.js,
   ...SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`),
 ].join('\n')
 
@@ -87,5 +140,11 @@ ${body}
 )
 
 const kb = p => (readFileSync(join(root, p)).length / 1024).toFixed(0)
+console.log(
+  photos.used
+    ? `photos             ${photos.used} inlined, ${photos.kb.toFixed(0)} KB` +
+      (photos.skipped ? `, ${photos.skipped} skipped (over budget or missing)` : '')
+    : 'photos             none — destinations fall back to drawn illustrations'
+)
 console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
 console.log(`index.html         ${kb('index.html')} KB`)

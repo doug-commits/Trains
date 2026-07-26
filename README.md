@@ -60,10 +60,16 @@ legs is worth more than one that presents everything with false confidence.
 ```
 data/network.js      Stations, legs, borders, seasons, booking windows.
                      This is the product; everything else is plumbing.
+data/landmarks.js    Landmarks mapped to the railhead you actually get off at.
 data/basemap.json    Simplified SE Asia coastline, generated, committed.
+data/photos.json     Photo manifest with credits. Absent until fetched.
+data/photos/         Downloaded photographs. Absent until fetched.
 src/proj.js          Web Mercator with a fitted, pannable viewport.
 src/router.js        Rail-first Dijkstra. The cost function is the thesis.
 src/plan.js          Feasibility: leg merging, buffers, risks, costs, booking order.
+src/ask.js           Plain-language questions to a pair of stations.
+src/scene.js         Drawn destination illustrations, the photo fallback.
+src/photos.js        Real photographs and their attribution.
 src/map.js           Canvas rendering.
 src/ui.js            The itinerary document.
 src/app.js           Controls, map interaction, URL state.
@@ -110,6 +116,48 @@ them inside a published page is not ours to do.
 Never invent a booking URL to fill the column. `book: null` with a `bookNote`
 saying how the ticket is really bought is worth more than a link that 404s, and
 the smoke test enforces that every leg resolves to one of the three outcomes.
+
+---
+
+## Destination images
+
+Two sources, in order of preference.
+
+**Photographs**, when `data/photos.json` exists. Fetch them with:
+
+```sh
+node tools/fetch-photos.mjs               # everything missing
+node tools/fetch-photos.mjs --force       # refetch
+node tools/fetch-photos.mjs --only borobudur,angkor-wat
+```
+
+It queries Wikimedia Commons, keeps only licences that permit redistribution
+with attribution (CC0, public domain, CC BY, CC BY-SA), and records the author,
+licence and source URL alongside each file. Anything non-commercial,
+no-derivatives or fair-use is rejected rather than quietly used. If a landmark
+searches badly, add a `commons` field to it in `data/landmarks.js` and re-run
+with `--only`.
+
+**Attribution is a licence condition, not a nicety.** The credit renders on the
+image itself and the full list renders with the itinerary, both generated from
+the manifest. Do not hand-edit those out.
+
+`tools/build.mjs` inlines photos as data URIs so the page stays one
+self-contained file, subject to `PHOTO_BUDGET_KB` (default 3000). Past that it
+stops inlining and those destinations fall back to illustrations — at which
+point serve `data/photos/` as static assets and reference them by path instead.
+
+**Illustrations** otherwise: `src/scene.js` draws an original picture from the
+landform that characterises each place. Photographs were not available when this
+was written — every image host is blocked from the build environment — so the
+drawn set is what ships by default, and it is the permanent fallback for any
+destination without a photograph. To exercise the photo path without network:
+
+```sh
+node tools/make-fixture-photos.mjs   # placeholder images, clearly marked
+node tools/build.mjs
+rm -rf data/photos data/photos.json  # never commit fixtures
+```
 
 ---
 
