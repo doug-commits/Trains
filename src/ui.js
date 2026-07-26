@@ -503,11 +503,23 @@ const UI = (() => {
   }
 
   function idle(network, presets) {
-    const chips = presets
-      .map(
-        (p, i) =>
-          `<button class="chip" data-preset="${i}"><b>${esc(p.label)}</b><span>${esc(p.note)}</span></button>`
-      )
+    const cards = presets
+      .map((p, i) => {
+        const st = p.stats
+        const stats = st
+          ? `<span class="corridor-stats">
+               <span><b>${st.days}</b>${st.days === 1 ? 'day' : 'days'}</span>
+               <span><b>${st.legs}</b>legs</span>
+               <span><b>${st.borders}</b>${st.borders === 1 ? 'border' : 'borders'}</span>
+               <span><b>${esc(money(st.usd))}</b>all in</span>
+             </span>`
+          : ''
+        return `<button type="button" class="corridor" data-preset="${i}">
+            <span class="corridor-name">${esc(p.label)}<em aria-hidden="true">→</em></span>
+            <span class="corridor-note">${esc(p.note)}</span>
+            ${stats}
+          </button>`
+      })
       .join('')
 
     const myths = network.myths
@@ -518,15 +530,17 @@ const UI = (() => {
       <header class="head">
         <p class="eyebrow">Rail-first overland planning</p>
         <h1>Southeast Asia<br>without flying</h1>
-        <p class="lede">${esc(network.intro)}</p>
-        <p class="sub">Every mainstream planner optimises for speed, so it answers
-        “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the ground:
-        it keeps you on rails as far as the rails go, puts a boat where the land ends, and uses a
-        road vehicle only where neither exists.</p>
+        <p class="lede">Every mainstream planner optimises for speed, so it answers
+        “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the
+        ground: it keeps you on rails as far as the rails go, puts a boat where the land
+        ends, and uses a road vehicle only where neither exists.</p>
+        <p class="sub">Pick two stations above, or click any two points on the map. Every
+        itinerary comes with the border mechanics, the connection buffers that actually hold,
+        and a way to book each leg.</p>
       </header>
       <section class="block">
         <h2>Start from a corridor</h2>
-        <div class="chips">${chips}</div>
+        <div class="chips">${cards}</div>
       </section>
       <section class="block">
         <h2>What people get wrong</h2>
@@ -535,6 +549,7 @@ const UI = (() => {
         <ul class="myths">${myths}</ul>
       </section>
       <footer class="foot-note">
+        <p>${esc(network.intro)}</p>
         <p>Network reviewed ${esc(network.reviewed)}. This planner gives you legs, operators,
         border mechanics and connection buffers — deliberately not departure times, because
         SRT, KTMB, LCR, DSVN and KAI publish nothing in a common format and a remembered

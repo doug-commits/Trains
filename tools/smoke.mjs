@@ -50,8 +50,8 @@ function check(label, condition, detail = '') {
   const h1 = await page.textContent('#panel h1')
   check('idle headline renders', /Southeast Asia/.test(h1), h1.replace(/\s+/g, ' ').trim())
   // Count comes from the preset list, not a magic number that rots on edit.
-  const chips = await page.locator('.chip').count()
-  check('preset chips render', chips >= 6, `${chips} chips`)
+  const chips = await page.locator('.corridor').count()
+  check('corridor cards render', chips >= 6, `${chips} cards`)
   check('myths render', (await page.locator('.myths li').count()) === 7)
 
   // The canvas must actually have painted something, not just be sized.
@@ -74,7 +74,7 @@ function check(label, condition, detail = '') {
   const { page, context } = await newPage()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'Laos → Malaysia' }).click()
+  await page.locator('.corridor', { hasText: 'Laos → Malaysia' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1100)
 
@@ -118,7 +118,7 @@ function check(label, condition, detail = '') {
   const { page, context } = await newPage()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'The Mekong slow boat' }).click()
+  await page.locator('.corridor', { hasText: 'The Mekong slow boat' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1100)
 
@@ -143,7 +143,7 @@ function check(label, condition, detail = '') {
   const { page, context } = await newPage()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'Bangkok → Hanoi' }).click()
+  await page.locator('.corridor', { hasText: 'Bangkok → Hanoi' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(900)
 
@@ -161,9 +161,11 @@ function check(label, condition, detail = '') {
   const { page, context } = await newPage()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'Bangkok → Hanoi' }).click()
+  await page.locator('.corridor', { hasText: 'Bangkok → Hanoi' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
-  // Drive it the way a user does — via the label, not the hidden input.
+  // Secondary options live behind a disclosure now; open it, then click the
+  // label rather than the visually hidden input.
+  await page.locator('.details > summary').click()
   await page.locator('.toggle-text b').click()
   await page.waitForTimeout(700)
 
@@ -174,12 +176,43 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------- getting back to home */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  check('start over hidden until there is a route',
+    !(await page.locator('#startover').isVisible()))
+
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+  check('start over appears with a route', await page.locator('#startover').isVisible())
+  check('route is shareable via the url', /from=bkk_aphiwat/.test(page.url()))
+
+  await page.locator('#startover').click()
+  await page.waitForTimeout(600)
+  check('start over returns to the corridor list', (await page.locator('.corridor').count()) >= 6)
+  check('start over clears the url', !/from=/.test(page.url()))
+  check('start over clears the pair', (await page.locator('#from').inputValue()) === '')
+
+  // The wordmark is the other way home, and must work the same.
+  await page.locator('.corridor', { hasText: 'Laos → Malaysia' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.locator('#home').click()
+  await page.waitForTimeout(600)
+  check('wordmark goes home too', (await page.locator('.corridor').count()) >= 6)
+
+  await page.screenshot({ path: join(outDir, '14-home.png') })
+  await context.close()
+}
+
 /* --------------------------------------------------------- light theme */
 {
   const { page, context } = await newPage({ colorScheme: 'light' })
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'Singapore → Bali' }).click()
+  await page.locator('.corridor', { hasText: 'Singapore → Bali' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1100)
   await page.screenshot({ path: join(outDir, '05-route-light.png') })
@@ -204,7 +237,7 @@ function check(label, condition, detail = '') {
   })
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  await page.locator('.chip', { hasText: 'Bangkok → Singapore' }).click()
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1100)
 

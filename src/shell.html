@@ -1,11 +1,20 @@
-<div class="app">
-    <form class="controls" onsubmit="return false">
-      <div class="brand">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="brandtext">Overland<b>SEA</b></span>
-      </div>
+<div class="app" data-active="false">
+  <header class="topbar">
+    <button type="button" id="home" class="brand" title="Back to the start">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="brandtext">Overland<b>SEA</b></span>
+    </button>
 
-      <div class="row">
+    <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+
+    <div class="topbar-actions">
+      <button type="button" id="startover" class="btn-ghost">Start over</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <form class="controls" onsubmit="return false">
+      <div class="search">
         <label class="field">
           <span>From</span>
           <select id="from"></select>
@@ -17,49 +26,55 @@
         </label>
       </div>
 
-      <div class="row tight">
-        <label class="field">
-          <span>Departing</span>
-          <input type="date" id="date">
-        </label>
-        <label class="field">
-          <span>Passport</span>
-          <input type="text" id="nationality" placeholder="e.g. British" autocomplete="country-name">
-        </label>
-        <label class="field">
-          <span>Pace</span>
-          <select id="pace">
-            <option value="relaxed">Relaxed</option>
-            <option value="standard">Standard</option>
-            <option value="fast">Hard running</option>
-          </select>
-        </label>
-      </div>
+      <details class="details">
+        <summary><span>Trip details</span><em id="detail-summary">Pragmatic routing</em></summary>
+        <div class="details-body">
+          <div class="row tight">
+            <label class="field">
+              <span>Departing</span>
+              <input type="date" id="date">
+            </label>
+            <label class="field">
+              <span>Passport</span>
+              <input type="text" id="nationality" placeholder="e.g. British" autocomplete="country-name">
+            </label>
+            <label class="field">
+              <span>Pace</span>
+              <select id="pace">
+                <option value="relaxed">Relaxed</option>
+                <option value="standard">Standard</option>
+                <option value="fast">Hard running</option>
+              </select>
+            </label>
+          </div>
 
-      <label class="toggle">
-        <input type="checkbox" id="railonly">
-        <span class="track" aria-hidden="true"><span class="knob"></span></span>
-        <span class="toggle-text">
-          <b>Hard rail-only</b>
-          <em>Refuse substitute road legs. Station transfers and pier shuttles stay — excluding those wouldn't route around a gap, it would just make the journey impossible.</em>
-        </span>
-      </label>
+          <label class="toggle">
+            <input type="checkbox" id="railonly">
+            <span class="track" aria-hidden="true"><span class="knob"></span></span>
+            <span class="toggle-text">
+              <b>Hard rail-only</b>
+              <em>Refuse substitute road legs. Station transfers and pier shuttles stay — excluding those wouldn't route around a gap, it would just make the journey impossible.</em>
+            </span>
+          </label>
+        </div>
+      </details>
     </form>
 
-  <div class="mapwrap">
-    <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
-    <div id="tip" class="tip" role="status" hidden></div>
+    <div class="mapwrap">
+      <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
+      <div id="tip" class="tip" role="status" hidden></div>
 
-    <div class="mapfoot">
-      <div class="legend">
-        <span class="key"><i class="line rail"></i>Rail</span>
-        <span class="key"><i class="line ferry"></i>Sea</span>
-        <span class="key"><i class="line road"></i>Road</span>
-        <span class="key"><i class="bmark"></i>Border</span>
+      <div class="mapfoot">
+        <div class="legend">
+          <span class="key"><i class="line rail"></i>Rail</span>
+          <span class="key"><i class="line ferry"></i>Sea</span>
+          <span class="key"><i class="line road"></i>Road</span>
+          <span class="key"><i class="bmark"></i>Border</span>
+        </div>
+        <button type="button" id="reset" class="btn-ghost">Reset view</button>
       </div>
-      <button type="button" id="reset" class="ghost">Reset view</button>
     </div>
-  </div>
 
-  <aside id="panel" class="panel" aria-live="polite"></aside>
+    <aside id="panel" class="panel" aria-live="polite"></aside>
+  </div>
 </div>

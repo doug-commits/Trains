@@ -20,6 +20,7 @@
   ]
 
   const $ = sel => document.querySelector(sel)
+  const app = document.querySelector('.app')
   const canvas = $('#map')
   const panel = $('#panel')
   const tooltip = $('#tip')
@@ -35,6 +36,18 @@
     pace: 'standard',
     plan: null,
   }
+
+  /* Real numbers on the corridor cards, so the choice is informed before the
+     click. Six Dijkstra runs over 155 edges — cheap enough to do at boot. */
+  function withStats(presets) {
+    return presets.map(p => {
+      const routed = Router.route(NETWORK, p.from, p.to, {})
+      if (!routed) return p
+      const t = Plan.build(NETWORK, routed, {}).totals
+      return { ...p, stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd } }
+    })
+  }
+  const CORRIDORS = withStats(PRESETS)
 
   /* ------------------------------------------------------------- controls */
 
@@ -59,6 +72,16 @@
       .join('')
   }
 
+  const PACE_LABEL = { relaxed: 'Relaxed', standard: 'Standard', fast: 'Hard running' }
+
+  function renderDetailSummary() {
+    const bits = [state.railOnly ? 'Hard rail-only' : 'Pragmatic routing']
+    if (state.pace !== 'standard') bits.push(PACE_LABEL[state.pace])
+    if (state.date) bits.push(state.date)
+    if (state.nationality) bits.push(state.nationality)
+    $('#detail-summary').textContent = bits.join(' · ')
+  }
+
   function renderControls() {
     $('#from').innerHTML = `<option value="">Choose a station…</option>${stationOptions(state.from)}`
     $('#to').innerHTML = `<option value="">Choose a station…</option>${stationOptions(state.to)}`
@@ -66,6 +89,7 @@
     $('#date').value = state.date
     $('#nationality').value = state.nationality
     $('#pace').value = state.pace
+    renderDetailSummary()
   }
 
   /* ----------------------------------------------------------------- plan */
@@ -74,7 +98,8 @@
     if (!state.from || !state.to || state.from === state.to) {
       state.plan = null
       map.setRoute(null, false)
-      panel.innerHTML = UI.idle(NETWORK, PRESETS)
+      app.dataset.active = 'false'
+      panel.innerHTML = UI.idle(NETWORK, CORRIDORS)
       resetScroll()
       return
     }
@@ -91,6 +116,7 @@
       state.plan = null
       map.setRoute(null, false)
       const reach = Router.reachable(NETWORK, state.from, opts)
+      app.dataset.active = 'true'
       panel.innerHTML = UI.unreachable(NETWORK, state.from, state.to, reach, opts)
       resetScroll()
       return
@@ -98,6 +124,7 @@
 
     const plan = Plan.build(NETWORK, routed, opts)
     state.plan = plan
+    app.dataset.active = 'true'
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
     panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
     resetScroll()
@@ -264,22 +291,39 @@
     compute()
   })
   $('#railonly').addEventListener('change', e => {
+    renderDetailSummary()
     state.railOnly = e.target.checked
     compute()
   })
   $('#date').addEventListener('change', e => {
+    renderDetailSummary()
     state.date = e.target.value
     compute()
   })
   $('#nationality').addEventListener('input', e => {
     state.nationality = e.target.value
+    renderDetailSummary()
     if (state.plan) compute()
   })
   $('#pace').addEventListener('change', e => {
+    renderDetailSummary()
     state.pace = e.target.value
     compute()
   })
   $('#reset').addEventListener('click', () => map.resetView())
+
+  /* Back to a blank slate: clear the pair, drop the shared URL, refit the map. */
+  function goHome() {
+    state.from = null
+    state.to = null
+    state.plan = null
+    history.replaceState(null, '', location.pathname + location.search)
+    renderControls()
+    compute()
+    map.resetView()
+  }
+  $('#home').addEventListener('click', goHome)
+  $('#startover').addEventListener('click', goHome)
 
   panel.addEventListener('click', e => {
     const chip = e.target.closest('[data-preset]')

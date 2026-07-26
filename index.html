@@ -7,14 +7,23 @@
 <meta name="description" content="Plan a Southeast Asian journey that stays on rails as far as the rails go, bridges the gaps by sea, and tells you what happens at every border.">
 </head>
 <body>
-<div class="app">
-    <form class="controls" onsubmit="return false">
-      <div class="brand">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="brandtext">Overland<b>SEA</b></span>
-      </div>
+<div class="app" data-active="false">
+  <header class="topbar">
+    <button type="button" id="home" class="brand" title="Back to the start">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="brandtext">Overland<b>SEA</b></span>
+    </button>
 
-      <div class="row">
+    <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+
+    <div class="topbar-actions">
+      <button type="button" id="startover" class="btn-ghost">Start over</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <form class="controls" onsubmit="return false">
+      <div class="search">
         <label class="field">
           <span>From</span>
           <select id="from"></select>
@@ -26,51 +35,57 @@
         </label>
       </div>
 
-      <div class="row tight">
-        <label class="field">
-          <span>Departing</span>
-          <input type="date" id="date">
-        </label>
-        <label class="field">
-          <span>Passport</span>
-          <input type="text" id="nationality" placeholder="e.g. British" autocomplete="country-name">
-        </label>
-        <label class="field">
-          <span>Pace</span>
-          <select id="pace">
-            <option value="relaxed">Relaxed</option>
-            <option value="standard">Standard</option>
-            <option value="fast">Hard running</option>
-          </select>
-        </label>
-      </div>
+      <details class="details">
+        <summary><span>Trip details</span><em id="detail-summary">Pragmatic routing</em></summary>
+        <div class="details-body">
+          <div class="row tight">
+            <label class="field">
+              <span>Departing</span>
+              <input type="date" id="date">
+            </label>
+            <label class="field">
+              <span>Passport</span>
+              <input type="text" id="nationality" placeholder="e.g. British" autocomplete="country-name">
+            </label>
+            <label class="field">
+              <span>Pace</span>
+              <select id="pace">
+                <option value="relaxed">Relaxed</option>
+                <option value="standard">Standard</option>
+                <option value="fast">Hard running</option>
+              </select>
+            </label>
+          </div>
 
-      <label class="toggle">
-        <input type="checkbox" id="railonly">
-        <span class="track" aria-hidden="true"><span class="knob"></span></span>
-        <span class="toggle-text">
-          <b>Hard rail-only</b>
-          <em>Refuse substitute road legs. Station transfers and pier shuttles stay — excluding those wouldn't route around a gap, it would just make the journey impossible.</em>
-        </span>
-      </label>
+          <label class="toggle">
+            <input type="checkbox" id="railonly">
+            <span class="track" aria-hidden="true"><span class="knob"></span></span>
+            <span class="toggle-text">
+              <b>Hard rail-only</b>
+              <em>Refuse substitute road legs. Station transfers and pier shuttles stay — excluding those wouldn't route around a gap, it would just make the journey impossible.</em>
+            </span>
+          </label>
+        </div>
+      </details>
     </form>
 
-  <div class="mapwrap">
-    <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
-    <div id="tip" class="tip" role="status" hidden></div>
+    <div class="mapwrap">
+      <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
+      <div id="tip" class="tip" role="status" hidden></div>
 
-    <div class="mapfoot">
-      <div class="legend">
-        <span class="key"><i class="line rail"></i>Rail</span>
-        <span class="key"><i class="line ferry"></i>Sea</span>
-        <span class="key"><i class="line road"></i>Road</span>
-        <span class="key"><i class="bmark"></i>Border</span>
+      <div class="mapfoot">
+        <div class="legend">
+          <span class="key"><i class="line rail"></i>Rail</span>
+          <span class="key"><i class="line ferry"></i>Sea</span>
+          <span class="key"><i class="line road"></i>Road</span>
+          <span class="key"><i class="bmark"></i>Border</span>
+        </div>
+        <button type="button" id="reset" class="btn-ghost">Reset view</button>
       </div>
-      <button type="button" id="reset" class="ghost">Reset view</button>
     </div>
-  </div>
 
-  <aside id="panel" class="panel" aria-live="polite"></aside>
+    <aside id="panel" class="panel" aria-live="polite"></aside>
+  </div>
 </div>
 
 <style>
@@ -98,8 +113,8 @@
   color-scheme: dark;
 
   --sea: #0a191f;
-  --land: #1b3138;
-  --land-edge: #2c4f5a;
+  --land: #1e373f;
+  --land-edge: #335c69;
   --panel: #0d2028;
   --panel-solid: #0d2028;
   --panel-edge: #21414c;
@@ -114,10 +129,11 @@
   --road: #978d7f;
   --alert: #e2615a;
 
-  --idle-line: #2b4d58;
-  --idle-dot: #3b626d;
+  --idle-line: #3a6674;
+  --idle-dot: #4c7d8b;
 
   --panel-w: 28.5rem;
+  --topbar-h: 3.5rem;
   --radius: 3px;
 
   --sans: BarlowCond, ui-sans-serif, system-ui, sans-serif;
@@ -145,8 +161,8 @@
     --road: #7b7263;
     --alert: #b93a2e;
 
-    --idle-line: #c2c9c4;
-    --idle-dot: #a9b4b2;
+    --idle-line: #aab5b2;
+    --idle-dot: #93a09e;
   }
 }
 
@@ -154,11 +170,11 @@
    in both directions. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --sea: #0a191f; --land: #1b3138; --land-edge: #2c4f5a;
+  --sea: #0a191f; --land: #1e373f; --land-edge: #335c69;
   --panel: #0d2028; --panel-solid: #0d2028; --panel-edge: #21414c; --raise: #122a33;
   --ink: #e7efea; --ink-soft: #c4d6d5; --muted: #7d9ba2;
   --rail: #e9a63e; --ferry: #57b6c8; --road: #978d7f; --alert: #e2615a;
-  --idle-line: #2b4d58; --idle-dot: #3b626d;
+  --idle-line: #3a6674; --idle-dot: #4c7d8b;
 }
 
 :root[data-theme='light'] {
@@ -167,7 +183,7 @@
   --panel: #fbfaf6; --panel-solid: #fbfaf6; --panel-edge: #ddd8ca; --raise: #efece3;
   --ink: #13212a; --ink-soft: #2c3d45; --muted: #5b7178;
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;
-  --idle-line: #c2c9c4; --idle-dot: #a9b4b2;
+  --idle-line: #aab5b2; --idle-dot: #93a09e;
 }
 
 * { box-sizing: border-box; }
@@ -190,9 +206,99 @@ body {
 /* ------------------------------------------------------------------ frame */
 
 .app {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100dvh;
   overflow: hidden;
+}
+
+/* --------------------------------------------------------------- topbar */
+
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  height: var(--topbar-h);
+  padding: 0 1.25rem;
+  background: var(--panel-solid);
+  border-bottom: 1px solid var(--panel-edge);
+  box-shadow: 0 1px 0 0 color-mix(in srgb, var(--rail) 22%, transparent);
+  z-index: 5;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.3rem;
+  margin-left: -0.3rem;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.brand:hover { background: var(--raise); }
+
+.brand .mark {
+  width: 1.6rem;
+  height: 0.6rem;
+  flex: none;
+  background:
+    linear-gradient(var(--rail), var(--rail)) left center / 100% 2.5px no-repeat,
+    repeating-linear-gradient(90deg, var(--muted) 0 1.5px, transparent 1.5px 5px) center / 100% 100%;
+}
+
+.brandtext {
+  font-size: 1.08rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.brandtext b { color: var(--ink); font-weight: 600; }
+
+.tagline {
+  margin: 0;
+  padding-left: 1.1rem;
+  border-left: 1px solid var(--panel-edge);
+  font-size: 0.92rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.topbar-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+
+/* Nothing to start over from until a route exists. */
+.app[data-active='false'] #startover { display: none; }
+
+.btn-ghost {
+  padding: 0.42rem 0.75rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.btn-ghost:hover { color: var(--ink); border-color: var(--muted); }
+
+/* ---------------------------------------------------------------- stage */
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .mapwrap { position: absolute; inset: 0; }
@@ -209,57 +315,35 @@ body {
 
 .controls {
   position: absolute;
-  top: 1.25rem;
-  left: 1.25rem;
-  width: 23rem;
-  max-width: calc(100vw - 2.5rem);
-  padding: 1rem 1.1rem 1.1rem;
+  top: 1.1rem;
+  left: 1.1rem;
+  width: 24rem;
+  max-width: calc(100vw - 2.2rem);
+  padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  gap: 0.7rem;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
-  box-shadow: 0 16px 40px -20px rgb(0 0 0 / 0.55);
+  box-shadow: 0 20px 48px -24px rgb(0 0 0 / 0.6);
   z-index: 3;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-family: var(--sans);
-}
-
-.brand .mark {
-  width: 1.5rem;
-  height: 0.55rem;
-  flex: none;
-  background:
-    linear-gradient(var(--rail), var(--rail)) left center / 100% 2.5px no-repeat,
-    repeating-linear-gradient(90deg, var(--muted) 0 1.5px, transparent 1.5px 5px) center / 100% 100%;
-}
-
-.brandtext {
-  font-size: 1.05rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.brandtext b { color: var(--ink); font-weight: 600; }
-
-.row {
+.search {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
 }
-.row.tight { gap: 0.4rem; }
-.row .field { flex: 1 1 0; min-width: 0; }
+.search .field { flex: 1 1 0; min-width: 0; }
 
-.field { display: flex; flex-direction: column; gap: 0.22rem; }
+.row { display: flex; align-items: flex-end; gap: 0.5rem; }
+.row.tight { gap: 0.4rem; }
+.row .field { flex: 1 1 7.5rem; min-width: 0; }
+
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
 
 .field > span {
   font-family: var(--sans);
@@ -274,22 +358,25 @@ body {
 .field input {
   width: 100%;
   min-width: 0;
-  padding: 0.42rem 0.5rem;
+  padding: 0.5rem 0.55rem;
   font-family: var(--sans);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--ink);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: 2px;
+  transition: border-color 0.15s ease;
 }
 .field select:hover,
 .field input:hover { border-color: var(--muted); }
+.field select:focus,
+.field input:focus { border-color: var(--rail); }
 
 .swap {
   flex: none;
-  width: 2rem;
-  height: 2rem;
+  width: 2.2rem;
+  height: 2.2rem;
   margin-bottom: 0.05rem;
   font-size: 1rem;
   color: var(--muted);
@@ -300,14 +387,53 @@ body {
 }
 .swap:hover { color: var(--rail); border-color: var(--rail); }
 
+/* The four secondary inputs shouted as loudly as the two that matter, so they
+   fold away until asked for. */
+.details {
+  border-top: 1px solid var(--panel-edge);
+  padding-top: 0.6rem;
+}
+.details > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  list-style: none;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.details > summary::-webkit-details-marker { display: none; }
+.details > summary > span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.details > summary > span::after {
+  content: ' ▸';
+  color: var(--muted);
+}
+.details[open] > summary > span::after { content: ' ▾'; }
+.details > summary > em {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-left: auto;
+  text-align: right;
+}
+.details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+}
+
 .toggle {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.6rem;
   align-items: start;
   cursor: pointer;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--panel-edge);
 }
 /* Visually hidden but still focusable and hit-testable — a zero-size box gets
    skipped by some assistive tech and by automation. */
@@ -361,18 +487,18 @@ body {
 
 .mapfoot {
   position: absolute;
-  left: 1.25rem;
+  left: 1.1rem;
   bottom: 1rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   z-index: 3;
 }
 
 .legend {
   display: flex;
   gap: 0.85rem;
-  padding: 0.4rem 0.7rem;
+  padding: 0.42rem 0.7rem;
   background: color-mix(in srgb, var(--panel) 85%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -395,23 +521,6 @@ body {
   background: var(--alert);
   transform: rotate(45deg);
 }
-
-.ghost {
-  padding: 0.4rem 0.7rem;
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.ghost:hover { color: var(--ink); border-color: var(--muted); }
 
 /* ------------------------------------------------------------------- tip */
 
@@ -884,12 +993,15 @@ table { width: 100%; border-collapse: collapse; }
 
 /* ------------------------------------------------------------ idle state */
 
-.chips { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.9rem; }
+.chips { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
 
-.chip {
+/* A corridor card carries its real numbers, so the choice is informed before
+   the click rather than after it. */
+.corridor {
+  position: relative;
   display: block;
   width: 100%;
-  padding: 0.6rem 0.75rem;
+  padding: 0.8rem 0.9rem;
   text-align: left;
   font-family: var(--sans);
   color: var(--ink);
@@ -897,11 +1009,67 @@ table { width: 100%; border-collapse: collapse; }
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   cursor: pointer;
-  transition: border-color 0.14s ease, transform 0.14s ease;
+  overflow: hidden;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
-.chip:hover { border-color: var(--rail); transform: translateX(2px); }
-.chip b { display: block; font-size: 1rem; font-weight: 600; }
-.chip span { display: block; font-size: 0.85rem; line-height: 1.35; color: var(--muted); }
+.corridor::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--rail);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.corridor:hover {
+  border-color: color-mix(in srgb, var(--rail) 55%, var(--panel-edge));
+  transform: translateX(2px);
+  box-shadow: 0 8px 20px -14px rgb(0 0 0 / 0.5);
+}
+.corridor:hover::before { opacity: 1; }
+
+.corridor-name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.corridor-name em {
+  font-style: normal;
+  font-size: 0.95rem;
+  color: var(--rail);
+}
+.corridor-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.corridor-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.85rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--panel-edge);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.corridor-stats b {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  margin-right: 0.22rem;
+}
 
 .myths { margin: 0.9rem 0 0; padding: 0; list-style: none; }
 .myths li { padding: 0.8rem 0; border-bottom: 1px solid var(--panel-edge); }
@@ -943,12 +1111,15 @@ table { width: 100%; border-collapse: collapse; }
    past it, then the itinerary. */
 @media (max-width: 60rem) {
   .app {
-    display: flex;
-    flex-direction: column;
     height: auto;
     min-height: 100dvh;
     overflow: visible;
   }
+
+  .topbar { position: sticky; top: 0; padding: 0 1rem; }
+  .tagline { display: none; }
+
+  .stage { display: flex; flex-direction: column; }
 
   .controls {
     position: static;
@@ -970,7 +1141,7 @@ table { width: 100%; border-collapse: collapse; }
   .mapwrap {
     position: sticky;
     inset: auto;
-    top: 0;
+    top: var(--topbar-h);
     z-index: 2;
     flex: none;
     height: 42dvh;
@@ -1001,12 +1172,13 @@ table { width: 100%; border-collapse: collapse; }
   .toggle-text em { display: none; }
   .mapwrap { height: 38dvh; }
   .legend { font-size: 0.72rem; }
-  .ghost { font-size: 0.72rem; }
+  .btn-ghost { font-size: 0.72rem; padding: 0.35rem 0.55rem; }
+  .brandtext { font-size: 0.95rem; letter-spacing: 0.1em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-  .chip:hover { transform: none; }
+  .corridor:hover { transform: none; }
 }
 
 .where .via {
@@ -3734,11 +3906,23 @@ const UI = (() => {
   }
 
   function idle(network, presets) {
-    const chips = presets
-      .map(
-        (p, i) =>
-          `<button class="chip" data-preset="${i}"><b>${esc(p.label)}</b><span>${esc(p.note)}</span></button>`
-      )
+    const cards = presets
+      .map((p, i) => {
+        const st = p.stats
+        const stats = st
+          ? `<span class="corridor-stats">
+               <span><b>${st.days}</b>${st.days === 1 ? 'day' : 'days'}</span>
+               <span><b>${st.legs}</b>legs</span>
+               <span><b>${st.borders}</b>${st.borders === 1 ? 'border' : 'borders'}</span>
+               <span><b>${esc(money(st.usd))}</b>all in</span>
+             </span>`
+          : ''
+        return `<button type="button" class="corridor" data-preset="${i}">
+            <span class="corridor-name">${esc(p.label)}<em aria-hidden="true">→</em></span>
+            <span class="corridor-note">${esc(p.note)}</span>
+            ${stats}
+          </button>`
+      })
       .join('')
 
     const myths = network.myths
@@ -3749,15 +3933,17 @@ const UI = (() => {
       <header class="head">
         <p class="eyebrow">Rail-first overland planning</p>
         <h1>Southeast Asia<br>without flying</h1>
-        <p class="lede">${esc(network.intro)}</p>
-        <p class="sub">Every mainstream planner optimises for speed, so it answers
-        “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the ground:
-        it keeps you on rails as far as the rails go, puts a boat where the land ends, and uses a
-        road vehicle only where neither exists.</p>
+        <p class="lede">Every mainstream planner optimises for speed, so it answers
+        “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the
+        ground: it keeps you on rails as far as the rails go, puts a boat where the land
+        ends, and uses a road vehicle only where neither exists.</p>
+        <p class="sub">Pick two stations above, or click any two points on the map. Every
+        itinerary comes with the border mechanics, the connection buffers that actually hold,
+        and a way to book each leg.</p>
       </header>
       <section class="block">
         <h2>Start from a corridor</h2>
-        <div class="chips">${chips}</div>
+        <div class="chips">${cards}</div>
       </section>
       <section class="block">
         <h2>What people get wrong</h2>
@@ -3766,6 +3952,7 @@ const UI = (() => {
         <ul class="myths">${myths}</ul>
       </section>
       <footer class="foot-note">
+        <p>${esc(network.intro)}</p>
         <p>Network reviewed ${esc(network.reviewed)}. This planner gives you legs, operators,
         border mechanics and connection buffers — deliberately not departure times, because
         SRT, KTMB, LCR, DSVN and KAI publish nothing in a common format and a remembered
@@ -3800,6 +3987,7 @@ const UI = (() => {
   ]
 
   const $ = sel => document.querySelector(sel)
+  const app = document.querySelector('.app')
   const canvas = $('#map')
   const panel = $('#panel')
   const tooltip = $('#tip')
@@ -3815,6 +4003,18 @@ const UI = (() => {
     pace: 'standard',
     plan: null,
   }
+
+  /* Real numbers on the corridor cards, so the choice is informed before the
+     click. Six Dijkstra runs over 155 edges — cheap enough to do at boot. */
+  function withStats(presets) {
+    return presets.map(p => {
+      const routed = Router.route(NETWORK, p.from, p.to, {})
+      if (!routed) return p
+      const t = Plan.build(NETWORK, routed, {}).totals
+      return { ...p, stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd } }
+    })
+  }
+  const CORRIDORS = withStats(PRESETS)
 
   /* ------------------------------------------------------------- controls */
 
@@ -3839,6 +4039,16 @@ const UI = (() => {
       .join('')
   }
 
+  const PACE_LABEL = { relaxed: 'Relaxed', standard: 'Standard', fast: 'Hard running' }
+
+  function renderDetailSummary() {
+    const bits = [state.railOnly ? 'Hard rail-only' : 'Pragmatic routing']
+    if (state.pace !== 'standard') bits.push(PACE_LABEL[state.pace])
+    if (state.date) bits.push(state.date)
+    if (state.nationality) bits.push(state.nationality)
+    $('#detail-summary').textContent = bits.join(' · ')
+  }
+
   function renderControls() {
     $('#from').innerHTML = `<option value="">Choose a station…</option>${stationOptions(state.from)}`
     $('#to').innerHTML = `<option value="">Choose a station…</option>${stationOptions(state.to)}`
@@ -3846,6 +4056,7 @@ const UI = (() => {
     $('#date').value = state.date
     $('#nationality').value = state.nationality
     $('#pace').value = state.pace
+    renderDetailSummary()
   }
 
   /* ----------------------------------------------------------------- plan */
@@ -3854,7 +4065,8 @@ const UI = (() => {
     if (!state.from || !state.to || state.from === state.to) {
       state.plan = null
       map.setRoute(null, false)
-      panel.innerHTML = UI.idle(NETWORK, PRESETS)
+      app.dataset.active = 'false'
+      panel.innerHTML = UI.idle(NETWORK, CORRIDORS)
       resetScroll()
       return
     }
@@ -3871,6 +4083,7 @@ const UI = (() => {
       state.plan = null
       map.setRoute(null, false)
       const reach = Router.reachable(NETWORK, state.from, opts)
+      app.dataset.active = 'true'
       panel.innerHTML = UI.unreachable(NETWORK, state.from, state.to, reach, opts)
       resetScroll()
       return
@@ -3878,6 +4091,7 @@ const UI = (() => {
 
     const plan = Plan.build(NETWORK, routed, opts)
     state.plan = plan
+    app.dataset.active = 'true'
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
     panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
     resetScroll()
@@ -4044,22 +4258,39 @@ const UI = (() => {
     compute()
   })
   $('#railonly').addEventListener('change', e => {
+    renderDetailSummary()
     state.railOnly = e.target.checked
     compute()
   })
   $('#date').addEventListener('change', e => {
+    renderDetailSummary()
     state.date = e.target.value
     compute()
   })
   $('#nationality').addEventListener('input', e => {
     state.nationality = e.target.value
+    renderDetailSummary()
     if (state.plan) compute()
   })
   $('#pace').addEventListener('change', e => {
+    renderDetailSummary()
     state.pace = e.target.value
     compute()
   })
   $('#reset').addEventListener('click', () => map.resetView())
+
+  /* Back to a blank slate: clear the pair, drop the shared URL, refit the map. */
+  function goHome() {
+    state.from = null
+    state.to = null
+    state.plan = null
+    history.replaceState(null, '', location.pathname + location.search)
+    renderControls()
+    compute()
+    map.resetView()
+  }
+  $('#home').addEventListener('click', goHome)
+  $('#startover').addEventListener('click', goHome)
 
   panel.addEventListener('click', e => {
     const chip = e.target.closest('[data-preset]')
