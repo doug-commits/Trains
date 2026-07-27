@@ -354,31 +354,6 @@ body {
 .btn-zoom:hover { background: var(--panel); }
 .btn-zoom:active { background: color-mix(in srgb, var(--panel) 80%, var(--ink)); }
 
-/* Shown only when a page scroll passes over the map, to say why nothing
- * zoomed. It fades itself out; it is never a thing you have to dismiss. */
-.maphint {
-  position: absolute;
-  inset: auto 0 45% 0;
-  margin: 0 auto;
-  width: max-content;
-  max-width: 80%;
-  padding: 0.5rem 0.9rem;
-  border-radius: var(--r-lg);
-  font-size: 0.82rem;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  box-shadow: var(--lift-2);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.maphint.show { opacity: 1; }
-
-@media (prefers-reduced-motion: reduce) {
-  .maphint { transition: none; }
-}
 
 /* ------------------------------------------------------------- controls */
 

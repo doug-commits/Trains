@@ -79,7 +79,6 @@
   const canvas = $('#map')
   const panel = $('#panel')
   const tooltip = $('#tip')
-  const hint = $('#maphint')
 
   const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS)
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
@@ -635,33 +634,18 @@
     drag = null
   })
 
-  const ZOOM_KEY = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl'
-  let hintTimer = null
-
-  function flashHint(text) {
-    hint.textContent = text
-    hint.hidden = false
-    // Two frames, so the element is laid out before the class that fades it in.
-    requestAnimationFrame(() => requestAnimationFrame(() => hint.classList.add('show')))
-    clearTimeout(hintTimer)
-    hintTimer = setTimeout(() => {
-      hint.classList.remove('show')
-      setTimeout(() => { hint.hidden = true }, 300)
-    }, 1600)
-  }
-
+  /* The wheel zooms, with no modifier to hold.
+   *
+   * There is a fashion for making maps demand ctrl before they will zoom, to
+   * stop them swallowing a page scroll. On this layout there is no page scroll
+   * to swallow — the app fills the viewport and the document does not move — so
+   * the modifier was pure friction guarding against nothing. */
   canvas.addEventListener(
     'wheel',
     e => {
-      // Scrolling the page over the map is still scrolling the page. Zooming is
-      // something you ask for: ctrl/⌘ and the wheel, which is also exactly what
-      // a trackpad pinch reports. Anything else falls through to the document.
-      if (!e.ctrlKey && !e.metaKey) {
-        flashHint(`Hold ${ZOOM_KEY} and scroll to zoom the map`)
-        return
-      }
       e.preventDefault()
-      // A pinch arrives as many small deltas; the wheel as few large ones.
+      // A trackpad pinch arrives as many small deltas, a wheel as few large
+      // ones. Scaling by the delta keeps both smooth instead of stepping.
       const step = Math.min(Math.abs(e.deltaY) / 100, 1) * 0.12
       map.zoomAt(e.offsetX, e.offsetY, e.deltaY < 0 ? 1 + step : 1 / (1 + step))
       hideTip()

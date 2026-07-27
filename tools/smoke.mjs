@@ -60,11 +60,7 @@ async function zoomOn(page, lon, lat, steps) {
     )
     if (!at) return
     await page.mouse.move(at.x, at.y)
-    // Ctrl is how a human asks the map to zoom rather than the page to scroll,
-    // so the test has to ask the same way.
-    await page.keyboard.down('Control')
     await page.mouse.wheel(0, -240)
-    await page.keyboard.up('Control')
     await page.waitForTimeout(90)
   }
   await page.waitForTimeout(250)
@@ -875,7 +871,7 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
-/* --------------------------------------- the map does not eat page scroll */
+/* ------------------------------------------------------- the wheel zooms */
 {
   const { page, context } = await newPage()
   await page.goto(url)
@@ -884,39 +880,43 @@ function check(label, condition, detail = '') {
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1100)
 
-  // Park the pointer over the middle of the map and scroll as if reading on.
+  const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
   const box = await page.locator('#map').boundingBox()
   const cx = box.x + box.width / 2
   const cy = box.y + box.height / 2
   await page.mouse.move(cx, cy)
 
-  const before = await page.evaluate(() => window.OverlandMap.viewSignature())
-  await page.mouse.wheel(0, 400)
+  // No modifier. The app fills the viewport and the document does not scroll,
+  // so there is no page scroll for the map to steal.
+  const before = await sig()
+  await page.mouse.wheel(0, -300)
   await page.waitForTimeout(300)
-  const after = await page.evaluate(() => window.OverlandMap.viewSignature())
+  const zoomedIn = await sig()
+  check('the wheel zooms in with nothing held', zoomedIn !== before, `${before} → ${zoomedIn}`)
 
-  check('a plain scroll over the map leaves the map alone', before === after, after)
-  check('and says why nothing zoomed',
-    await page.locator('#maphint').isVisible())
-
-  // Ctrl held is the ask, and it must still work.
-  await page.keyboard.down('Control')
-  await page.mouse.wheel(0, -200)
-  await page.keyboard.up('Control')
+  await page.mouse.wheel(0, 300)
   await page.waitForTimeout(300)
-  const zoomed = await page.evaluate(() => window.OverlandMap.viewSignature())
-  check('ctrl and scroll still zooms', zoomed !== after, `${after} → ${zoomed}`)
+  check('and back out the other way', (await sig()) !== zoomedIn)
 
-  // And the buttons work without any gesture at all.
+  check('there is no page scroll for it to have stolen',
+    (await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight
+    )) <= 0)
+
+  // The buttons work without any gesture at all.
+  const beforeBtn = await sig()
   await page.click('#zoomout')
   await page.waitForTimeout(300)
-  const buttoned = await page.evaluate(() => window.OverlandMap.viewSignature())
-  check('the zoom buttons work on their own', buttoned !== zoomed)
+  check('the zoom buttons work on their own', (await sig()) !== beforeBtn)
 
-  check('one finger is the page\'s, not the map\'s',
-    await page.evaluate(() => getComputedStyle(document.querySelector('#map')).touchAction) === 'pan-y')
+  // Touch is the case where the page really does scroll, so one finger stays
+  // the page's and two are the map's.
+  check('one finger is still the page\'s, not the map\'s',
+    (await page.evaluate(
+      () => getComputedStyle(document.querySelector('#map')).touchAction
+    )) === 'pan-y')
 
-  await page.screenshot({ path: join(outDir, '20-scroll-guard.png') })
+  await page.screenshot({ path: join(outDir, '20-wheel-zoom.png') })
   await context.close()
 }
 

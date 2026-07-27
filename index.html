@@ -121,7 +121,6 @@
     <div class="mapwrap">
       <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
       <div id="tip" class="tip" role="status" hidden></div>
-      <div id="maphint" class="maphint" role="status" hidden></div>
 
       <div class="mapfoot">
         <div class="legend">
@@ -510,31 +509,6 @@ body {
 .btn-zoom:hover { background: var(--panel); }
 .btn-zoom:active { background: color-mix(in srgb, var(--panel) 80%, var(--ink)); }
 
-/* Shown only when a page scroll passes over the map, to say why nothing
- * zoomed. It fades itself out; it is never a thing you have to dismiss. */
-.maphint {
-  position: absolute;
-  inset: auto 0 45% 0;
-  margin: 0 auto;
-  width: max-content;
-  max-width: 80%;
-  padding: 0.5rem 0.9rem;
-  border-radius: var(--r-lg);
-  font-size: 0.82rem;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  box-shadow: var(--lift-2);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.maphint.show { opacity: 1; }
-
-@media (prefers-reduced-motion: reduce) {
-  .maphint { transition: none; }
-}
 
 /* ------------------------------------------------------------- controls */
 
@@ -7014,7 +6988,6 @@ const UI = (() => {
   const canvas = $('#map')
   const panel = $('#panel')
   const tooltip = $('#tip')
-  const hint = $('#maphint')
 
   const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS)
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
@@ -7570,33 +7543,18 @@ const UI = (() => {
     drag = null
   })
 
-  const ZOOM_KEY = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl'
-  let hintTimer = null
-
-  function flashHint(text) {
-    hint.textContent = text
-    hint.hidden = false
-    // Two frames, so the element is laid out before the class that fades it in.
-    requestAnimationFrame(() => requestAnimationFrame(() => hint.classList.add('show')))
-    clearTimeout(hintTimer)
-    hintTimer = setTimeout(() => {
-      hint.classList.remove('show')
-      setTimeout(() => { hint.hidden = true }, 300)
-    }, 1600)
-  }
-
+  /* The wheel zooms, with no modifier to hold.
+   *
+   * There is a fashion for making maps demand ctrl before they will zoom, to
+   * stop them swallowing a page scroll. On this layout there is no page scroll
+   * to swallow — the app fills the viewport and the document does not move — so
+   * the modifier was pure friction guarding against nothing. */
   canvas.addEventListener(
     'wheel',
     e => {
-      // Scrolling the page over the map is still scrolling the page. Zooming is
-      // something you ask for: ctrl/⌘ and the wheel, which is also exactly what
-      // a trackpad pinch reports. Anything else falls through to the document.
-      if (!e.ctrlKey && !e.metaKey) {
-        flashHint(`Hold ${ZOOM_KEY} and scroll to zoom the map`)
-        return
-      }
       e.preventDefault()
-      // A pinch arrives as many small deltas; the wheel as few large ones.
+      // A trackpad pinch arrives as many small deltas, a wheel as few large
+      // ones. Scaling by the delta keeps both smooth instead of stepping.
       const step = Math.min(Math.abs(e.deltaY) / 100, 1) * 0.12
       map.zoomAt(e.offsetX, e.offsetY, e.deltaY < 0 ? 1 + step : 1 / (1 + step))
       hideTip()
