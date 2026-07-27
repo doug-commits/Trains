@@ -769,9 +769,9 @@ const UI = (() => {
         “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the
         ground: it keeps you on rails as far as the rails go, puts a boat where the land
         ends, and uses a road vehicle only where neither exists.</p>
-        <p class="sub">Pick two stations above, or click any two points on the map. Every
-        itinerary comes with the border mechanics, the connection buffers that actually hold,
-        and a way to book each leg.</p>
+        <p class="sub">Pick two stations above, or point at anywhere on the map and choose
+        whether to start or finish there. Every itinerary comes with the border mechanics, the
+        connection buffers that actually hold, and a way to book each leg.</p>
       </header>
       <section class="block">
         <h2>Start from a corridor</h2>

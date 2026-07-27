@@ -122,6 +122,23 @@ src/shell.html       Markup.
 tools/               Build and data-generation scripts.
 ```
 
+### Picking two points
+
+Point at any station on the map and a popup offers the two things anyone wants
+from a point on a map: **start here**, or **end here**. Once one end is set the
+other button names it — *"Kunming → end here"* — and a station that is already
+an endpoint says so rather than offering again.
+
+The hard part is not the popup, it is the reach: the pointer has to cross
+ordinary map to get to the buttons, and a naive "no hit means hide" snatches
+them away mid-reach. `showTip` records the box containing the popup, the marker
+it belongs to and the gap between them, and the pointer is safe anywhere inside
+it.
+
+A mouse click still cycles origin then destination as a shortcut. A tap gets
+the popup instead — a finger has no hover, and touch users would otherwise be
+the only ones who never see the choice.
+
 ### Three ideas worth knowing before you edit
 
 **A leg is one vehicle, not one hop.** The graph stores station-to-station

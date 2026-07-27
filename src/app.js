@@ -277,6 +277,11 @@
   /* -------------------------------------------------------- map behaviour */
 
   let drag = null
+  // Which station the popup is currently offering, so a hover inside the same
+  // marker does not rebuild it on every pointer move and kill a click.
+  let tipStation = null
+  let tipReach = null
+  let hideTimer = null
 
   canvas.addEventListener('pointerdown', e => {
     canvas.setPointerCapture(e.pointerId)
@@ -297,17 +302,18 @@
 
     const found = map.pick(e.offsetX, e.offsetY)
     canvas.style.cursor = found ? 'pointer' : 'grab'
-    if (!found) return hideTip()
+
+    // Moving between the station and its own popup crosses ordinary map, so a
+    // plain "no hit means hide" would snatch the buttons away as you reach for
+    // them. While a station popup is open, the pointer is safe anywhere inside
+    // the box that contains both it and the point it belongs to.
+    if (!found) {
+      if (!inTipReach(e.offsetX, e.offsetY)) hideTip()
+      return
+    }
 
     if (found.type === 'station') {
-      const s = found.station
-      showTip(
-        e.offsetX,
-        e.offsetY,
-        `<b>${UI.esc(s.name)}</b><span>${UI.esc(s.city)}, ${UI.esc(COUNTRY_NAME[s.country])}${
-          s.gauge ? ` · ${UI.esc(s.gauge)} gauge` : ''
-        }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}`
-      )
+      if (tipStation !== found.id) showStationTip(e.offsetX, e.offsetY, found.id)
       map.focusLeg(null)
     } else {
       const leg = found.entry.leg
@@ -323,6 +329,68 @@
     }
   })
 
+  /* ------------------------------------------------ the destination popup
+   * Hovering a station offers the two things anyone actually wants from a
+   * point on a map: start here, or end here. The click-to-cycle shortcut still
+   * works, but it is guesswork — it silently decides which end you meant from
+   * how many points you have picked. Buttons say it out loud, and they are the
+   * only way to change one end of a route without clearing the other.
+   */
+  function showStationTip(x, y, id) {
+    const s = NETWORK.stations[id]
+    tipStation = id
+
+    const isFrom = state.from === id
+    const isTo = state.to === id
+    const originName = state.from ? NETWORK.stations[state.from].city : null
+    const targetName = state.to ? NETWORK.stations[state.to].city : null
+
+    const act = (kind, label, on) =>
+      `<button type="button" class="tip-go${on ? ' on' : ''}" data-act="${kind}" data-id="${UI.esc(
+        id
+      )}"${on ? ' aria-current="true"' : ''}>${label}</button>`
+
+    const actions = [
+      isFrom
+        ? act('from', 'Starting here', true)
+        : act('from', targetName ? `Start here → ${UI.esc(targetName)}` : 'Directions from here'),
+      isTo
+        ? act('to', 'Ending here', true)
+        : act('to', originName ? `${UI.esc(originName)} → end here` : 'Directions to here'),
+    ].join('')
+
+    showTip(
+      x,
+      y,
+      `<b>${UI.esc(s.name)}</b><span>${UI.esc(s.city)}, ${UI.esc(COUNTRY_NAME[s.country])}${
+        s.gauge ? ` · ${UI.esc(s.gauge)} gauge` : ''
+      }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}<span class="tip-acts">${actions}</span>`,
+      true
+    )
+  }
+
+  tooltip.addEventListener('pointerenter', cancelHide)
+  tooltip.addEventListener('pointerleave', hideTip)
+
+  tooltip.addEventListener('click', e => {
+    const btn = e.target.closest('.tip-go')
+    if (!btn) return
+    const id = btn.dataset.id
+    if (btn.dataset.act === 'from') {
+      // Choosing a start that is already the destination would ask for a route
+      // from a place to itself; swap instead, which is what was meant.
+      if (state.to === id) state.to = state.from
+      state.from = id
+    } else {
+      if (state.from === id) state.from = state.to
+      state.to = id
+    }
+    state.labels = null
+    hideTip()
+    renderControls()
+    compute()
+  })
+
   canvas.addEventListener('pointerup', e => {
     const wasDrag = drag && drag.moved > 6
     drag = null
@@ -330,21 +398,33 @@
     if (wasDrag) return
 
     const found = map.pick(e.offsetX, e.offsetY)
-    if (!found || found.type !== 'station') return
-    // First click sets the origin, second the destination, then it cycles.
+    if (!found || found.type !== 'station') return hideTip()
+
+    /* A finger has no hover, so a tap gets the popup rather than the cycle —
+       otherwise touch users are the only ones who never see the choice, and
+       they are the ones for whom guessing wrong is most annoying to undo. */
+    if (e.pointerType === 'touch') {
+      showStationTip(e.offsetX, e.offsetY, found.id)
+      return
+    }
+
+    // Mouse keeps the shortcut: first click sets the origin, second the
+    // destination, then it cycles. The popup is the deliberate version.
     if (!state.from || (state.from && state.to)) {
       state.from = found.id
       state.to = null
     } else {
       state.to = found.id
     }
+    hideTip()
     renderControls()
     compute()
   })
 
-  canvas.addEventListener('pointerleave', () => {
+  canvas.addEventListener('pointerleave', e => {
     drag = null
-    hideTip()
+    // Leaving the canvas for the popup is not leaving the map.
+    if (!inTipReach(e.offsetX, e.offsetY)) hideTip()
   })
 
   canvas.addEventListener(
@@ -357,17 +437,48 @@
     { passive: false }
   )
 
-  function showTip(x, y, html) {
+  function showTip(x, y, html, interactive = false) {
+    cancelHide()
     tooltip.innerHTML = html
     tooltip.hidden = false
+    tooltip.classList.toggle('live', interactive)
+    if (!interactive) tipStation = null
     const rect = canvas.getBoundingClientRect()
     const tw = tooltip.offsetWidth
     const th = tooltip.offsetHeight
-    tooltip.style.left = `${Math.min(Math.max(8, x + 14), rect.width - tw - 8)}px`
-    tooltip.style.top = `${Math.max(8, y - th - 14)}px`
+    const left = Math.min(Math.max(8, x + 14), rect.width - tw - 8)
+    const top = Math.max(8, y - th - 14)
+    tooltip.style.left = `${left}px`
+    tooltip.style.top = `${top}px`
+    // The box the pointer may wander in without dismissing the popup: the
+    // popup itself, the point it belongs to, and the gap between them.
+    tipReach = interactive
+      ? {
+          x0: Math.min(left, x) - 12,
+          y0: Math.min(top, y) - 12,
+          x1: Math.max(left + tw, x) + 12,
+          y1: Math.max(top + th, y) + 12,
+        }
+      : null
   }
+
+  function inTipReach(x, y) {
+    return (
+      tipReach && x >= tipReach.x0 && x <= tipReach.x1 && y >= tipReach.y0 && y <= tipReach.y1
+    )
+  }
+
+  function cancelHide() {
+    if (hideTimer) clearTimeout(hideTimer)
+    hideTimer = null
+  }
+
   function hideTip() {
+    cancelHide()
     tooltip.hidden = true
+    tooltip.classList.remove('live')
+    tipStation = null
+    tipReach = null
   }
 
   /* ------------------------------------------------------------- listeners */

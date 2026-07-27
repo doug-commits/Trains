@@ -384,6 +384,70 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* -------------------------------------------------- directions from a point
+ * Hovering a station offers the two things anyone wants from a point on a map:
+ * start here, or end here. The hard part is not the popup — it is that the
+ * pointer has to cross ordinary map to reach the buttons, and a naive "no hit
+ * means hide" snatches them away mid-reach. */
+{
+  const { page, context } = await newPage({ viewport: { width: 1440, height: 900 } })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(1100)
+
+  const box = await page.locator('#map').boundingBox()
+  // Sweep for a station rather than hard-coding a pixel, which would rot the
+  // moment the viewport or the fitted view changes.
+  async function findStation(fromY) {
+    for (let y = fromY; y < box.y + box.height - 60; y += 9) {
+      for (let x = box.x + 60; x < box.x + box.width - 40; x += 9) {
+        await page.mouse.move(x, y)
+        if (await page.locator('#tip.live').isVisible()) return { x, y }
+      }
+    }
+    return null
+  }
+
+  const first = await findStation(box.y + 60)
+  check('hovering a station opens a popup', !!first, first ? `at ${first.x},${first.y}` : 'none found')
+
+  const actions = await page.locator('#tip .tip-go').allTextContents()
+  check('it offers both directions', actions.length === 2 && /from here/i.test(actions[0]) && /to here/i.test(actions[1]),
+    actions.join(' | '))
+
+  // The reach test: travel from the marker to the button and it must survive.
+  const tip = await page.locator('#tip').boundingBox()
+  await page.mouse.move(tip.x + tip.width / 2, tip.y + tip.height - 14, { steps: 14 })
+  await page.waitForTimeout(220)
+  check('the popup survives the reach for its buttons',
+    await page.locator('#tip.live').isVisible())
+
+  await page.locator('#tip .tip-go').first().click()
+  await page.waitForTimeout(400)
+  const from = await page.locator('#from').inputValue()
+  check('"from here" sets the origin', !!from, from)
+
+  // The second station should now offer to finish the route, by name.
+  const second = await findStation(box.y + 520)
+  check('a second station offers to complete it', !!second)
+  const labelled = await page.locator('#tip .tip-go').nth(1).textContent()
+  check('and names the origin it would run from', /→ end here/.test(labelled), labelled.trim())
+
+  await page.locator('#tip .tip-go').nth(1).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(800)
+  check('choosing it routes', (await page.locator('tr.leg').count()) > 0,
+    (await page.textContent('#panel h1')).replace(/\s+/g, ' ').trim())
+
+  // An endpoint of the live route states its role rather than re-offering it.
+  await findStation(box.y + 60)
+  const onRoute = await page.locator('#tip .tip-go.on').count()
+  check('an endpoint says it is one, rather than offering again', onRoute >= 1, `${onRoute} marked`)
+
+  await page.screenshot({ path: join(outDir, '28-station-popup.png') })
+  await context.close()
+}
+
 /* ------------------------------------------------------------- what beds cost
  * The whole point of pricing per place rather than per region: a flat average
  * hides that one night on this route costs more than the other four together. */

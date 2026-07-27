@@ -540,17 +540,58 @@ body {
 .tip {
   position: absolute;
   z-index: 4;
-  max-width: 17rem;
-  padding: 0.45rem 0.6rem;
+  max-width: 19rem;
+  padding: 0.6rem 0.7rem;
+  /* A leg tooltip is a label and must not intercept the drag. A station popup
+     has buttons in it and has to be reachable — see .tip.live. */
   pointer-events: none;
   background: var(--panel-solid);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
-  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.6);
+  box-shadow: var(--lift-3), var(--sheen);
   font-family: var(--sans);
   line-height: 1.35;
 }
-.tip b { display: block; font-size: 0.95rem; font-weight: 600; }
+.tip.live { pointer-events: auto; }
+
+/* Start here / end here. The two things anyone wants from a point on a map. */
+.tip-acts {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--panel-edge);
+}
+.tip-go {
+  flex: 1 1 auto;
+  padding: 0.34rem 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--raise);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.tip-go:hover {
+  color: var(--sea);
+  background: var(--rail);
+  border-color: var(--rail);
+}
+/* Already one end of the current route — a statement, not an offer. */
+.tip-go.on {
+  color: var(--rail);
+  border-color: color-mix(in srgb, var(--rail) 55%, var(--panel-edge));
+  background: color-mix(in srgb, var(--rail) 12%, transparent);
+  cursor: default;
+}
+.tip-go.on:hover { color: var(--rail); background: color-mix(in srgb, var(--rail) 12%, transparent); }
+.tip b { display: block; font-size: 1rem; font-weight: 600; }
 .tip span { display: block; font-size: 0.82rem; color: var(--muted); }
 .tip em {
   display: block;
