@@ -213,6 +213,7 @@
     // The search boxes show whatever the selects now hold, so a pick made on
     // the map or by a corridor card reads back in the fields too.
     syncCombos()
+    foldSummary()
     renderDetailSummary()
   }
 
@@ -1135,6 +1136,50 @@
     })
   }
 
+  /* ------------------------------------------------------------- folding */
+
+  /* The panel covers northwest Thailand at the default view — Chiang Mai, Pai,
+   * the Mae Hong Son loop — and there is no arrangement of a 24rem panel over
+   * a map of ten countries that covers nothing. So it folds, and the choice
+   * sticks, because someone who wants that corner wants it every visit. */
+  const FOLD_KEY = 'overlandsea:folded'
+  const controls = document.querySelector('.controls')
+  const foldBtn = $('#fold')
+
+  function applyFold(folded, remember = true) {
+    controls.dataset.collapsed = String(folded)
+    foldBtn.setAttribute('aria-expanded', String(!folded))
+    $('#fold-label').textContent = folded ? 'Show the search panel' : 'Hide the search panel'
+    foldBtn.title = folded ? 'Show the search panel' : 'Hide the search panel'
+    if (remember) {
+      try {
+        localStorage.setItem(FOLD_KEY, folded ? '1' : '0')
+      } catch (e) {
+        /* private mode — the fold still works, it just will not be remembered */
+      }
+    }
+    // The map fits itself around whatever the overlays leave, so it has to be
+    // told the moment that changes.
+    updateInset()
+    map.resize()
+  }
+
+  /* What the folded bar says. Without it the panel collapses to a bare chevron
+   * and the route you picked disappears from the controls entirely. */
+  function foldSummary() {
+    const label = id => {
+      const s = NETWORK.stations[id]
+      return s ? s.city : ''
+    }
+    const bit = $('.fold-what')
+    bit.textContent =
+      state.from && state.to ? `${label(state.from)} → ${label(state.to)}` : ''
+  }
+
+  foldBtn.addEventListener('click', () => {
+    applyFold(controls.dataset.collapsed !== 'true')
+  })
+
   let resizeTimer = null
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer)
@@ -1152,7 +1197,15 @@
   // Fonts are inlined, but the canvas measures text — wait for them so labels
   // are laid out against the real face rather than the fallback metrics.
   const start = () => {
-    updateInset()
+    // Restore the fold before the first fit, so the map is not laid out for a
+    // panel width it is about to stop having.
+    let folded = false
+    try {
+      folded = localStorage.getItem(FOLD_KEY) === '1'
+    } catch (e) {
+      /* private mode — open is the right default */
+    }
+    applyFold(folded, false)
     map.resize()
     compute()
   }

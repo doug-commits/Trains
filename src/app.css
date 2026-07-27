@@ -376,6 +376,65 @@ body {
   z-index: 3;
 }
 
+/* ------------------------------------------------------------ folding away */
+
+/* At the default view this panel sits over northwest Thailand — Chiang Mai,
+   Pai, the whole Mae Hong Son loop. Folding it gives that corner back without
+   losing the route you already picked, which the collapsed bar keeps showing. */
+.controls-body { display: contents; }
+
+.controls[data-collapsed='true'] { gap: 0; padding: 0.5rem 0.6rem; width: auto; }
+.controls[data-collapsed='true'] .controls-body { display: none; }
+
+.fold {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.35rem -0.35rem 0 0;
+  padding: 0.3rem 0.4rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.fold:hover { color: var(--ink); background: var(--raise); }
+
+.fold svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.controls[data-collapsed='true'] .fold {
+  align-self: auto;
+  margin: 0;
+  flex-direction: row-reverse;
+}
+.controls[data-collapsed='true'] .fold svg { transform: rotate(-90deg); }
+
+/* Empty until there is a route, so the folded panel is just a chevron when it
+   has nothing to report. */
+.fold-what {
+  display: none;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.controls[data-collapsed='true'] .fold-what:not(:empty) { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fold svg { transition: none; }
+}
+
 .search {
   display: flex;
   align-items: flex-end;

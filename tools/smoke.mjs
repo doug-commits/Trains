@@ -872,6 +872,70 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------- getting the panel out of the way */
+{
+  /* Narrower than the suite's default on purpose. Whether the panel covers
+   * northwest Thailand depends on how wide the window is — at 1600 it clears
+   * it, on a 13-inch laptop it does not, and the laptop is where the complaint
+   * came from. */
+  const { page, context } = await newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(1100)
+
+  // Northwest Thailand sits under the controls at the default view: Chiang Mai,
+  // Chiang Rai and Pai are all behind the panel.
+  const covered = async () =>
+    page.evaluate(() =>
+      [[98.98, 18.79], [99.88, 19.91], [98.44, 19.36]].filter(([lo, la]) => {
+        const q = window.OverlandMap.locate(lo, la)
+        if (!q) return false
+        const b = document.querySelector('#map').getBoundingClientRect()
+        const el = document.elementFromPoint(b.left + q.x, b.top + q.y)
+        return !!(el && el.closest('.controls'))
+      }).length
+    )
+
+  check('the panel does cover northwest Thailand', (await covered()) === 3,
+    `${await covered()} of 3 hidden`)
+
+  await page.click('#fold')
+  await page.waitForTimeout(700)
+  check('folding it gives that corner back', (await covered()) === 0,
+    `${await covered()} of 3 still hidden`)
+  check('and the map is told its room changed',
+    (await page.getAttribute('.controls', 'data-collapsed')) === 'true')
+
+  // Folded, it still says where you are going — otherwise the route vanishes
+  // from the controls along with the panel.
+  await page.click('#fold')
+  await page.waitForTimeout(400)
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.click('#fold')
+  await page.waitForTimeout(500)
+  check('the folded bar still names the route',
+    /Bangkok → Singapore/.test(await page.textContent('.fold-what')),
+    await page.textContent('.fold-what'))
+
+  check('the button says what it will do next',
+    /Show the search panel/.test(await page.textContent('#fold-label')))
+
+  await page.reload()
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(900)
+  check('the choice survives a reload',
+    (await page.getAttribute('.controls', 'data-collapsed')) === 'true')
+
+  await page.click('#fold')
+  await page.waitForTimeout(400)
+  check('and unfolding brings the controls back',
+    await page.locator('#askbox').isVisible())
+
+  await page.screenshot({ path: join(outDir, '22-folded.png') })
+  await context.close()
+}
+
 /* ------------------------------------------------ something to actually index */
 {
   const { execFileSync } = await import('node:child_process')

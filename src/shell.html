@@ -41,7 +41,19 @@
   </header>
 
   <div class="stage">
-    <form class="controls" onsubmit="return false">
+    <form class="controls" onsubmit="return false" data-collapsed="false">
+      <!-- The panel covers northwest Thailand at the default view, which is
+           where Chiang Mai, Pai and the Mae Hong Son loop all are. -->
+      <button type="button" id="fold" class="fold" aria-expanded="true" aria-controls="controls-body">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="sr" id="fold-label">Hide the search panel</span>
+        <span class="fold-what" aria-hidden="true"></span>
+      </button>
+
+      <div id="controls-body" class="controls-body">
       <div class="ask">
         <label class="field">
           <span>Where do you want to go?</span>
@@ -118,6 +130,7 @@
           </label>
         </div>
       </details>
+      </div>
     </form>
 
     <div class="mapwrap">

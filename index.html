@@ -61,7 +61,19 @@
   </header>
 
   <div class="stage">
-    <form class="controls" onsubmit="return false">
+    <form class="controls" onsubmit="return false" data-collapsed="false">
+      <!-- The panel covers northwest Thailand at the default view, which is
+           where Chiang Mai, Pai and the Mae Hong Son loop all are. -->
+      <button type="button" id="fold" class="fold" aria-expanded="true" aria-controls="controls-body">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="sr" id="fold-label">Hide the search panel</span>
+        <span class="fold-what" aria-hidden="true"></span>
+      </button>
+
+      <div id="controls-body" class="controls-body">
       <div class="ask">
         <label class="field">
           <span>Where do you want to go?</span>
@@ -138,6 +150,7 @@
           </label>
         </div>
       </details>
+      </div>
     </form>
 
     <div class="mapwrap">
@@ -551,6 +564,65 @@ body {
   border-radius: var(--r);
   box-shadow: var(--lift-3), var(--sheen);
   z-index: 3;
+}
+
+/* ------------------------------------------------------------ folding away */
+
+/* At the default view this panel sits over northwest Thailand — Chiang Mai,
+   Pai, the whole Mae Hong Son loop. Folding it gives that corner back without
+   losing the route you already picked, which the collapsed bar keeps showing. */
+.controls-body { display: contents; }
+
+.controls[data-collapsed='true'] { gap: 0; padding: 0.5rem 0.6rem; width: auto; }
+.controls[data-collapsed='true'] .controls-body { display: none; }
+
+.fold {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.35rem -0.35rem 0 0;
+  padding: 0.3rem 0.4rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.fold:hover { color: var(--ink); background: var(--raise); }
+
+.fold svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.controls[data-collapsed='true'] .fold {
+  align-self: auto;
+  margin: 0;
+  flex-direction: row-reverse;
+}
+.controls[data-collapsed='true'] .fold svg { transform: rotate(-90deg); }
+
+/* Empty until there is a route, so the folded panel is just a chevron when it
+   has nothing to report. */
+.fold-what {
+  display: none;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.controls[data-collapsed='true'] .fold-what:not(:empty) { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fold svg { transition: none; }
 }
 
 .search {
@@ -7366,6 +7438,7 @@ const UI = (() => {
     // The search boxes show whatever the selects now hold, so a pick made on
     // the map or by a corridor card reads back in the fields too.
     syncCombos()
+    foldSummary()
     renderDetailSummary()
   }
 
@@ -8288,6 +8361,50 @@ const UI = (() => {
     })
   }
 
+  /* ------------------------------------------------------------- folding */
+
+  /* The panel covers northwest Thailand at the default view — Chiang Mai, Pai,
+   * the Mae Hong Son loop — and there is no arrangement of a 24rem panel over
+   * a map of ten countries that covers nothing. So it folds, and the choice
+   * sticks, because someone who wants that corner wants it every visit. */
+  const FOLD_KEY = 'overlandsea:folded'
+  const controls = document.querySelector('.controls')
+  const foldBtn = $('#fold')
+
+  function applyFold(folded, remember = true) {
+    controls.dataset.collapsed = String(folded)
+    foldBtn.setAttribute('aria-expanded', String(!folded))
+    $('#fold-label').textContent = folded ? 'Show the search panel' : 'Hide the search panel'
+    foldBtn.title = folded ? 'Show the search panel' : 'Hide the search panel'
+    if (remember) {
+      try {
+        localStorage.setItem(FOLD_KEY, folded ? '1' : '0')
+      } catch (e) {
+        /* private mode — the fold still works, it just will not be remembered */
+      }
+    }
+    // The map fits itself around whatever the overlays leave, so it has to be
+    // told the moment that changes.
+    updateInset()
+    map.resize()
+  }
+
+  /* What the folded bar says. Without it the panel collapses to a bare chevron
+   * and the route you picked disappears from the controls entirely. */
+  function foldSummary() {
+    const label = id => {
+      const s = NETWORK.stations[id]
+      return s ? s.city : ''
+    }
+    const bit = $('.fold-what')
+    bit.textContent =
+      state.from && state.to ? `${label(state.from)} → ${label(state.to)}` : ''
+  }
+
+  foldBtn.addEventListener('click', () => {
+    applyFold(controls.dataset.collapsed !== 'true')
+  })
+
   let resizeTimer = null
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer)
@@ -8305,7 +8422,15 @@ const UI = (() => {
   // Fonts are inlined, but the canvas measures text — wait for them so labels
   // are laid out against the real face rather than the fallback metrics.
   const start = () => {
-    updateInset()
+    // Restore the fold before the first fit, so the map is not laid out for a
+    // panel width it is about to stop having.
+    let folded = false
+    try {
+      folded = localStorage.getItem(FOLD_KEY) === '1'
+    } catch (e) {
+      /* private mode — open is the right default */
+    }
+    applyFold(folded, false)
     map.resize()
     compute()
   }
