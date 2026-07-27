@@ -688,19 +688,6 @@
     "req": 800,
     "bytes": 106423
   },
-  "ubud": {
-    "file": "ubud.jpg",
-    "station": "denpasar",
-    "landmark": "Ubud",
-    "credit": "Unknown",
-    "licence": "CC BY-SA 3.0",
-    "licenceUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
-    "source": "https://commons.wikimedia.org/wiki/File:Rice_terrace_Kadewatan_200507-1.jpg",
-    "width": 800,
-    "height": 600,
-    "req": 800,
-    "bytes": 306365
-  },
   "gili-trawangan": {
     "file": "gili-trawangan.jpg",
     "station": "gili",
@@ -882,19 +869,6 @@
     "height": 600,
     "req": 800,
     "bytes": 181537
-  },
-  "kawasan-falls": {
-    "file": "kawasan-falls.jpg",
-    "station": "cebu",
-    "landmark": "Kawasan Falls",
-    "credit": "No machine-readable author provided. Magalhães assumed (based on copyright claims).",
-    "licence": "Public domain",
-    "licenceUrl": "",
-    "source": "https://commons.wikimedia.org/wiki/File:Kawasan_Falls_Cebu_Island.jpg",
-    "width": 800,
-    "height": 530,
-    "req": 800,
-    "bytes": 133864
   },
   "oslob-whale-sharks": {
     "file": "oslob-whale-sharks.jpg",

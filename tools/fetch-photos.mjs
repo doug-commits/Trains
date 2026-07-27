@@ -91,6 +91,23 @@ function licenceOk(name) {
   return ALLOWED.some(rx => rx.test(String(name || '').trim()))
 }
 
+/** CC BY and CC BY-SA oblige us to name the author. CC0 and public domain do not. */
+function needsAuthor(licence) {
+  return /^cc[ -]by/i.test(String(licence || '').trim())
+}
+
+/* Commons fills an empty author field with boilerplate rather than leaving it
+ * blank, and rendering "No machine-readable author provided. Foo assumed (based
+ * on copyright claims)." under a photograph looks like a bug. Recover the name
+ * it is guessing at; give up if there is not one. */
+function cleanAuthor(raw) {
+  const s = stripHtml(raw)
+  const guessed = s.match(/^No machine-readable author provided\.?\s*([^,]+?)\s+assumed/i)
+  if (guessed) return guessed[1].trim()
+  if (/^no machine-readable author/i.test(s) || /^unknown$/i.test(s)) return ''
+  return s
+}
+
 class NetworkError extends Error {}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -199,6 +216,13 @@ async function findImage(term) {
       rejected.push(`${page.title}: no thumbnail`)
       continue
     }
+    // An attribution licence with nobody to attribute is not a licence we can
+    // satisfy. Take the next candidate rather than shipping "Unknown".
+    const author = cleanAuthor(meta.Artist?.value)
+    if (!author && needsAuthor(licence)) {
+      rejected.push(`${page.title}: ${licence} with no named author`)
+      continue
+    }
 
     return {
       ok: true,
@@ -206,7 +230,7 @@ async function findImage(term) {
       thumburl: info.thumburl,
       width: info.thumbwidth,
       height: info.thumbheight,
-      credit: stripHtml(meta.Artist?.value) || 'Unknown',
+      credit: author || 'Author not recorded on Commons',
       licence,
       licenceUrl: stripHtml(meta.LicenseUrl?.value) || '',
       source: info.descriptionurl || '',

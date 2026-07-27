@@ -153,7 +153,11 @@ with `--only`.
 
 **Attribution is a licence condition, not a nicety.** The credit renders on the
 image itself and the full list renders with the itinerary, both generated from
-the manifest. Do not hand-edit those out.
+the manifest. Do not hand-edit those out. A CC BY or CC BY-SA candidate whose
+author Commons does not record is rejected outright and the next candidate
+taken — an attribution licence with nobody to attribute is not one we can
+satisfy, and shipping "Unknown" is not compliance. CC0 and public domain images
+carry no such obligation and are kept either way.
 
 The build environment cannot reach Wikimedia — the request is refused at the
 network edge — so the fetch runs on CI instead and commits its results.
