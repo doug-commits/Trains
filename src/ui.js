@@ -777,6 +777,19 @@ const UI = (() => {
         <h2>Start from a corridor</h2>
         <div class="chips">${cards}</div>
       </section>
+      ${
+        typeof GUIDES !== 'undefined' && GUIDES.length
+          ? `<section class="block">
+        <h2>Routes written up in full</h2>
+        <p class="sub">The planner answers any pair on the network. These are the ones asked
+        about most often, written out as pages you can read, link to and come back to.</p>
+        <ul class="guides">${GUIDES.map(
+          g =>
+            `<li><a href="/${esc(g.slug)}">${esc(g.h1)}</a><span>${esc(g.summary)}</span></li>`
+        ).join('')}</ul>
+      </section>`
+          : ''
+      }
       <section class="block">
         <h2>What people get wrong</h2>
         <p class="sub">Travellers arrive with these. All seven are load-bearing — each one has

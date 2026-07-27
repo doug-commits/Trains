@@ -872,6 +872,78 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------ something to actually index */
+{
+  const { execFileSync } = await import('node:child_process')
+  const { existsSync, readdirSync } = await import('node:fs')
+
+  // Build the pages against a known origin so the absolute-URL work is real.
+  execFileSync('node', [join(root, 'tools/build-pages.mjs')], {
+    cwd: root,
+    env: { ...process.env, SITE_ORIGIN: 'https://example.test' },
+    stdio: 'pipe',
+  })
+
+  const pub = join(root, 'public')
+  const pages = readdirSync(pub).filter(f => f.endsWith('.html') && f !== 'index.html')
+  check('routes are written out as real pages', pages.length >= 10, `${pages.length} pages`)
+
+  const html = readFileSync(join(pub, 'bangkok-to-singapore-by-train.html'), 'utf8')
+  const textOnly = html
+    .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // The point of the exercise: a crawler that runs no JavaScript still gets
+  // the whole itinerary, not an empty shell waiting for a script.
+  check('a page carries its itinerary without running any script',
+    textOnly.length > 5000, `${textOnly.length} chars of text`)
+  check('and the border mechanics come with it', /Padang Besar/.test(textOnly))
+  check('and the operators are named', /KTMB|SRT/.test(textOnly))
+
+  const h1s = html.match(/<h1[\s>]/g) || []
+  check('exactly one h1, and it names the route', h1s.length === 1, `${h1s.length} found`)
+  check('the h1 is the route, not the brand',
+    /<h1>Bangkok to Singapore by train<\/h1>/.test(html))
+
+  check('canonical points at the configured origin',
+    html.includes('<link rel="canonical" href="https://example.test/bangkok-to-singapore-by-train">'))
+  check('social cards are filled in',
+    /og:title/.test(html) && /og:description/.test(html) && /twitter:card/.test(html))
+
+  const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1])
+  check('structured data describes the trip', ld['@type'] === 'TouristTrip', ld['@type'])
+  check('and lists the legs in order',
+    ld.itinerary.itemListElement.length > 3 &&
+      ld.itinerary.itemListElement[0].position === 1,
+    `${ld.itinerary.itemListElement.length} stops`)
+
+  // Crawl reachability: every page links to every other, so one landing page
+  // is enough to find the whole set.
+  const linked = new Set([...html.matchAll(/href="\/([a-z0-9-]+)"/g)].map(m => m[1]))
+  const slugs = pages.map(f => f.replace(/\.html$/, ''))
+  const missing = slugs.filter(s => s !== 'bangkok-to-singapore-by-train' && !linked.has(s))
+  check('every other route is one hop away', missing.length === 0,
+    missing.join(' ') || 'all reachable')
+
+  check('sitemap lists every page',
+    existsSync(join(pub, 'sitemap.xml')) &&
+      slugs.every(s => readFileSync(join(pub, 'sitemap.xml'), 'utf8').includes(`/${s}<`)))
+  check('robots points at the sitemap',
+    /Sitemap: https:\/\/example\.test\/sitemap\.xml/.test(readFileSync(join(pub, 'robots.txt'), 'utf8')))
+
+  // The honest half: with no origin configured, nothing wrong is emitted.
+  execFileSync('node', [join(root, 'tools/build-pages.mjs')], {
+    cwd: root,
+    env: { ...process.env, SITE_ORIGIN: '' },
+    stdio: 'pipe',
+  })
+  const bare = readFileSync(join(pub, 'bangkok-to-singapore-by-train.html'), 'utf8')
+  check('without an origin it emits no canonical rather than a wrong one',
+    !/<link rel="canonical"/.test(bare) && !existsSync(join(pub, 'sitemap.xml')))
+}
+
 /* ------------------------------------------------- finding a station by typing */
 {
   const { page, context } = await newPage()

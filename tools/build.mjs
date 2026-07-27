@@ -24,10 +24,54 @@ const DESCRIPTION =
   'Plan a Southeast Asian journey that stays on rails as far as the rails go, ' +
   'bridges the gaps by sea, and tells you what happens at every border.'
 
+/* Absolute URLs are required for canonical, og:url and the sitemap, and a
+ * canonical pointing at a host you do not own is worse than none — it tells a
+ * crawler to index a page that is not there. So they only appear when the host
+ * is actually known. */
+const ORIGIN = (process.env.SITE_ORIGIN || '').replace(/\/$/, '')
+
+const headMeta = () => {
+  const ld = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Overland SEA',
+    applicationCategory: 'TravelApplication',
+    operatingSystem: 'Any browser',
+    description: DESCRIPTION,
+    ...(ORIGIN ? { url: ORIGIN, '@id': ORIGIN } : {}),
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    featureList: [
+      'Rail-first routing across ten countries',
+      'Border mechanics and connection buffers',
+      'Frequency estimates for trains, buses and ferries',
+      'Lodging costs along the route',
+    ],
+  })
+  return [
+    ORIGIN
+      ? `<link rel="canonical" href="${ORIGIN}/">`
+      : '<!-- no canonical: SITE_ORIGIN was not set at build time -->',
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="Overland SEA">`,
+    `<meta property="og:title" content="${TITLE}">`,
+    `<meta property="og:description" content="${DESCRIPTION}">`,
+    ORIGIN ? `<meta property="og:url" content="${ORIGIN}/">` : '',
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${TITLE}">`,
+    `<meta name="twitter:description" content="${DESCRIPTION}">`,
+    `<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">`,
+    `<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">`,
+    `<script type="application/ld+json">${ld}</script>`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 // Order matters: each module reads the ones above it.
 const SCRIPTS = [
   'data/network.js',
   'data/landmarks.js',
+  'data/guides.js',
   'src/proj.js',
   'src/router.js',
   'src/plan.js',
@@ -160,6 +204,7 @@ writeFileSync(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${TITLE}</title>
 <meta name="description" content="${DESCRIPTION}">
+${headMeta()}
 </head>
 <body>
 ${bodyWith({ ...photos.embedded, ...photos.linked })}

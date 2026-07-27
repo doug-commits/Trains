@@ -158,6 +158,15 @@
   }
   const CORRIDORS = withStats(PRESETS)
 
+  /* The written-up routes get their headline numbers from the same router that
+   * produced the page, so the link and the page it points at cannot disagree. */
+  for (const g of GUIDES) {
+    const routed = Router.route(NETWORK, g.from, g.to, {})
+    if (!routed) continue
+    const t = Plan.build(NETWORK, routed, {}).totals
+    g.summary = `${t.legs} legs · ${t.days}d · ${UI.money(t.totalUsd)}`
+  }
+
   /* ------------------------------------------------------------- controls */
 
   function stationOptions(selectedId) {

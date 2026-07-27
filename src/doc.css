@@ -1,0 +1,180 @@
+/* Static route pages.
+ *
+ * app.css dresses a console: a fixed viewport with a map behind a floating
+ * panel. These pages are documents — they scroll, they have one column, and
+ * they are read rather than operated. This overrides only what that difference
+ * requires, so the palette, type and panel styling stay identical and a reader
+ * arriving from Google lands somewhere that is recognisably the same place.
+ */
+
+body.doc {
+  height: auto;
+  overflow: visible;
+  background: var(--sea);
+}
+
+body.doc .topbar { position: static; }
+
+body.doc .brand { text-decoration: none; }
+
+.docwrap {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.docwrap h1 {
+  margin: 0 0 0.6rem;
+  font-family: var(--sans);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--ink);
+}
+
+.lede {
+  margin: 0 0 1.2rem;
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+/* The numbers, up front, because they are what the reader came to check. */
+.facts {
+  margin: 0 0 1.6rem;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--sans);
+  font-size: 1rem;
+  color: var(--muted);
+  background: var(--raise);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+}
+.facts b {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.85rem;
+  margin: 1.6rem 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.cta {
+  flex: none;
+  padding: 0.6rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--sea);
+  background: var(--rail);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cta:hover { transform: translateY(-1px); box-shadow: var(--lift-3); }
+
+/* The panel is absolutely placed over the map in the app; here it is just the
+   body of the document. */
+.doc-panel {
+  position: static;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* In the app the destination photograph bleeds to the panel's edges, which it
+   does with a negative margin sized to the panel's padding. There is no such
+   padding here, so that margin dragged the image up over the text above it. */
+body.doc .banner {
+  margin: 0 0 1.8rem;
+  border-radius: var(--r);
+}
+
+/* Illustrations are painted by a script the static pages do not load, so an
+   empty canvas would be a grey hole. The photographs still show. */
+body.doc canvas.scene { display: none; }
+
+/* A photograph that fails to load leaves its alt text floating over a blank
+   box. On a page whose whole job is to be read by someone who arrived from a
+   search result, that reads as broken — so the frame carries the colour. */
+body.doc .banner { background: var(--raise); }
+body.doc .banner img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.more {
+  margin-top: 3.5rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--panel-edge);
+}
+
+.more h2 {
+  margin: 0 0 0.9rem;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.more ul { margin: 0; padding: 0; list-style: none; }
+
+.more li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 55%, transparent);
+}
+
+.more a {
+  font-family: var(--sans);
+  font-size: 1.02rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--rail) 45%, transparent);
+}
+.more a:hover { color: var(--rail); border-bottom-color: var(--rail); }
+
+.more span {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.docfoot {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 3rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.docfoot a { color: var(--rail); }
+
+@media (max-width: 34rem) {
+  .docwrap { padding: 1.75rem 1rem 3rem; }
+  .more span { margin-left: 0; }
+}

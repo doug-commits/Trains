@@ -389,6 +389,38 @@ body {
 
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 
+/* Links to the written-up routes. Real anchors, so a crawler arriving at the
+   homepage can walk to every page from here — and so can a reader who would
+   rather read one than operate the planner. */
+.guides { margin: 0; padding: 0; list-style: none; }
+
+.guides li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.7rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 55%, transparent);
+}
+
+.guides a {
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--rail) 40%, transparent);
+}
+.guides a:hover { color: var(--rail); border-bottom-color: var(--rail); }
+
+.guides span {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ------------------------------------------------------------- combobox */
 
 /* Two hundred stations in a native select means scrolling past nine countries
