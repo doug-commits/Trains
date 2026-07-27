@@ -473,6 +473,45 @@ const NETWORK = {
     puertoprincesa: { name: 'Puerto Princesa',          city: 'Puerto Princesa', country: 'ph', lat: 9.74, lon: 118.74, gauge: null },
     elnido:         { name: 'El Nido',                  city: 'El Nido',       country: 'ph', lat: 11.20,  lon: 119.41, gauge: null },
     coron:          { name: 'Coron (Busuanga)',         city: 'Coron',         country: 'ph', lat: 12.00,  lon: 120.20, gauge: null },
+
+    /* --- Thailand: the Eastern Line and the eastern seaboard ---------------
+     * Pattaya has a railway and most people are surprised by it, because the
+     * bus is quicker and everyone takes the bus.
+     */
+    pattaya:        { name: 'Pattaya',                  city: 'Pattaya',       country: 'th', lat: 12.94,  lon: 100.90, gauge: 'metre',
+                      warn: 'The Eastern Line station is well inland of the beach and sees a couple of trains a day. Real, worth doing once, and not the way most people arrive.' },
+    rayong:         { name: 'Rayong',                   city: 'Rayong',        country: 'th', lat: 12.68,  lon: 101.28, gauge: null },
+    banphe:         { name: 'Ban Phe pier',             city: 'Ban Phe',       country: 'th', lat: 12.62,  lon: 101.44, gauge: null, minor: true },
+    kohsamet:       { name: 'Koh Samet (Na Dan)',       city: 'Koh Samet',     country: 'th', lat: 12.57,  lon: 101.45, gauge: null },
+    trat:           { name: 'Trat',                     city: 'Trat',          country: 'th', lat: 12.24,  lon: 102.51, gauge: null },
+    kohchang:       { name: 'Koh Chang (Dan Kao)',      city: 'Koh Chang',     country: 'th', lat: 12.05,  lon: 102.32, gauge: null },
+
+    // --- Thailand: the north beyond Chiang Mai
+    chiangrai:      { name: 'Chiang Rai',               city: 'Chiang Rai',    country: 'th', lat: 19.91,  lon: 99.83,  gauge: null,
+                      warn: 'No railway. The line north stops at Chiang Mai, and Chiang Rai is a bus from there — which is also how you reach the Lao border at Chiang Khong.' },
+    pai:            { name: 'Pai',                      city: 'Pai',           country: 'th', lat: 19.36,  lon: 98.44,  gauge: null,
+                      warn: 'Seven hundred and sixty-two curves from Chiang Mai. Take the motion sickness seriously or take the minivan at dawn.' },
+
+    /* --- Laos: the Route 13 south corridor -------------------------------
+     * The half of Laos the railway does not touch. Everything here is a bus
+     * on one road, and that road is the country's spine.
+     */
+    thakhek:        { name: 'Thakhek',                  city: 'Thakhek',       country: 'la', lat: 17.41,  lon: 104.82, gauge: null },
+    savannakhet:    { name: 'Savannakhet',              city: 'Savannakhet',   country: 'la', lat: 16.56,  lon: 104.75, gauge: null },
+    pakse:          { name: 'Pakse',                    city: 'Pakse',         country: 'la', lat: 15.12,  lon: 105.80, gauge: null },
+    siphandon:      { name: 'Si Phan Don (Don Det)',    city: 'Si Phan Don',   country: 'la', lat: 13.95,  lon: 105.85, gauge: null,
+                      warn: 'Four Thousand Islands. The last hop is a longtail from Nakasang and the boats stop at dusk.' },
+
+    // --- Vietnam: the south beyond the mainline
+    vungtau:        { name: 'Vũng Tàu',                 city: 'Vũng Tàu',      country: 'vn', lat: 10.35,  lon: 107.08, gauge: null },
+    dalat:          { name: 'Đà Lạt',                   city: 'Đà Lạt',        country: 'vn', lat: 11.94,  lon: 108.44, gauge: null,
+                      warn: 'Đà Lạt has a beautiful station and 7 km of track to Trại Mát. It is a heritage ride, not a way in or out — the mainline railhead is Tháp Chàm, down on the coast.' },
+    cantho:         { name: 'Cần Thơ',                  city: 'Cần Thơ',       country: 'vn', lat: 10.03,  lon: 105.78, gauge: null },
+
+    // --- Malaysia: Sarawak, which the Sabah line does not reach either
+    miri:           { name: 'Miri',                     city: 'Miri',          country: 'my', lat: 4.40,   lon: 113.99, gauge: null },
+    kuching:        { name: 'Kuching',                  city: 'Kuching',       country: 'my', lat: 1.56,   lon: 110.35, gauge: null,
+                      warn: 'Sarawak has no railway at all. Kuching is a long day on a bus from anywhere, or a flight.' },
   },
 
   /* -------------------------------------------------------------------- legs
@@ -823,6 +862,45 @@ const NETWORK = {
     { from: 'cebu', to: 'surigao', mode: 'ferry', op: 'localferry', service: 'Cokaliong overnight', hours: 9, usd: 18, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
     { from: 'cebu', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Iloilo', hours: 12, usd: 22, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
 
+    // === Thailand: the Eastern Line and the eastern seaboard ===========
+    { from: 'chachoengsao', to: 'pattaya', mode: 'rail', op: 'srt', service: 'Eastern Line 283/284 (Bangkok – Ban Phlu Ta Luang)', hours: 2, usd: 3, confidence: 'verify',
+      note: 'One train each way on weekdays, and it takes longer than the bus. People ride it because it is a train, which is a good enough reason — but do not build a connection on it.' },
+    { from: 'pattaya', to: 'rayong', mode: 'road', op: 'coach', service: 'Provincial bus or minivan', hours: 1.5, usd: 3, confidence: 'reported' },
+    { from: 'rayong', to: 'banphe', mode: 'road', op: 'transfer', service: 'Songthaew to the pier', hours: 0.5, usd: 2, essential: true, confidence: 'reported' },
+    { from: 'banphe', to: 'kohsamet', mode: 'ferry', op: 'localferry', service: 'Ban Phe – Na Dan ferry', hours: 0.5, usd: 3, seasonal: 'gulf', confidence: 'reported',
+      note: 'Half an hour, frequent through the day. There is a national park fee collected on arrival that catches people out.' },
+    { from: 'rayong', to: 'trat', mode: 'road', op: 'coach', service: 'Eastern seaboard coach', hours: 3, usd: 7, confidence: 'reported' },
+    { from: 'trat', to: 'kohchang', mode: 'ferry', op: 'localferry', service: 'Songthaew to Laem Ngop, then the Koh Chang ferry', hours: 1.25, usd: 6, essential: true, seasonal: 'gulf', confidence: 'reported',
+      note: 'Two ferry companies from two different piers. Whichever your minibus is going to is the right one.' },
+
+    // === Thailand: north of the railhead ===============================
+    { from: 'chiangmai', to: 'chiangrai', mode: 'road', op: 'greenbus', service: 'Green Bus V-Class', hours: 3.5, usd: 8, confidence: 'reported' },
+    { from: 'chiangrai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus to the border', hours: 2.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'chiangmai', to: 'pai', mode: 'road', op: 'transfer', service: 'Aya Service minivan', hours: 3.5, usd: 6, scenic: true, confidence: 'reported',
+      note: 'Seven hundred and sixty-two curves, and the minivan drives them like it is late. Sit at the front and take something for it.' },
+
+    // === Laos: the Route 13 south corridor =============================
+    { from: 'ubon', to: 'pakse', mode: 'road', op: 'coach', service: 'Cross-border coach via Chong Mek', hours: 4, usd: 12, border: 'chongmek', confidence: 'reported',
+      note: 'The way into southern Laos from the Thai railway, and the only one that is not a long detour through Vientiane.' },
+    { from: 'pakse', to: 'siphandon', mode: 'road', op: 'coach', service: 'Minibus to Nakasang, then a longtail', hours: 3, usd: 10, essential: true, scenic: true, confidence: 'reported' },
+    { from: 'pakse', to: 'savannakhet', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 5, usd: 10, confidence: 'reported' },
+    { from: 'savannakhet', to: 'thakhek', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 2.5, usd: 6, confidence: 'reported' },
+    { from: 'thakhek', to: 'vte_khamsavath', mode: 'road', op: 'coach', service: 'Route 13 coach to Vientiane', hours: 5, usd: 12, confidence: 'reported',
+      note: 'Arrives at Vientiane\'s southern bus terminal, not at either railway station. Allow a tuk-tuk and half an hour on top.' },
+
+    // === Vietnam: south of the mainline ================================
+    { from: 'saigon', to: 'vungtau', mode: 'ferry', op: 'localferry', service: 'Greenlines DP hydrofoil', hours: 1.5, usd: 12, scenic: true, confidence: 'reported',
+      note: 'Down the Saigon river and out into the sea. Quicker than the road and much better company.' },
+    { from: 'thapcham', to: 'dalat', mode: 'road', op: 'transfer', service: 'Minibus up the pass', hours: 2.5, usd: 6, essential: true, scenic: true, confidence: 'reported',
+      note: 'Tháp Chàm is the mainline station for Đà Lạt and the bottom of the old rack railway. The climb is 1,500 m in two hours.' },
+    { from: 'nhatrang', to: 'dalat', mode: 'road', op: 'coach', service: 'Sleeper bus over the Khánh Lê pass', hours: 4, usd: 8, scenic: true, confidence: 'reported' },
+    { from: 'saigon', to: 'cantho', mode: 'road', op: 'coach', service: 'Mekong Delta coach', hours: 4, usd: 8, confidence: 'reported' },
+
+    // === Malaysian Borneo: Sarawak =====================================
+    { from: 'bandarseri', to: 'miri', mode: 'road', op: 'coach', service: 'Cross-border coach via Sungai Tujoh', hours: 4, usd: 15, border: 'sungaitujoh', confidence: 'reported' },
+    { from: 'miri', to: 'kuching', mode: 'road', op: 'coach', service: 'Overnight coast coach', hours: 14, usd: 20, confidence: 'reported',
+      note: 'Fourteen hours down the Sarawak coast. There is no railway and no ferry — this is the overland answer and it is a long one.' },
+
     // --- Palawan
     { from: 'coron', to: 'elnido', mode: 'ferry', op: 'localferry', service: 'Montenegro / Jomalia fast craft', hours: 4, usd: 30, scenic: true, seasonal: 'typhoon', confidence: 'verify',
       note: 'Weather-dependent and cancelled outright in rough months. Nothing else connects northern Palawan to the Calamianes.' },
@@ -951,6 +1029,25 @@ const NETWORK = {
       visa: 'Brunei is visa-free for many nationalities on short visits. Confirm for your own passport.',
       cash: 'Brunei dollars; Singapore dollars are accepted at par.',
       trap: 'Muara is a working port well outside Bandar Seri Begawan, and onward transport thins out in the evening. Both this leg and the Kota Kinabalu one are weather-dependent.',
+      verify: true,
+    },
+    chongmek: {
+      name: 'Chong Mek ↔ Vangtao', countries: 'Thailand ↔ Laos', at: 'Road border, everyone off the coach and back on',
+      minutes: 90,
+      stayOnTrain: 'No — walk through both posts while the coach waits',
+      luggage: 'Yes, carried across',
+      visa: 'Lao visa-on-arrival is normally issued here in US dollars cash. Bring exact notes and a passport photo; the photo booth is not always working.',
+      cash: 'US dollars in small notes for the visa, and Thai baht — southern Laos takes baht more readily than kip in some places.',
+      trap: 'There is an unofficial "overtime fee" collected outside office hours and at weekends. It is small, it is real in the sense that you will be asked for it, and arguing costs more time than paying. Arrive on a weekday morning and it does not come up.',
+    },
+    sungaitujoh: {
+      name: 'Sungai Tujoh', countries: 'Brunei ↔ Malaysia (Sarawak)', at: 'Road border on the coast highway, cleared from the coach',
+      minutes: 60,
+      stayOnTrain: 'Off and on at each post',
+      luggage: 'Yes',
+      visa: 'Malaysian entry is visa-free for many nationalities. Sarawak runs its own immigration and stamps you separately from peninsular Malaysia — this is normal, not a problem.',
+      cash: 'Malaysian ringgit for the far side.',
+      trap: 'Sarawak\'s autonomous immigration means your Malaysian entry stamp from KL does not carry over; you get a fresh one with its own duration. Check the days you are given rather than assuming.',
       verify: true,
     },
     batam: {

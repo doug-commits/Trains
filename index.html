@@ -1340,6 +1340,24 @@ table { width: 100%; border-collapse: collapse; }
 .ask-note.ok { border-left-color: var(--rail); }
 .ask-note.warn { border-left-color: var(--alert); color: var(--ink-soft); }
 
+/* "Did you mean" options. Buttons, because the note is asking a question and
+   the answer should be one click rather than a retype. */
+.ask-sug {
+  display: inline-block;
+  margin: 0.35rem 0.3rem 0 0;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.ask-sug:hover,
+.ask-sug:focus-visible { border-color: var(--rail); color: var(--rail); }
+
 .or {
   display: flex;
   align-items: center;
@@ -1951,6 +1969,45 @@ const NETWORK = {
     puertoprincesa: { name: 'Puerto Princesa',          city: 'Puerto Princesa', country: 'ph', lat: 9.74, lon: 118.74, gauge: null },
     elnido:         { name: 'El Nido',                  city: 'El Nido',       country: 'ph', lat: 11.20,  lon: 119.41, gauge: null },
     coron:          { name: 'Coron (Busuanga)',         city: 'Coron',         country: 'ph', lat: 12.00,  lon: 120.20, gauge: null },
+
+    /* --- Thailand: the Eastern Line and the eastern seaboard ---------------
+     * Pattaya has a railway and most people are surprised by it, because the
+     * bus is quicker and everyone takes the bus.
+     */
+    pattaya:        { name: 'Pattaya',                  city: 'Pattaya',       country: 'th', lat: 12.94,  lon: 100.90, gauge: 'metre',
+                      warn: 'The Eastern Line station is well inland of the beach and sees a couple of trains a day. Real, worth doing once, and not the way most people arrive.' },
+    rayong:         { name: 'Rayong',                   city: 'Rayong',        country: 'th', lat: 12.68,  lon: 101.28, gauge: null },
+    banphe:         { name: 'Ban Phe pier',             city: 'Ban Phe',       country: 'th', lat: 12.62,  lon: 101.44, gauge: null, minor: true },
+    kohsamet:       { name: 'Koh Samet (Na Dan)',       city: 'Koh Samet',     country: 'th', lat: 12.57,  lon: 101.45, gauge: null },
+    trat:           { name: 'Trat',                     city: 'Trat',          country: 'th', lat: 12.24,  lon: 102.51, gauge: null },
+    kohchang:       { name: 'Koh Chang (Dan Kao)',      city: 'Koh Chang',     country: 'th', lat: 12.05,  lon: 102.32, gauge: null },
+
+    // --- Thailand: the north beyond Chiang Mai
+    chiangrai:      { name: 'Chiang Rai',               city: 'Chiang Rai',    country: 'th', lat: 19.91,  lon: 99.83,  gauge: null,
+                      warn: 'No railway. The line north stops at Chiang Mai, and Chiang Rai is a bus from there — which is also how you reach the Lao border at Chiang Khong.' },
+    pai:            { name: 'Pai',                      city: 'Pai',           country: 'th', lat: 19.36,  lon: 98.44,  gauge: null,
+                      warn: 'Seven hundred and sixty-two curves from Chiang Mai. Take the motion sickness seriously or take the minivan at dawn.' },
+
+    /* --- Laos: the Route 13 south corridor -------------------------------
+     * The half of Laos the railway does not touch. Everything here is a bus
+     * on one road, and that road is the country's spine.
+     */
+    thakhek:        { name: 'Thakhek',                  city: 'Thakhek',       country: 'la', lat: 17.41,  lon: 104.82, gauge: null },
+    savannakhet:    { name: 'Savannakhet',              city: 'Savannakhet',   country: 'la', lat: 16.56,  lon: 104.75, gauge: null },
+    pakse:          { name: 'Pakse',                    city: 'Pakse',         country: 'la', lat: 15.12,  lon: 105.80, gauge: null },
+    siphandon:      { name: 'Si Phan Don (Don Det)',    city: 'Si Phan Don',   country: 'la', lat: 13.95,  lon: 105.85, gauge: null,
+                      warn: 'Four Thousand Islands. The last hop is a longtail from Nakasang and the boats stop at dusk.' },
+
+    // --- Vietnam: the south beyond the mainline
+    vungtau:        { name: 'Vũng Tàu',                 city: 'Vũng Tàu',      country: 'vn', lat: 10.35,  lon: 107.08, gauge: null },
+    dalat:          { name: 'Đà Lạt',                   city: 'Đà Lạt',        country: 'vn', lat: 11.94,  lon: 108.44, gauge: null,
+                      warn: 'Đà Lạt has a beautiful station and 7 km of track to Trại Mát. It is a heritage ride, not a way in or out — the mainline railhead is Tháp Chàm, down on the coast.' },
+    cantho:         { name: 'Cần Thơ',                  city: 'Cần Thơ',       country: 'vn', lat: 10.03,  lon: 105.78, gauge: null },
+
+    // --- Malaysia: Sarawak, which the Sabah line does not reach either
+    miri:           { name: 'Miri',                     city: 'Miri',          country: 'my', lat: 4.40,   lon: 113.99, gauge: null },
+    kuching:        { name: 'Kuching',                  city: 'Kuching',       country: 'my', lat: 1.56,   lon: 110.35, gauge: null,
+                      warn: 'Sarawak has no railway at all. Kuching is a long day on a bus from anywhere, or a flight.' },
   },
 
   /* -------------------------------------------------------------------- legs
@@ -2301,6 +2358,45 @@ const NETWORK = {
     { from: 'cebu', to: 'surigao', mode: 'ferry', op: 'localferry', service: 'Cokaliong overnight', hours: 9, usd: 18, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
     { from: 'cebu', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Iloilo', hours: 12, usd: 22, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
 
+    // === Thailand: the Eastern Line and the eastern seaboard ===========
+    { from: 'chachoengsao', to: 'pattaya', mode: 'rail', op: 'srt', service: 'Eastern Line 283/284 (Bangkok – Ban Phlu Ta Luang)', hours: 2, usd: 3, confidence: 'verify',
+      note: 'One train each way on weekdays, and it takes longer than the bus. People ride it because it is a train, which is a good enough reason — but do not build a connection on it.' },
+    { from: 'pattaya', to: 'rayong', mode: 'road', op: 'coach', service: 'Provincial bus or minivan', hours: 1.5, usd: 3, confidence: 'reported' },
+    { from: 'rayong', to: 'banphe', mode: 'road', op: 'transfer', service: 'Songthaew to the pier', hours: 0.5, usd: 2, essential: true, confidence: 'reported' },
+    { from: 'banphe', to: 'kohsamet', mode: 'ferry', op: 'localferry', service: 'Ban Phe – Na Dan ferry', hours: 0.5, usd: 3, seasonal: 'gulf', confidence: 'reported',
+      note: 'Half an hour, frequent through the day. There is a national park fee collected on arrival that catches people out.' },
+    { from: 'rayong', to: 'trat', mode: 'road', op: 'coach', service: 'Eastern seaboard coach', hours: 3, usd: 7, confidence: 'reported' },
+    { from: 'trat', to: 'kohchang', mode: 'ferry', op: 'localferry', service: 'Songthaew to Laem Ngop, then the Koh Chang ferry', hours: 1.25, usd: 6, essential: true, seasonal: 'gulf', confidence: 'reported',
+      note: 'Two ferry companies from two different piers. Whichever your minibus is going to is the right one.' },
+
+    // === Thailand: north of the railhead ===============================
+    { from: 'chiangmai', to: 'chiangrai', mode: 'road', op: 'greenbus', service: 'Green Bus V-Class', hours: 3.5, usd: 8, confidence: 'reported' },
+    { from: 'chiangrai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus to the border', hours: 2.5, usd: 5, essential: true, confidence: 'reported' },
+    { from: 'chiangmai', to: 'pai', mode: 'road', op: 'transfer', service: 'Aya Service minivan', hours: 3.5, usd: 6, scenic: true, confidence: 'reported',
+      note: 'Seven hundred and sixty-two curves, and the minivan drives them like it is late. Sit at the front and take something for it.' },
+
+    // === Laos: the Route 13 south corridor =============================
+    { from: 'ubon', to: 'pakse', mode: 'road', op: 'coach', service: 'Cross-border coach via Chong Mek', hours: 4, usd: 12, border: 'chongmek', confidence: 'reported',
+      note: 'The way into southern Laos from the Thai railway, and the only one that is not a long detour through Vientiane.' },
+    { from: 'pakse', to: 'siphandon', mode: 'road', op: 'coach', service: 'Minibus to Nakasang, then a longtail', hours: 3, usd: 10, essential: true, scenic: true, confidence: 'reported' },
+    { from: 'pakse', to: 'savannakhet', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 5, usd: 10, confidence: 'reported' },
+    { from: 'savannakhet', to: 'thakhek', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 2.5, usd: 6, confidence: 'reported' },
+    { from: 'thakhek', to: 'vte_khamsavath', mode: 'road', op: 'coach', service: 'Route 13 coach to Vientiane', hours: 5, usd: 12, confidence: 'reported',
+      note: 'Arrives at Vientiane\'s southern bus terminal, not at either railway station. Allow a tuk-tuk and half an hour on top.' },
+
+    // === Vietnam: south of the mainline ================================
+    { from: 'saigon', to: 'vungtau', mode: 'ferry', op: 'localferry', service: 'Greenlines DP hydrofoil', hours: 1.5, usd: 12, scenic: true, confidence: 'reported',
+      note: 'Down the Saigon river and out into the sea. Quicker than the road and much better company.' },
+    { from: 'thapcham', to: 'dalat', mode: 'road', op: 'transfer', service: 'Minibus up the pass', hours: 2.5, usd: 6, essential: true, scenic: true, confidence: 'reported',
+      note: 'Tháp Chàm is the mainline station for Đà Lạt and the bottom of the old rack railway. The climb is 1,500 m in two hours.' },
+    { from: 'nhatrang', to: 'dalat', mode: 'road', op: 'coach', service: 'Sleeper bus over the Khánh Lê pass', hours: 4, usd: 8, scenic: true, confidence: 'reported' },
+    { from: 'saigon', to: 'cantho', mode: 'road', op: 'coach', service: 'Mekong Delta coach', hours: 4, usd: 8, confidence: 'reported' },
+
+    // === Malaysian Borneo: Sarawak =====================================
+    { from: 'bandarseri', to: 'miri', mode: 'road', op: 'coach', service: 'Cross-border coach via Sungai Tujoh', hours: 4, usd: 15, border: 'sungaitujoh', confidence: 'reported' },
+    { from: 'miri', to: 'kuching', mode: 'road', op: 'coach', service: 'Overnight coast coach', hours: 14, usd: 20, confidence: 'reported',
+      note: 'Fourteen hours down the Sarawak coast. There is no railway and no ferry — this is the overland answer and it is a long one.' },
+
     // --- Palawan
     { from: 'coron', to: 'elnido', mode: 'ferry', op: 'localferry', service: 'Montenegro / Jomalia fast craft', hours: 4, usd: 30, scenic: true, seasonal: 'typhoon', confidence: 'verify',
       note: 'Weather-dependent and cancelled outright in rough months. Nothing else connects northern Palawan to the Calamianes.' },
@@ -2429,6 +2525,25 @@ const NETWORK = {
       visa: 'Brunei is visa-free for many nationalities on short visits. Confirm for your own passport.',
       cash: 'Brunei dollars; Singapore dollars are accepted at par.',
       trap: 'Muara is a working port well outside Bandar Seri Begawan, and onward transport thins out in the evening. Both this leg and the Kota Kinabalu one are weather-dependent.',
+      verify: true,
+    },
+    chongmek: {
+      name: 'Chong Mek ↔ Vangtao', countries: 'Thailand ↔ Laos', at: 'Road border, everyone off the coach and back on',
+      minutes: 90,
+      stayOnTrain: 'No — walk through both posts while the coach waits',
+      luggage: 'Yes, carried across',
+      visa: 'Lao visa-on-arrival is normally issued here in US dollars cash. Bring exact notes and a passport photo; the photo booth is not always working.',
+      cash: 'US dollars in small notes for the visa, and Thai baht — southern Laos takes baht more readily than kip in some places.',
+      trap: 'There is an unofficial "overtime fee" collected outside office hours and at weekends. It is small, it is real in the sense that you will be asked for it, and arguing costs more time than paying. Arrive on a weekday morning and it does not come up.',
+    },
+    sungaitujoh: {
+      name: 'Sungai Tujoh', countries: 'Brunei ↔ Malaysia (Sarawak)', at: 'Road border on the coast highway, cleared from the coach',
+      minutes: 60,
+      stayOnTrain: 'Off and on at each post',
+      luggage: 'Yes',
+      visa: 'Malaysian entry is visa-free for many nationalities. Sarawak runs its own immigration and stamps you separately from peninsular Malaysia — this is normal, not a problem.',
+      cash: 'Malaysian ringgit for the far side.',
+      trap: 'Sarawak\'s autonomous immigration means your Malaysian entry stamp from KL does not carry over; you get a fresh one with its own duration. Check the days you are given rather than assuming.',
       verify: true,
     },
     batam: {
@@ -2643,14 +2758,14 @@ const LANDMARKS = [
   { name: 'Mũi Né dunes', station: 'muongman', scene: 'coast', country: 'vn',
     commons: 'Mui Ne sand dunes Vietnam',
     aka: ['mui ne', 'phan thiet', 'sand dunes'], last: 'Taxi from Mương Mán' },
-  { name: 'Đà Lạt', station: 'thapcham', scene: 'hills', country: 'vn',
+  { name: 'Đà Lạt', station: 'dalat', scene: 'hills', country: 'vn',
     commons: 'Da Lat Vietnam city',
-    aka: ['dalat', 'da lat'], last: 'Winding road up from Tháp Chàm, about three hours' },
+    aka: ['dalat', 'da lat', 'crazy house', 'lang biang'], last: null },
   { name: 'Cu Chi Tunnels', station: 'saigon', scene: 'forest', country: 'vn',
     aka: ['cu chi', 'ho chi minh city', 'saigon', 'ben thanh', 'war remnants'], last: 'Half-day trip from the city' },
   { name: 'Mekong Delta', station: 'chaudoc', scene: 'river', country: 'vn',
     commons: 'Mekong Delta Vietnam floating market',
-    aka: ['mekong delta', 'chau doc', 'can tho', 'floating market'], last: null },
+    aka: ['mekong delta', 'chau doc'], last: null },
 
   // --- Malaysia
   { name: 'Petronas Towers', station: 'klsentral', scene: 'skyline', country: 'my',
@@ -2717,6 +2832,50 @@ const LANDMARKS = [
   { name: 'Stone Forest', station: 'kunming', scene: 'karst', country: 'cn',
     commons: 'Shilin Stone Forest Yunnan',
     aka: ['kunming', 'shilin'], last: 'Ninety minutes by road from Kunming' },
+
+  // --- Thailand, the eastern seaboard and the far north
+  { name: 'Pattaya beach', station: 'pattaya', scene: 'coast', country: 'th',
+    commons: 'Pattaya Beach Thailand',
+    aka: ['pattaya', 'jomtien', 'walking street'], last: 'Songthaew from the Eastern Line station down to the seafront' },
+  { name: 'Koh Samet', station: 'kohsamet', scene: 'coast', country: 'th',
+    commons: 'Ko Samet beach Thailand',
+    aka: ['samet', 'ko samet', 'sai kaew'], last: null },
+  { name: 'Koh Chang', station: 'kohchang', scene: 'forest', country: 'th',
+    commons: 'Ko Chang Trat Thailand',
+    aka: ['ko chang', 'white sand beach', 'lonely beach'], last: null },
+  { name: 'White Temple', station: 'chiangrai', scene: 'temple', country: 'th',
+    commons: 'Wat Rong Khun White Temple',
+    aka: ['chiang rai', 'wat rong khun', 'blue temple', 'golden triangle'], last: 'Local bus or songthaew south of Chiang Rai' },
+  { name: 'Pai', station: 'pai', scene: 'hills', country: 'th',
+    commons: 'Pai Mae Hong Son Thailand',
+    aka: ['pai canyon', 'pai thailand'], last: null },
+
+  // --- Laos, the south
+  { name: 'Four Thousand Islands', station: 'siphandon', scene: 'river', country: 'la',
+    commons: 'Si Phan Don Don Det Laos',
+    aka: ['si phan don', 'don det', 'don khon', '4000 islands'], last: 'Longtail from Nakasang pier' },
+  { name: 'Bolaven Plateau', station: 'pakse', scene: 'forest', country: 'la',
+    commons: 'Tad Fane waterfall Bolaven Plateau',
+    aka: ['pakse', 'bolaven', 'tad fane', 'champasak'], last: 'Motorbike loop or a day tour out of Pakse' },
+  { name: 'Thakhek Loop', station: 'thakhek', scene: 'karst', country: 'la',
+    commons: 'Kong Lor Cave Laos',
+    aka: ['thakhek', 'kong lor', 'konglor cave'], last: 'Three or four days round the loop by motorbike' },
+
+  // --- Vietnam, the south
+  { name: 'Vũng Tàu', station: 'vungtau', scene: 'coast', country: 'vn',
+    commons: 'Vung Tau Vietnam beach',
+    aka: ['vung tau', 'front beach', 'christ of vung tau'], last: null },
+  { name: 'Cần Thơ floating market', station: 'cantho', scene: 'river', country: 'vn',
+    commons: 'Cai Rang floating market',
+    aka: ['can tho', 'cai rang', 'floating market'], last: 'Boat from Ninh Kieu quay before dawn' },
+
+  // --- Malaysian Borneo
+  { name: 'Bako National Park', station: 'kuching', scene: 'forest', country: 'my',
+    commons: 'Bako National Park Sarawak',
+    aka: ['kuching', 'sarawak', 'bako', 'proboscis monkey'], last: 'Bus to Bako village, then a boat along the coast' },
+  { name: 'Mulu Caves', station: 'miri', scene: 'karst', country: 'my',
+    commons: 'Gunung Mulu National Park cave',
+    aka: ['miri', 'mulu', 'gunung mulu', 'deer cave'], last: 'There is no road — Mulu is reached by air or a two-day river trip' },
 
   // --- Philippines
   { name: 'Intramuros', station: 'manila', scene: 'skyline', country: 'ph',
@@ -4129,7 +4288,13 @@ const Ask = (() => {
       const st = network.stations[stationId]
       const bias =
         (kind === 'landmark' ? 6 : 0) + (st && st.hub ? 4 : 0) + (st && st.minor ? -4 : 0)
-      entries.push({ label, key: norm(key), stationId, kind, bias, ...extra })
+      // Coordinates travel with the entry so `match` can ask how far apart two
+      // near-identical spellings actually are, without needing the network.
+      entries.push({
+        label, key: norm(key), stationId, kind, bias,
+        lat: st ? st.lat : null, lon: st ? st.lon : null,
+        ...extra,
+      })
     }
 
     for (const lm of landmarks) {
@@ -4155,41 +4320,129 @@ const Ask = (() => {
     return entries
   }
 
+  /* Optimal string alignment distance — Levenshtein plus transposition, which
+   * matters here because the commonest typo in these names is a swap: "hanio",
+   * "siem riep", "bankok". Bails out as soon as the whole row exceeds `max`, so
+   * comparing a query against two hundred keys stays cheap.
+   *
+   * Not a general fuzzy search. It runs only after the exact, prefix and
+   * substring tiers have failed, and only within a distance the length of the
+   * word justifies — see TYPO_BUDGET. */
+  function editDistance(a, b, max) {
+    if (Math.abs(a.length - b.length) > max) return max + 1
+    let prev2 = null
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+    for (let i = 1; i <= a.length; i++) {
+      const row = new Array(b.length + 1)
+      row[0] = i
+      let best = row[0]
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1
+        let v = Math.min(row[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          v = Math.min(v, prev2[j - 2] + 1)
+        }
+        row[j] = v
+        if (v < best) best = v
+      }
+      if (best > max) return max + 1
+      prev2 = prev
+      prev = row
+    }
+    return prev[b.length]
+  }
+
+  /* How wrong a spelling is allowed to be, by length. One slip in a short word
+   * is already most of it — "pai" and "pak" are different places — so the
+   * budget only opens up as the word gets long enough for a typo to be
+   * unambiguous. */
+  function typoBudget(len) {
+    if (len < 5) return 0
+    if (len < 8) return 1
+    if (len < 13) return 2
+    return 3
+  }
+
+  const NO = { s: 0 }
+
   /* Deliberately conservative. A wrong confident match is worse than asking
-   * again, because the traveller has no way to tell it guessed. */
+   * again, because the traveller has no way to tell it guessed.
+   *
+   * Returns {s, fuzzy, loose}. `fuzzy` means the tier that matched was a
+   * spelling guess rather than a real hit — the caller has to say so out loud,
+   * because "Rayong" and "Ranong" are one letter and eight hundred kilometres
+   * apart and the traveller is the only one who knows which they meant. */
   function score(query, entry) {
     const q = query
     const k = entry.key
-    if (!q || !k) return 0
-    if (q === k) return 100
+    if (!q || !k) return NO
+    if (q === k) return { s: 100 }
     if (k.startsWith(q) || q.startsWith(k)) {
-      return 84 - Math.min(20, Math.abs(k.length - q.length))
+      return { s: 84 - Math.min(20, Math.abs(k.length - q.length)) }
     }
-    if (q.length >= 4 && k.includes(q)) return 66
-    if (k.length >= 4 && q.includes(k)) return 62
+    if (q.length >= 4 && k.includes(q)) return { s: 66 }
+    if (k.length >= 4 && q.includes(k)) return { s: 62 }
 
     // People type "danang" for "Đà Nẵng" and "hochiminh" for "Ho Chi Minh".
     const qj = q.replace(/ /g, '')
     const kj = k.replace(/ /g, '')
-    if (qj === kj) return 96
+    if (qj === kj) return { s: 96 }
     if (kj.startsWith(qj) || qj.startsWith(kj)) {
-      return 78 - Math.min(20, Math.abs(kj.length - qj.length))
+      return { s: 78 - Math.min(20, Math.abs(kj.length - qj.length)) }
     }
-    if (qj.length >= 5 && kj.includes(qj)) return 58
+    if (qj.length >= 5 && kj.includes(qj)) return { s: 58 }
+
+    /* Misspellings. Compared without spaces so a missing or extra one is free —
+     * "kohsamui", "koh samui" and "ko samui" are the same guess. Scored high
+     * enough to beat a chance token overlap, because "kuala lumper" meant Kuala
+     * Lumpur and used to come back Taman Negara on the strength of "kuala". */
+    const budget = typoBudget(Math.max(qj.length, kj.length))
+    if (budget) {
+      const d = editDistance(qj, kj, budget)
+      if (d <= budget) return { s: 74 - 7 * d, fuzzy: true, distance: d }
+    }
+
+    /* A key can also be one typo'd word inside a longer name — "phnom pen" for
+     * "Phnom Penh", "chiangmai" for "Chiang Mai (station)". */
+    const qw = q.split(' ').filter(w => w.length > 3)
+    const kw = k.split(' ').filter(w => w.length > 3)
+    if (qw.length && kw.length && qw.length <= kw.length) {
+      let matched = 0
+      for (const word of qw) {
+        const b = typoBudget(word.length)
+        if (kw.some(other => other === word || (b && editDistance(word, other, b) <= b))) matched++
+      }
+      if (matched === qw.length && matched >= Math.min(2, kw.length)) return { s: 64, fuzzy: true, distance: 1 }
+    }
 
     const qt = new Set(q.split(' ').filter(w => w.length > 2))
     const kt = k.split(' ').filter(w => w.length > 2)
-    if (!qt.size || !kt.length) return 0
+    if (!qt.size || !kt.length) return NO
     const hits = kt.filter(w => qt.has(w)).length
-    if (!hits) return 0
-    return 30 * (hits / Math.max(qt.size, kt.length)) + 12 * hits
+    if (!hits) return NO
+    return { s: 30 * (hits / Math.max(qt.size, kt.length)) + 12 * hits, loose: true }
+  }
+
+  /* Far enough apart that picking the wrong one is a different holiday.
+   * Ranong and Rayong are 700 km; Bangkok's terminals are five. */
+  const AMBIGUITY_KM = 150
+
+  function farApart(a, b) {
+    if (a.lat == null || b.lat == null) return true
+    // Rough equirectangular distance — exact enough for a 150 km threshold.
+    const dLat = (a.lat - b.lat) * 111
+    const dLon = (a.lon - b.lon) * 111 * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180))
+    return Math.hypot(dLat, dLon) > AMBIGUITY_KM
   }
 
   function match(entries, raw) {
     const q = norm(raw)
     if (!q) return null
     const ranked = entries
-      .map(e => ({ entry: e, s: score(q, e) + (score(q, e) > 0 ? e.bias : 0) }))
+      .map(e => {
+        const r = score(q, e)
+        return { entry: e, ...r, s: r.s > 0 ? r.s + e.bias : 0 }
+      })
       .filter(r => r.s > 0)
       .sort((a, b) => b.s - a.s || a.entry.label.length - b.entry.label.length)
     if (!ranked.length) return null
@@ -4205,12 +4458,36 @@ const Ask = (() => {
       if (unique.length >= 5) break
     }
     const best = unique[0]
+
+    /* Two different places spelled almost the same is the case that must not
+     * be answered confidently. Ranong and Rayong, Koh Chang and Pak Chong: if
+     * the query is an equally good guess at a second station, the planner has
+     * no basis for choosing and the traveller does.
+     *
+     * Measured in kilometres rather than by station id, because Bangkok has
+     * three stations and Manila three terminals — landing on a different one
+     * of those is not an ambiguity, it is the same trip. */
+    const rival = unique.find(
+      r =>
+        r !== best &&
+        r.fuzzy &&
+        (r.distance ?? 9) <= (best.distance ?? 0) &&
+        farApart(best.entry, r.entry)
+    )
+    const ambiguous = !!best.fuzzy && !!rival
+
     return {
       stationId: best.entry.stationId,
       label: best.entry.label,
       kind: best.entry.kind,
       landmark: best.entry.landmark || null,
-      confident: best.s >= 60,
+      confident: best.s >= 60 && !ambiguous,
+      // A guess at a misspelling, to be shown as one rather than applied quietly.
+      corrected: !!best.fuzzy,
+      // Nothing but a shared common word — "son" in "Mae Hong Son" also being
+      // in "Son Doong". Never worth offering back as a suggestion.
+      loose: !!best.loose,
+      ambiguous,
       alternatives: unique.slice(1, 4).map(r => ({
         label: r.entry.label,
         stationId: r.entry.stationId,
@@ -4269,21 +4546,52 @@ const Ask = (() => {
     const from = match(entries, rawFrom)
     const to = match(entries, rawTo)
 
-    const missing = []
-    if (!from || !from.confident) missing.push(rawFrom)
-    if (!to || !to.confident) missing.push(rawTo)
-    if (missing.length) {
-      const near = [from, to].filter(x => x && x.alternatives)
+    /* Three different failures, and telling them apart is most of the value.
+     * "We do not cover that" is a fact about the network; "did you mean one of
+     * these" is a spelling problem; and a place we have never heard of should
+     * not be answered with the nearest string in the gazetteer. */
+    const sides = [
+      { raw: rawFrom, m: from },
+      { raw: rawTo, m: to },
+    ].filter(x => !x.m || !x.m.confident)
+
+    if (sides.length) {
+      const ambiguous = sides.filter(x => x.m && x.m.ambiguous)
+      const quoted = xs => xs.map(x => `“${x.raw}”`).join(' or ')
+
+      if (ambiguous.length) {
+        return {
+          ok: false,
+          reason: `${quoted(ambiguous)} could be more than one place. Pick the one you meant.`,
+          suggestions: ambiguous.flatMap(x => [x.m.label, ...x.m.alternatives.map(a => a.label)]).slice(0, 5),
+        }
+      }
+      /* A match on nothing but a shared common word is not a near miss, it is
+       * noise. Offering it back — "did you mean Phong Nha caves?" for "Mae Hong
+       * Son" — makes the planner look like it is guessing, which it was. */
+      const nothing = sides.filter(x => !x.m || x.m.loose)
+      if (nothing.length) {
+        return {
+          ok: false,
+          reason: `${quoted(nothing)} is not on this network — either it is spelled differently here, or nothing overland reaches it.`,
+          suggestions: [],
+        }
+      }
+      // Matched, but not well enough to act on. Offer what it nearly matched.
       return {
         ok: false,
-        reason: `Not sure what you mean by ${missing.map(m => `“${m}”`).join(' or ')}.`,
-        suggestions: near.flatMap(x => [x.label, ...x.alternatives.map(a => a.label)]).slice(0, 5),
+        reason: `Not sure what you mean by ${quoted(sides)}.`,
+        suggestions: sides
+          .flatMap(x => [x.m.label, ...x.m.alternatives.map(a => a.label)])
+          .slice(0, 5),
       }
     }
     if (from.stationId === to.stationId) {
       return { ok: false, reason: `Those both resolve to ${from.label}. Pick two different places.` }
     }
-    return { ok: true, from, to }
+    // Keep what was actually typed, so a corrected spelling can be shown as a
+    // correction rather than silently swapped in.
+    return { ok: true, from: { ...from, typed: rawFrom }, to: { ...to, typed: rawTo } }
   }
 
   /** How the answer explains itself, including the gap it cannot cover by rail. */
@@ -4298,10 +4606,16 @@ const Ask = (() => {
     } else {
       bits.push(station.name)
     }
+    // Say the correction out loud, after the answer rather than instead of it.
+    // Someone who typed "Ranong" and got Rayong needs to see that happen while
+    // they can still object to it.
+    if (side.corrected && side.typed && norm(side.typed) !== norm(side.label)) {
+      bits.push(`read “${side.typed}” as ${side.label}`)
+    }
     return bits
   }
 
-  return { build, ask, match, explain, norm, COUNTRY_LABEL }
+  return { build, ask, match, split, explain, norm, COUNTRY_LABEL }
 })()
 
 
@@ -5806,8 +6120,14 @@ const UI = (() => {
 
     const result = Ask.ask(NETWORK, ASK_INDEX, text)
     if (!result.ok) {
+      /* Buttons rather than bold text. "Pick the one you meant" is an
+         instruction, and making the reader retype the answer to a question the
+         planner just asked them is a poor way to ask it. */
       const hint = result.suggestions && result.suggestions.length
-        ? ` Try ${result.suggestions.slice(0, 3).map(s => `<b>${UI.esc(s)}</b>`).join(', ')}.`
+        ? ` ${result.suggestions
+            .slice(0, 4)
+            .map(s => `<button type="button" class="ask-sug" data-sug="${UI.esc(s)}">${UI.esc(s)}</button>`)
+            .join('')}`
         : ''
       return showAskNote(UI.esc(result.reason) + hint, 'warn')
     }
@@ -5825,6 +6145,26 @@ const UI = (() => {
         .join(' — ')
     showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')
   }
+
+  /* Clicking a suggestion substitutes it for whichever half the planner could
+     not read, and re-asks — so the correction takes one click, not a retype. */
+  $('#asknote').addEventListener('click', e => {
+    const btn = e.target.closest('.ask-sug')
+    if (!btn) return
+    const pick = btn.dataset.sug
+    const box = $('#askbox')
+    const pair = Ask.split(box.value)
+    if (pair) {
+      const [a, b] = pair
+      const bad = Ask.ask(NETWORK, ASK_INDEX, box.value)
+      // Replace the end that failed; if both did, replace the first.
+      const replaceTo = bad.ok ? false : Ask.match(ASK_INDEX, a)?.confident === true
+      box.value = replaceTo ? `${a} to ${pick}` : `${pick} to ${b}`
+    } else {
+      box.value = pick
+    }
+    runAsk()
+  })
 
   $('#askgo').addEventListener('click', runAsk)
   $('#askbox').addEventListener('keydown', e => {

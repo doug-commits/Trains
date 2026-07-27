@@ -50,7 +50,13 @@ const Ask = (() => {
       const st = network.stations[stationId]
       const bias =
         (kind === 'landmark' ? 6 : 0) + (st && st.hub ? 4 : 0) + (st && st.minor ? -4 : 0)
-      entries.push({ label, key: norm(key), stationId, kind, bias, ...extra })
+      // Coordinates travel with the entry so `match` can ask how far apart two
+      // near-identical spellings actually are, without needing the network.
+      entries.push({
+        label, key: norm(key), stationId, kind, bias,
+        lat: st ? st.lat : null, lon: st ? st.lon : null,
+        ...extra,
+      })
     }
 
     for (const lm of landmarks) {
@@ -76,41 +82,129 @@ const Ask = (() => {
     return entries
   }
 
+  /* Optimal string alignment distance — Levenshtein plus transposition, which
+   * matters here because the commonest typo in these names is a swap: "hanio",
+   * "siem riep", "bankok". Bails out as soon as the whole row exceeds `max`, so
+   * comparing a query against two hundred keys stays cheap.
+   *
+   * Not a general fuzzy search. It runs only after the exact, prefix and
+   * substring tiers have failed, and only within a distance the length of the
+   * word justifies — see TYPO_BUDGET. */
+  function editDistance(a, b, max) {
+    if (Math.abs(a.length - b.length) > max) return max + 1
+    let prev2 = null
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+    for (let i = 1; i <= a.length; i++) {
+      const row = new Array(b.length + 1)
+      row[0] = i
+      let best = row[0]
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1
+        let v = Math.min(row[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          v = Math.min(v, prev2[j - 2] + 1)
+        }
+        row[j] = v
+        if (v < best) best = v
+      }
+      if (best > max) return max + 1
+      prev2 = prev
+      prev = row
+    }
+    return prev[b.length]
+  }
+
+  /* How wrong a spelling is allowed to be, by length. One slip in a short word
+   * is already most of it — "pai" and "pak" are different places — so the
+   * budget only opens up as the word gets long enough for a typo to be
+   * unambiguous. */
+  function typoBudget(len) {
+    if (len < 5) return 0
+    if (len < 8) return 1
+    if (len < 13) return 2
+    return 3
+  }
+
+  const NO = { s: 0 }
+
   /* Deliberately conservative. A wrong confident match is worse than asking
-   * again, because the traveller has no way to tell it guessed. */
+   * again, because the traveller has no way to tell it guessed.
+   *
+   * Returns {s, fuzzy, loose}. `fuzzy` means the tier that matched was a
+   * spelling guess rather than a real hit — the caller has to say so out loud,
+   * because "Rayong" and "Ranong" are one letter and eight hundred kilometres
+   * apart and the traveller is the only one who knows which they meant. */
   function score(query, entry) {
     const q = query
     const k = entry.key
-    if (!q || !k) return 0
-    if (q === k) return 100
+    if (!q || !k) return NO
+    if (q === k) return { s: 100 }
     if (k.startsWith(q) || q.startsWith(k)) {
-      return 84 - Math.min(20, Math.abs(k.length - q.length))
+      return { s: 84 - Math.min(20, Math.abs(k.length - q.length)) }
     }
-    if (q.length >= 4 && k.includes(q)) return 66
-    if (k.length >= 4 && q.includes(k)) return 62
+    if (q.length >= 4 && k.includes(q)) return { s: 66 }
+    if (k.length >= 4 && q.includes(k)) return { s: 62 }
 
     // People type "danang" for "Đà Nẵng" and "hochiminh" for "Ho Chi Minh".
     const qj = q.replace(/ /g, '')
     const kj = k.replace(/ /g, '')
-    if (qj === kj) return 96
+    if (qj === kj) return { s: 96 }
     if (kj.startsWith(qj) || qj.startsWith(kj)) {
-      return 78 - Math.min(20, Math.abs(kj.length - qj.length))
+      return { s: 78 - Math.min(20, Math.abs(kj.length - qj.length)) }
     }
-    if (qj.length >= 5 && kj.includes(qj)) return 58
+    if (qj.length >= 5 && kj.includes(qj)) return { s: 58 }
+
+    /* Misspellings. Compared without spaces so a missing or extra one is free —
+     * "kohsamui", "koh samui" and "ko samui" are the same guess. Scored high
+     * enough to beat a chance token overlap, because "kuala lumper" meant Kuala
+     * Lumpur and used to come back Taman Negara on the strength of "kuala". */
+    const budget = typoBudget(Math.max(qj.length, kj.length))
+    if (budget) {
+      const d = editDistance(qj, kj, budget)
+      if (d <= budget) return { s: 74 - 7 * d, fuzzy: true, distance: d }
+    }
+
+    /* A key can also be one typo'd word inside a longer name — "phnom pen" for
+     * "Phnom Penh", "chiangmai" for "Chiang Mai (station)". */
+    const qw = q.split(' ').filter(w => w.length > 3)
+    const kw = k.split(' ').filter(w => w.length > 3)
+    if (qw.length && kw.length && qw.length <= kw.length) {
+      let matched = 0
+      for (const word of qw) {
+        const b = typoBudget(word.length)
+        if (kw.some(other => other === word || (b && editDistance(word, other, b) <= b))) matched++
+      }
+      if (matched === qw.length && matched >= Math.min(2, kw.length)) return { s: 64, fuzzy: true, distance: 1 }
+    }
 
     const qt = new Set(q.split(' ').filter(w => w.length > 2))
     const kt = k.split(' ').filter(w => w.length > 2)
-    if (!qt.size || !kt.length) return 0
+    if (!qt.size || !kt.length) return NO
     const hits = kt.filter(w => qt.has(w)).length
-    if (!hits) return 0
-    return 30 * (hits / Math.max(qt.size, kt.length)) + 12 * hits
+    if (!hits) return NO
+    return { s: 30 * (hits / Math.max(qt.size, kt.length)) + 12 * hits, loose: true }
+  }
+
+  /* Far enough apart that picking the wrong one is a different holiday.
+   * Ranong and Rayong are 700 km; Bangkok's terminals are five. */
+  const AMBIGUITY_KM = 150
+
+  function farApart(a, b) {
+    if (a.lat == null || b.lat == null) return true
+    // Rough equirectangular distance — exact enough for a 150 km threshold.
+    const dLat = (a.lat - b.lat) * 111
+    const dLon = (a.lon - b.lon) * 111 * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180))
+    return Math.hypot(dLat, dLon) > AMBIGUITY_KM
   }
 
   function match(entries, raw) {
     const q = norm(raw)
     if (!q) return null
     const ranked = entries
-      .map(e => ({ entry: e, s: score(q, e) + (score(q, e) > 0 ? e.bias : 0) }))
+      .map(e => {
+        const r = score(q, e)
+        return { entry: e, ...r, s: r.s > 0 ? r.s + e.bias : 0 }
+      })
       .filter(r => r.s > 0)
       .sort((a, b) => b.s - a.s || a.entry.label.length - b.entry.label.length)
     if (!ranked.length) return null
@@ -126,12 +220,36 @@ const Ask = (() => {
       if (unique.length >= 5) break
     }
     const best = unique[0]
+
+    /* Two different places spelled almost the same is the case that must not
+     * be answered confidently. Ranong and Rayong, Koh Chang and Pak Chong: if
+     * the query is an equally good guess at a second station, the planner has
+     * no basis for choosing and the traveller does.
+     *
+     * Measured in kilometres rather than by station id, because Bangkok has
+     * three stations and Manila three terminals — landing on a different one
+     * of those is not an ambiguity, it is the same trip. */
+    const rival = unique.find(
+      r =>
+        r !== best &&
+        r.fuzzy &&
+        (r.distance ?? 9) <= (best.distance ?? 0) &&
+        farApart(best.entry, r.entry)
+    )
+    const ambiguous = !!best.fuzzy && !!rival
+
     return {
       stationId: best.entry.stationId,
       label: best.entry.label,
       kind: best.entry.kind,
       landmark: best.entry.landmark || null,
-      confident: best.s >= 60,
+      confident: best.s >= 60 && !ambiguous,
+      // A guess at a misspelling, to be shown as one rather than applied quietly.
+      corrected: !!best.fuzzy,
+      // Nothing but a shared common word — "son" in "Mae Hong Son" also being
+      // in "Son Doong". Never worth offering back as a suggestion.
+      loose: !!best.loose,
+      ambiguous,
       alternatives: unique.slice(1, 4).map(r => ({
         label: r.entry.label,
         stationId: r.entry.stationId,
@@ -190,21 +308,52 @@ const Ask = (() => {
     const from = match(entries, rawFrom)
     const to = match(entries, rawTo)
 
-    const missing = []
-    if (!from || !from.confident) missing.push(rawFrom)
-    if (!to || !to.confident) missing.push(rawTo)
-    if (missing.length) {
-      const near = [from, to].filter(x => x && x.alternatives)
+    /* Three different failures, and telling them apart is most of the value.
+     * "We do not cover that" is a fact about the network; "did you mean one of
+     * these" is a spelling problem; and a place we have never heard of should
+     * not be answered with the nearest string in the gazetteer. */
+    const sides = [
+      { raw: rawFrom, m: from },
+      { raw: rawTo, m: to },
+    ].filter(x => !x.m || !x.m.confident)
+
+    if (sides.length) {
+      const ambiguous = sides.filter(x => x.m && x.m.ambiguous)
+      const quoted = xs => xs.map(x => `“${x.raw}”`).join(' or ')
+
+      if (ambiguous.length) {
+        return {
+          ok: false,
+          reason: `${quoted(ambiguous)} could be more than one place. Pick the one you meant.`,
+          suggestions: ambiguous.flatMap(x => [x.m.label, ...x.m.alternatives.map(a => a.label)]).slice(0, 5),
+        }
+      }
+      /* A match on nothing but a shared common word is not a near miss, it is
+       * noise. Offering it back — "did you mean Phong Nha caves?" for "Mae Hong
+       * Son" — makes the planner look like it is guessing, which it was. */
+      const nothing = sides.filter(x => !x.m || x.m.loose)
+      if (nothing.length) {
+        return {
+          ok: false,
+          reason: `${quoted(nothing)} is not on this network — either it is spelled differently here, or nothing overland reaches it.`,
+          suggestions: [],
+        }
+      }
+      // Matched, but not well enough to act on. Offer what it nearly matched.
       return {
         ok: false,
-        reason: `Not sure what you mean by ${missing.map(m => `“${m}”`).join(' or ')}.`,
-        suggestions: near.flatMap(x => [x.label, ...x.alternatives.map(a => a.label)]).slice(0, 5),
+        reason: `Not sure what you mean by ${quoted(sides)}.`,
+        suggestions: sides
+          .flatMap(x => [x.m.label, ...x.m.alternatives.map(a => a.label)])
+          .slice(0, 5),
       }
     }
     if (from.stationId === to.stationId) {
       return { ok: false, reason: `Those both resolve to ${from.label}. Pick two different places.` }
     }
-    return { ok: true, from, to }
+    // Keep what was actually typed, so a corrected spelling can be shown as a
+    // correction rather than silently swapped in.
+    return { ok: true, from: { ...from, typed: rawFrom }, to: { ...to, typed: rawTo } }
   }
 
   /** How the answer explains itself, including the gap it cannot cover by rail. */
@@ -219,8 +368,14 @@ const Ask = (() => {
     } else {
       bits.push(station.name)
     }
+    // Say the correction out loud, after the answer rather than instead of it.
+    // Someone who typed "Ranong" and got Rayong needs to see that happen while
+    // they can still object to it.
+    if (side.corrected && side.typed && norm(side.typed) !== norm(side.label)) {
+      bits.push(`read “${side.typed}” as ${side.label}`)
+    }
     return bits
   }
 
-  return { build, ask, match, explain, norm, COUNTRY_LABEL }
+  return { build, ask, match, split, explain, norm, COUNTRY_LABEL }
 })()

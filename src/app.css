@@ -1226,6 +1226,24 @@ table { width: 100%; border-collapse: collapse; }
 .ask-note.ok { border-left-color: var(--rail); }
 .ask-note.warn { border-left-color: var(--alert); color: var(--ink-soft); }
 
+/* "Did you mean" options. Buttons, because the note is asking a question and
+   the answer should be one click rather than a retype. */
+.ask-sug {
+  display: inline-block;
+  margin: 0.35rem 0.3rem 0 0;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.ask-sug:hover,
+.ask-sug:focus-visible { border-color: var(--rail); color: var(--rail); }
+
 .or {
   display: flex;
   align-items: center;

@@ -231,7 +231,46 @@ function check(label, condition, detail = '') {
   await page.fill('#askbox', 'from mordor to gondor')
   await page.click('#askgo')
   await page.waitForTimeout(400)
-  check('nonsense is refused, not guessed at', /Not sure what you mean/.test(await page.textContent('#asknote')))
+  const nonsense = await page.textContent('#asknote')
+  check('nonsense is refused, not guessed at', /not on this network/i.test(nonsense), nonsense.trim())
+  check('and nothing is offered back as a near miss',
+    (await page.locator('#asknote .ask-sug').count()) === 0)
+
+  /* Spelling. The gazetteer is full of names nobody spells right first time,
+   * and until this existed "kuala lumper" came back Taman Negara. */
+  await page.fill('#askbox', 'bankok to singpore')
+  await page.click('#askgo')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(700)
+  const fixed = await page.textContent('#asknote')
+  check('a misspelling still finds the place', /Bangkok/.test(fixed) && /Singapore/.test(fixed))
+  check('and the correction is shown, not applied silently',
+    /read “bankok” as Bangkok/.test(fixed), fixed.replace(/\s+/g, ' ').trim())
+
+  /* One letter apart and 700 km apart. Guessing here is worse than asking. */
+  await page.fill('#askbox', 'ranyong to bangkok')
+  await page.click('#askgo')
+  await page.waitForTimeout(500)
+  const ambiguous = await page.textContent('#asknote')
+  check('an ambiguous spelling asks instead of guessing',
+    /more than one place/i.test(ambiguous), ambiguous.replace(/\s+/g, ' ').trim())
+  const sugs = await page.locator('#asknote .ask-sug').allTextContents()
+  check('and offers both real candidates', sugs.includes('Rayong') && sugs.includes('Ranong'), sugs.join(', '))
+
+  // Clicking one resolves it without making anyone retype the question.
+  await page.locator('#asknote .ask-sug', { hasText: 'Rayong' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(700)
+  check('clicking a suggestion routes it', /Rayong/.test(await page.textContent('#panel h1')),
+    (await page.textContent('#panel h1')).replace(/\s+/g, ' ').trim())
+
+  // The reported bug: a real station that was simply missing from the network.
+  await page.fill('#askbox', 'pattaya to hanoi')
+  await page.click('#askgo')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(700)
+  const h1b = (await page.textContent('#panel h1')).replace(/\s+/g, ' ').trim()
+  check('Pattaya to Hanoi returns a route', /Pattaya/.test(h1b) && /Hanoi/.test(h1b), h1b)
 
   await page.screenshot({ path: join(outDir, '16-ask-answer.png') })
   await context.close()

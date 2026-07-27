@@ -63,7 +63,7 @@ legs is worth more than one that presents everything with false confidence.
 ## Layout
 
 ```
-data/network.js      182 stations, 208 legs, 15 borders, 31 operators, plus
+data/network.js      199 stations, 228 legs, 17 borders, 31 operators, plus
                      seasons, advisories, booking windows and the countries
                      nothing sails to. This is the product; the rest is plumbing.
 data/landmarks.js    Landmarks mapped to the railhead you actually get off at.
@@ -73,7 +73,8 @@ data/photos/         Downloaded photographs. Absent until fetched.
 src/proj.js          Web Mercator with a fitted, pannable viewport.
 src/router.js        Rail-first Dijkstra. The cost function is the thesis.
 src/plan.js          Feasibility: leg merging, buffers, risks, costs, booking order.
-src/ask.js           Plain-language questions to a pair of stations.
+src/ask.js           Plain-language questions to a pair of stations, typos
+                     included. See "Reading the question" below.
 src/scene.js         Drawn destination illustrations, the photo fallback.
 src/photos.js        Real photographs and their attribution.
 src/map.js           Canvas rendering.
@@ -123,6 +124,37 @@ them inside a published page is not ours to do.
 Never invent a booking URL to fill the column. `book: null` with a `bookNote`
 saying how the ticket is really bought is worth more than a link that 404s, and
 the smoke test enforces that every leg resolves to one of the three outcomes.
+
+---
+
+## Reading the question
+
+`src/ask.js` turns "how do I get from Pattaya to Hanoi" into two station ids.
+No model and no network call — a gazetteer of every station, city, landmark and
+alias, scored in tiers: exact, prefix, substring, then spelling.
+
+The spelling tier is optimal string alignment distance (Levenshtein plus
+transposition, because the commonest slip in these names is a swap: *hanio*,
+*siem riep*, *bankok*). The allowed distance scales with the length of the word,
+so a three-letter name gets no latitude at all — *Pai* and *Pak* are different
+places.
+
+Two rules keep it from becoming a liar:
+
+**A corrected spelling is always shown as a correction.** "read *bankok* as
+Bangkok" appears under the answer. Applying it silently would mean someone who
+typed a real place and got a different one had no way to notice.
+
+**A spelling that fits two places more than 150 km apart is refused, not
+guessed.** *Ranong* and *Rayong* are one letter and seven hundred kilometres
+apart; *Koh Chang* and *Pak Chong* likewise. The planner offers both as buttons
+and lets the traveller choose. The threshold is in kilometres rather than
+station ids on purpose — Bangkok has three stations and Manila three terminals,
+and landing on a different one of those is the same trip, not an ambiguity.
+
+When nothing matches but a shared common word, the answer is "not on this
+network", with no suggestions. Offering *Phong Nha caves* to someone who typed
+*Mae Hong Son* is guessing dressed up as help.
 
 ---
 

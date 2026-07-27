@@ -115,14 +115,14 @@ const LANDMARKS = [
   { name: 'Mũi Né dunes', station: 'muongman', scene: 'coast', country: 'vn',
     commons: 'Mui Ne sand dunes Vietnam',
     aka: ['mui ne', 'phan thiet', 'sand dunes'], last: 'Taxi from Mương Mán' },
-  { name: 'Đà Lạt', station: 'thapcham', scene: 'hills', country: 'vn',
+  { name: 'Đà Lạt', station: 'dalat', scene: 'hills', country: 'vn',
     commons: 'Da Lat Vietnam city',
-    aka: ['dalat', 'da lat'], last: 'Winding road up from Tháp Chàm, about three hours' },
+    aka: ['dalat', 'da lat', 'crazy house', 'lang biang'], last: null },
   { name: 'Cu Chi Tunnels', station: 'saigon', scene: 'forest', country: 'vn',
     aka: ['cu chi', 'ho chi minh city', 'saigon', 'ben thanh', 'war remnants'], last: 'Half-day trip from the city' },
   { name: 'Mekong Delta', station: 'chaudoc', scene: 'river', country: 'vn',
     commons: 'Mekong Delta Vietnam floating market',
-    aka: ['mekong delta', 'chau doc', 'can tho', 'floating market'], last: null },
+    aka: ['mekong delta', 'chau doc'], last: null },
 
   // --- Malaysia
   { name: 'Petronas Towers', station: 'klsentral', scene: 'skyline', country: 'my',
@@ -189,6 +189,50 @@ const LANDMARKS = [
   { name: 'Stone Forest', station: 'kunming', scene: 'karst', country: 'cn',
     commons: 'Shilin Stone Forest Yunnan',
     aka: ['kunming', 'shilin'], last: 'Ninety minutes by road from Kunming' },
+
+  // --- Thailand, the eastern seaboard and the far north
+  { name: 'Pattaya beach', station: 'pattaya', scene: 'coast', country: 'th',
+    commons: 'Pattaya Beach Thailand',
+    aka: ['pattaya', 'jomtien', 'walking street'], last: 'Songthaew from the Eastern Line station down to the seafront' },
+  { name: 'Koh Samet', station: 'kohsamet', scene: 'coast', country: 'th',
+    commons: 'Ko Samet beach Thailand',
+    aka: ['samet', 'ko samet', 'sai kaew'], last: null },
+  { name: 'Koh Chang', station: 'kohchang', scene: 'forest', country: 'th',
+    commons: 'Ko Chang Trat Thailand',
+    aka: ['ko chang', 'white sand beach', 'lonely beach'], last: null },
+  { name: 'White Temple', station: 'chiangrai', scene: 'temple', country: 'th',
+    commons: 'Wat Rong Khun White Temple',
+    aka: ['chiang rai', 'wat rong khun', 'blue temple', 'golden triangle'], last: 'Local bus or songthaew south of Chiang Rai' },
+  { name: 'Pai', station: 'pai', scene: 'hills', country: 'th',
+    commons: 'Pai Mae Hong Son Thailand',
+    aka: ['pai canyon', 'pai thailand'], last: null },
+
+  // --- Laos, the south
+  { name: 'Four Thousand Islands', station: 'siphandon', scene: 'river', country: 'la',
+    commons: 'Si Phan Don Don Det Laos',
+    aka: ['si phan don', 'don det', 'don khon', '4000 islands'], last: 'Longtail from Nakasang pier' },
+  { name: 'Bolaven Plateau', station: 'pakse', scene: 'forest', country: 'la',
+    commons: 'Tad Fane waterfall Bolaven Plateau',
+    aka: ['pakse', 'bolaven', 'tad fane', 'champasak'], last: 'Motorbike loop or a day tour out of Pakse' },
+  { name: 'Thakhek Loop', station: 'thakhek', scene: 'karst', country: 'la',
+    commons: 'Kong Lor Cave Laos',
+    aka: ['thakhek', 'kong lor', 'konglor cave'], last: 'Three or four days round the loop by motorbike' },
+
+  // --- Vietnam, the south
+  { name: 'Vũng Tàu', station: 'vungtau', scene: 'coast', country: 'vn',
+    commons: 'Vung Tau Vietnam beach',
+    aka: ['vung tau', 'front beach', 'christ of vung tau'], last: null },
+  { name: 'Cần Thơ floating market', station: 'cantho', scene: 'river', country: 'vn',
+    commons: 'Cai Rang floating market',
+    aka: ['can tho', 'cai rang', 'floating market'], last: 'Boat from Ninh Kieu quay before dawn' },
+
+  // --- Malaysian Borneo
+  { name: 'Bako National Park', station: 'kuching', scene: 'forest', country: 'my',
+    commons: 'Bako National Park Sarawak',
+    aka: ['kuching', 'sarawak', 'bako', 'proboscis monkey'], last: 'Bus to Bako village, then a boat along the coast' },
+  { name: 'Mulu Caves', station: 'miri', scene: 'karst', country: 'my',
+    commons: 'Gunung Mulu National Park cave',
+    aka: ['miri', 'mulu', 'gunung mulu', 'deer cave'], last: 'There is no road — Mulu is reached by air or a two-day river trip' },
 
   // --- Philippines
   { name: 'Intramuros', station: 'manila', scene: 'skyline', country: 'ph',

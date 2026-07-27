@@ -386,8 +386,14 @@
 
     const result = Ask.ask(NETWORK, ASK_INDEX, text)
     if (!result.ok) {
+      /* Buttons rather than bold text. "Pick the one you meant" is an
+         instruction, and making the reader retype the answer to a question the
+         planner just asked them is a poor way to ask it. */
       const hint = result.suggestions && result.suggestions.length
-        ? ` Try ${result.suggestions.slice(0, 3).map(s => `<b>${UI.esc(s)}</b>`).join(', ')}.`
+        ? ` ${result.suggestions
+            .slice(0, 4)
+            .map(s => `<button type="button" class="ask-sug" data-sug="${UI.esc(s)}">${UI.esc(s)}</button>`)
+            .join('')}`
         : ''
       return showAskNote(UI.esc(result.reason) + hint, 'warn')
     }
@@ -405,6 +411,26 @@
         .join(' — ')
     showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')
   }
+
+  /* Clicking a suggestion substitutes it for whichever half the planner could
+     not read, and re-asks — so the correction takes one click, not a retype. */
+  $('#asknote').addEventListener('click', e => {
+    const btn = e.target.closest('.ask-sug')
+    if (!btn) return
+    const pick = btn.dataset.sug
+    const box = $('#askbox')
+    const pair = Ask.split(box.value)
+    if (pair) {
+      const [a, b] = pair
+      const bad = Ask.ask(NETWORK, ASK_INDEX, box.value)
+      // Replace the end that failed; if both did, replace the first.
+      const replaceTo = bad.ok ? false : Ask.match(ASK_INDEX, a)?.confident === true
+      box.value = replaceTo ? `${a} to ${pick}` : `${pick} to ${b}`
+    } else {
+      box.value = pick
+    }
+    runAsk()
+  })
 
   $('#askgo').addEventListener('click', runAsk)
   $('#askbox').addEventListener('keydown', e => {
