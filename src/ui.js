@@ -340,6 +340,72 @@ const UI = (() => {
       </section>`
   }
 
+  const TIERS = typeof Plan !== 'undefined' ? Plan.TIERS : ['dorm', 'room', 'comfort']
+
+  const TIER_LABEL = {
+    dorm: 'hostel bed',
+    room: 'simple private room',
+    comfort: 'good mid-range hotel',
+  }
+
+  /* What the beds cost, priced where they are actually spent.
+   *
+   * A regional average would put one figure on Battambang and Singapore, which
+   * are a factor of five apart — and the Singapore night is precisely the one
+   * worth knowing about before booking rather than after. Three bands rather
+   * than one number, because the same journey is a different trip depending on
+   * which you take, and both are legitimate. */
+  function lodgingSection(network, plan) {
+    if (!plan.nights || !plan.nights.length) {
+      return plan.totals.sleeperNights
+        ? `<section class="block">
+             <h2>Where you sleep</h2>
+             <p class="sub">Every night on this route is spent moving — ${
+               plan.totals.sleeperNights
+             } aboard a sleeper, a bed already inside the fare. Nothing to book and nothing to pay.</p>
+           </section>`
+        : ''
+    }
+
+    const tier = plan.stayTier
+    const rows = plan.nights
+      .map(n => {
+        const bands = n.rates
+          ? TIERS.map(
+              t =>
+                `<span class="band ${t === tier ? 'on' : ''}">` +
+                `<b>${esc(money(n.rates[t]))}</b><span>${esc(TIER_LABEL[t])}</span></span>`
+            ).join('')
+          : '<span class="band"><b>—</b><span>no figure recorded</span></span>'
+        return `
+          <li>
+            <div class="stay-head">
+              <span class="stay-city"><b>${esc(n.city)}</b> <span class="stay-day">night of day ${n.day}</span></span>
+              <span class="stay-price">${esc(money(n.usd ?? 0))}</span>
+            </div>
+            <div class="bands">${bands}</div>
+            ${n.note ? `<p class="stay-note">${esc(n.note)}</p>` : ''}
+          </li>`
+      })
+      .join('')
+
+    const sleepers = plan.totals.sleeperNights
+
+    return `
+      <section class="block">
+        <h2>Where you sleep</h2>
+        <p class="sub">Priced where the journey actually stops, not averaged across the region — the
+        difference between a night in Siem Reap and a night in Singapore is a factor of five, and it is
+        worth seeing before you book. Figures are indicative low-season rates for a room booked a week
+        or two out; the totals below use the <b>${esc(TIER_LABEL[tier])}</b> band.${
+          sleepers
+            ? ` ${sleepers} further ${sleepers === 1 ? 'night is' : 'nights are'} spent aboard, already inside the fare.`
+            : ''
+        }</p>
+        <ul class="stays">${rows}</ul>
+      </section>`
+  }
+
   function timezoneStrip(network, plan) {
     if (plan.zones.length < 2) return ''
     const crossesPadang = plan.borders.some(b => b.id === 'padangbesar')
@@ -468,7 +534,13 @@ const UI = (() => {
         <table class="costs">
           <tbody>
             <tr><td>Transport, ${t.legs} legs</td><td class="num-col">${esc(money(t.transportUsd))}</td></tr>
-            <tr><td>Accommodation, ${t.hotelNights} ${t.hotelNights === 1 ? 'night' : 'nights'} at about $${Plan.HOTEL_USD}</td><td class="num-col">${esc(money(t.lodgingUsd))}</td></tr>
+            <tr><td>Accommodation, ${t.hotelNights} ${
+              t.hotelNights === 1 ? 'night' : 'nights'
+            }${
+              plan.nights && plan.nights.length
+                ? ` — ${esc(plan.nights.map(n => `${n.city} ${money(n.usd ?? 0)}`).join(', '))}`
+                : ''
+            }</td><td class="num-col">${esc(money(t.lodgingUsd))}</td></tr>
             ${
               t.sleeperNights
                 ? `<tr class="saved"><td>${t.sleeperNights} ${t.sleeperNights === 1 ? 'night' : 'nights'} on a sleeper — a bed you already paid for in the fare</td><td class="num-col">included</td></tr>`
@@ -565,6 +637,7 @@ const UI = (() => {
       }
       ${routeTable(network, plan)}
       ${scheduleBlock(network, plan)}
+      ${lodgingSection(network, plan)}
       ${borderSection(network, plan)}
       ${risksSection(plan)}
       ${bookingSection(network, plan)}

@@ -319,6 +319,66 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------------------- what beds cost
+ * The whole point of pricing per place rather than per region: a flat average
+ * hides that one night on this route costs more than the other four together. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor', { hasText: 'The Spine' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const nights = await page.locator('.stays > li').count()
+  check('nights are listed where they are actually spent', nights > 0, `${nights} nights`)
+  check('each night shows all three bands',
+    (await page.locator('.stays .bands').count()) === nights)
+
+  // The listed nights must add up to the figure in the cost table.
+  const sums = await page.evaluate(() => {
+    const each = [...document.querySelectorAll('.stays .stay-price')]
+      .map(e => Number(e.textContent.replace(/[^0-9.]/g, '')))
+    const row = [...document.querySelectorAll('.costs tr')].find(r => /Accommodation/.test(r.textContent))
+    return { each, total: row ? Number(row.lastElementChild.textContent.replace(/[^0-9.]/g, '')) : null }
+  })
+  const listed = sums.each.reduce((a, b) => a + b, 0)
+  check('the nights add up to the accommodation total',
+    Math.abs(listed - sums.total) <= 1, `${listed} listed vs ${sums.total} charged`)
+
+  // Changing the band must move the money, or the control is decoration.
+  const totalAt = async tier => {
+    await page.selectOption('#stay', tier)
+    await page.waitForTimeout(600)
+    return Number((await page.textContent('.costs .total')).replace(/[^0-9.]/g, ''))
+  }
+  await page.locator('.details > summary').click()
+  const dorm = await totalAt('dorm')
+  const comfort = await totalAt('comfort')
+  check('the beds setting changes the total', comfort > dorm, `$${dorm} hostel vs $${comfort} mid-range`)
+
+  await context.close()
+}
+
+/* Singapore is the single most expensive night anywhere on this map, and the
+ * planner should say so where someone can still act on it. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor', { hasText: 'Singapore → Bali' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const sgRate = NETWORK.lodging.byStation.singapore.room
+  const jbRate = NETWORK.lodging.byStation.jbsentral.room
+  check('Singapore is priced far above its neighbour', sgRate > jbRate * 3,
+    `$${sgRate} vs $${jbRate} in Johor Bahru`)
+
+  await page.screenshot({ path: join(outDir, '26-lodging.png') })
+  await context.close()
+}
+
 /* --------------------------------- the fragment, which has no assets beside it
  * dist/planner.html is published as one file. Any photograph the build linked
  * rather than embedded cannot resolve there, so every one of them must come

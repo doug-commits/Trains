@@ -36,6 +36,14 @@ fine on a map fails in reality:
 - **Booking order.** Scarcest inventory first, not chronological. The shortest
   leg on the whole spine — five minutes across the Johor Strait — sells out
   before anything else.
+- **What a bed costs where you actually stop.** A single regional average puts
+  the same figure on Battambang and Singapore, which are a factor of five
+  apart. `lodging` in `data/network.js` prices each night per place, in three
+  bands — hostel bed, simple private room, good mid-range hotel — and the
+  itinerary totals the nights the day plan says you actually spend, not a flat
+  count. The Singapore entry says out loud that a night in Johor Bahru costs a
+  quarter as much and the crossing is five minutes; that is the sort of thing
+  worth knowing before booking rather than after.
 - **Places you cannot get to.** The Philippines is on the map with forty
   stations and a full bus-and-ferry network, and no leg joins it to anything
   else, because no scheduled passenger ship does. Ask for Bangkok to Manila and

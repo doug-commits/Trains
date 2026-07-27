@@ -1084,6 +1084,114 @@ const NETWORK = {
     sulu: 'The Sulu archipelago, Basilan and parts of the Zamboanga peninsula carry standing security advisories, and several governments advise against all travel to some of them. The rest of Mindanao — Davao, Cagayan de Oro, the Nautical Highway corridor — is generally not covered by the same advice, so read what your own government actually says about the specific route rather than about the island.',
   },
 
+  /* ----------------------------------------------------------------- lodging
+   * What a night costs where the journey actually stops.
+   *
+   * A single regional average is a fiction: the same $35 buys a good hotel in
+   * Battambang, a windowless box in Singapore, and nothing at all on Phi Phi in
+   * February. So this is banded and per-place —
+   *
+   *   dorm    a hostel bed
+   *   room    a simple private room, en suite, air-conditioned. The thing most
+   *           people actually book, and what the totals are built on.
+   *   comfort a good mid-range hotel
+   *
+   * Indicative and pre-tax, in the low season, booked a week or two out. Island
+   * high season and festival weeks run well above these; see `seasons`. Country
+   * figures are the fallback for a town with no entry of its own.
+   *
+   * `note` exists for the places where the price is not the problem — border
+   * towns with three guesthouses, a village that fills the night the boat lands.
+   */
+  lodging: {
+    byCountry: {
+      la: { dorm: 8, room: 22, comfort: 45 },
+      kh: { dorm: 7, room: 20, comfort: 45 },
+      vn: { dorm: 7, room: 22, comfort: 50 },
+      th: { dorm: 10, room: 28, comfort: 60 },
+      my: { dorm: 10, room: 30, comfort: 60 },
+      id: { dorm: 8, room: 25, comfort: 55 },
+      ph: { dorm: 10, room: 28, comfort: 55 },
+      sg: { dorm: 32, room: 95, comfort: 170 },
+      bn: { dorm: 25, room: 60, comfort: 110 },
+      cn: { dorm: 15, room: 40, comfort: 80 },
+      mm: { dorm: 8, room: 20, comfort: 40 },
+    },
+
+    byStation: {
+      // --- the expensive end
+      singapore:      { dorm: 32, room: 95, comfort: 170,
+                        note: 'The most expensive night on any route here by a factor of three. A night in Johor Bahru across the strait costs a quarter as much, and the Shuttle Tebrau is five minutes — worth restructuring a day around.' },
+      bandarseri:     { dorm: 25, room: 60, comfort: 110 },
+      kunming:        { dorm: 15, room: 40, comfort: 80 },
+
+      // --- capitals and big cities
+      bkk_aphiwat:    { dorm: 11, room: 30, comfort: 70 },
+      bkk_hualamphong:{ dorm: 11, room: 30, comfort: 70 },
+      bkk_thonburi:   { dorm: 11, room: 30, comfort: 70 },
+      klsentral:      { dorm: 11, room: 32, comfort: 65 },
+      jbsentral:      { dorm: 9, room: 26, comfort: 50,
+                        note: 'The cheap side of the Singapore border, and the reason to sleep here rather than there.' },
+      hanoi:          { dorm: 8, room: 25, comfort: 55 },
+      saigon:         { dorm: 9, room: 27, comfort: 60 },
+      phnompenh:      { dorm: 7, room: 20, comfort: 48 },
+      vte_khamsavath: { dorm: 9, room: 24, comfort: 50 },
+      vte_banthen:    { dorm: 9, room: 24, comfort: 50 },
+      jakarta:        { dorm: 9, room: 28, comfort: 60 },
+      manila:         { dorm: 10, room: 30, comfort: 65 },
+      cebu:           { dorm: 9, room: 27, comfort: 60 },
+      georgetown:     { dorm: 10, room: 28, comfort: 58 },
+
+      // --- tourist towns, where the premium is real
+      luangprabang:   { dorm: 10, room: 30, comfort: 65 },
+      vangvieng:      { dorm: 8, room: 22, comfort: 50 },
+      siemreap:       { dorm: 6, room: 18, comfort: 45,
+                        note: 'The best value on this map — Siem Reap has more rooms than it has visitors, and the mid-range is genuinely good.' },
+      chiangmai:      { dorm: 9, room: 25, comfort: 55 },
+      pai:            { dorm: 8, room: 22, comfort: 50 },
+      yogyakarta:     { dorm: 7, room: 22, comfort: 50 },
+      danang:         { dorm: 8, room: 25, comfort: 55 },
+      hue:            { dorm: 7, room: 22, comfort: 48 },
+      dalat:          { dorm: 8, room: 22, comfort: 50 },
+
+      // --- islands and beaches, where the land runs out and the price does not
+      phuket:         { dorm: 15, room: 40, comfort: 90 },
+      kohsamui:       { dorm: 15, room: 45, comfort: 100 },
+      kohphangan:     { dorm: 12, room: 30, comfort: 70,
+                        note: 'Full-moon week is a different market entirely — three to five times these figures, and booked out months ahead.' },
+      kohtao:         { dorm: 12, room: 28, comfort: 60 },
+      kohphiphi:      { dorm: 18, room: 45, comfort: 95,
+                        note: 'A small island with a fixed number of beds. High season is not expensive so much as unavailable.' },
+      kohchang:       { dorm: 12, room: 32, comfort: 70 },
+      kohsamet:       { dorm: 12, room: 32, comfort: 70 },
+      kohlanta:       { dorm: 12, room: 30, comfort: 65 },
+      langkawi:       { dorm: 11, room: 32, comfort: 70 },
+      kohrong:        { dorm: 10, room: 28, comfort: 65 },
+      denpasar:       { dorm: 12, room: 35, comfort: 80 },
+      gili:           { dorm: 15, room: 40, comfort: 85 },
+      boracay:        { dorm: 15, room: 45, comfort: 100 },
+      elnido:         { dorm: 15, room: 40, comfort: 85 },
+      coron:          { dorm: 14, room: 35, comfort: 75 },
+      siquijor:       { dorm: 12, room: 30, comfort: 60 },
+      camiguin:       { dorm: 11, room: 28, comfort: 55 },
+      catba:          { dorm: 8, room: 24, comfort: 55 },
+
+      /* --- places where the number is not the point ---------------------- */
+      pakbeng:        { dorm: 8, room: 18, comfort: 30,
+                        note: 'One street, and it fills the moment the slow boat lands. The risk here is availability, not price — book ahead in season or be first off the boat.' },
+      padangbesar:    { dorm: 8, room: 20, comfort: 35,
+                        note: 'A border town with very little to it. Hat Yai, an hour north, is a far better night and de-risks the morning connection.' },
+      poipet:         { dorm: 8, room: 18, comfort: 35,
+                        note: 'A casino border town. If you can reach Battambang or Sisophon instead, do — it is a better night in every way.' },
+      hatyai:         { dorm: 9, room: 24, comfort: 45 },
+      banaue:         { dorm: 8, room: 20, comfort: 40,
+                        note: 'Simple guesthouses and not many of them. The buses arrive together and so does everyone looking for a room.' },
+      siphandon:      { dorm: 6, room: 15, comfort: 35 },
+      matnog:         { dorm: 8, room: 18, comfort: 32,
+                        note: 'A ferry ramp with rooms attached. Only sleep here if the crossing is suspended — otherwise push on to Legazpi or Catbalogan.' },
+    },
+  },
+
   /* ------------------------------------------------------------ disconnected
    * Countries on this map that no leg reaches, and the honest reason why. The
    * planner will refuse to route into them; this is what it says instead of

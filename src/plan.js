@@ -340,6 +340,7 @@ const Plan = (() => {
       if (overnight) {
         open.night = 'sleeper'
         open.nightAt = entry.leg.service
+        open.nightAtId = null
         open = null
       }
     })
@@ -351,6 +352,8 @@ const Plan = (() => {
       d.night = 'hotel'
       const lastLeg = legs[d.legs[d.legs.length - 1]]
       d.nightAt = lastLeg ? lastLeg.toCity : null
+      // Kept so the night can be priced where it is actually spent.
+      d.nightAtId = lastLeg ? lastLeg.toId : null
     })
 
     /* Boarding an overnight is not arriving. Manila to Cebu is one 22-hour
@@ -371,6 +374,40 @@ const Plan = (() => {
     }
 
     return days
+  }
+
+  /* ------------------------------------------------------------ lodging
+   * Nights priced where they are actually spent. A regional average would put
+   * the same figure on Battambang and Singapore, which are a factor of five
+   * apart — and the Singapore night is exactly the one somebody should be
+   * warned about before they book it rather than after.
+   */
+  const TIERS = ['dorm', 'room', 'comfort']
+
+  function ratesFor(network, stationId) {
+    const table = network.lodging
+    if (!table) return null
+    const specific = table.byStation[stationId]
+    if (specific) return specific
+    const st = network.stations[stationId]
+    return (st && table.byCountry[st.country]) || null
+  }
+
+  function buildNights(network, schedule, tier) {
+    const nights = []
+    for (const day of schedule) {
+      if (day.night !== 'hotel' || !day.nightAtId) continue
+      const rates = ratesFor(network, day.nightAtId)
+      nights.push({
+        day: day.n,
+        stationId: day.nightAtId,
+        city: day.nightAt,
+        rates,
+        usd: rates ? rates[tier] : null,
+        note: rates && rates.note ? rates.note : null,
+      })
+    }
+    return nights
   }
 
   /* -------------------------------------------------------------- risks */
@@ -576,8 +613,11 @@ const Plan = (() => {
     const sleeperNights = schedule.filter(d => d.night === 'sleeper').length
     const hotelNights = schedule.filter(d => d.night === 'hotel').length
 
+    const tier = TIERS.includes(opts.stay) ? opts.stay : 'room'
+    const nights = buildNights(network, schedule, tier)
+
     const transportUsd = legs.reduce((n, e) => n + (e.leg.usd ?? 0), 0)
-    const lodgingUsd = hotelNights * HOTEL_USD
+    const lodgingUsd = nights.reduce((n, x) => n + (x.usd ?? HOTEL_USD), 0)
 
     const stationIds = routed.stations
     const stopIds = [legs[0].fromId, ...legs.map(e => e.toId)]
@@ -613,6 +653,8 @@ const Plan = (() => {
       seasons,
       detours,
       schedule,
+      nights,
+      stayTier: tier,
       risks: buildRisks(network, legs, junctions, seasons, opts),
       booking: bookingOrder(network, legs),
       totals: {
@@ -636,5 +678,5 @@ const Plan = (() => {
     }
   }
 
-  return { build, bufferFor, seasonHits, DETOURS, HOTEL_USD, clone }
+  return { build, bufferFor, seasonHits, ratesFor, DETOURS, TIERS, HOTEL_USD, clone }
 })()

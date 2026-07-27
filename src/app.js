@@ -36,6 +36,7 @@
     date: '',
     nationality: '',
     pace: 'standard',
+    stay: 'room',
     plan: null,
     // Set only when the question named places rather than stations, so the
     // answer can be headlined in the words that were actually used.
@@ -102,10 +103,12 @@
   }
 
   const PACE_LABEL = { relaxed: 'Relaxed', standard: 'Standard', fast: 'Hard running' }
+  const STAY_LABEL = { dorm: 'Hostel beds', room: 'Private rooms', comfort: 'Mid-range hotels' }
 
   function renderDetailSummary() {
     const bits = [state.railOnly ? 'Hard rail-only' : 'Pragmatic routing']
     if (state.pace !== 'standard') bits.push(PACE_LABEL[state.pace])
+    if (state.stay !== 'room') bits.push(STAY_LABEL[state.stay])
     if (state.date) bits.push(state.date)
     if (state.nationality) bits.push(state.nationality)
     $('#detail-summary').textContent = bits.join(' · ')
@@ -118,6 +121,7 @@
     $('#date').value = state.date
     $('#nationality').value = state.nationality
     $('#pace').value = state.pace
+    $('#stay').value = state.stay
     renderDetailSummary()
   }
 
@@ -139,6 +143,7 @@
       date: state.date,
       nationality: state.nationality,
       pace: state.pace,
+      stay: state.stay,
       labels: state.labels,
     }
     const routed = Router.route(NETWORK, state.from, state.to, opts)
@@ -222,6 +227,7 @@
     if (state.date) p.set('date', state.date)
     if (state.nationality) p.set('nat', state.nationality)
     if (state.pace !== 'standard') p.set('pace', state.pace)
+    if (state.stay !== 'room') p.set('stay', state.stay)
     history.replaceState(null, '', '#' + p.toString())
   }
 
@@ -235,6 +241,7 @@
     state.date = p.get('date') || ''
     state.nationality = p.get('nat') || ''
     state.pace = p.get('pace') || 'standard'
+    state.stay = p.get('stay') || 'room'
   }
 
   /* -------------------------------------------------------- map behaviour */
@@ -367,8 +374,13 @@
     if (state.plan) compute()
   })
   $('#pace').addEventListener('change', e => {
-    renderDetailSummary()
     state.pace = e.target.value
+    renderDetailSummary()
+    compute()
+  })
+  $('#stay').addEventListener('change', e => {
+    state.stay = e.target.value
+    renderDetailSummary()
     compute()
   })
   const ASK_INDEX = Ask.build(NETWORK, LANDMARKS, COUNTRY_HUB)

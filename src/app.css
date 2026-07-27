@@ -1291,6 +1291,62 @@ table { width: 100%; border-collapse: collapse; }
 .night.sleeper { color: var(--rail); }
 .night.end { color: var(--ink-soft); font-weight: 600; }
 
+/* Where you sleep, and what it costs there rather than on average. */
+.stays { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+.stays > li {
+  padding: 0.6rem 0.7rem;
+  background: var(--raise);
+  border-left: 2px solid var(--panel-edge);
+  border-radius: 2px;
+}
+.stay-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.stay-city { font-family: var(--sans); font-size: 0.95rem; color: var(--ink-soft); }
+.stay-city b { color: var(--ink); font-weight: 600; }
+.stay-day {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stay-price {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--rail);
+  white-space: nowrap;
+}
+.bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.band {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.76rem;
+  color: var(--muted);
+  border: 1px solid var(--panel-edge);
+  border-radius: 2px;
+}
+.band b { font-family: var(--mono); font-weight: 600; color: var(--ink-soft); }
+.band.on { border-color: var(--rail); color: var(--ink-soft); }
+.band.on b { color: var(--rail); }
+.stay-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 /* What it decided, shown rather than assumed — including the road gap it
    cannot cover, which is the part that would otherwise be a nasty surprise. */
 .ask-note {
