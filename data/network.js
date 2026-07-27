@@ -222,6 +222,12 @@ const NETWORK = {
     chiangmai:      { name: 'Chiang Mai',               city: 'Chiang Mai',    country: 'th', lat: 18.79,  lon: 98.98,  gauge: 'metre' },
     kanchanaburi:   { name: 'Kanchanaburi',             city: 'Kanchanaburi',  country: 'th', lat: 14.02,  lon: 99.53,  gauge: 'metre' },
     namtok:         { name: 'Nam Tok',                  city: 'Nam Tok',       country: 'th', lat: 14.24,  lon: 99.07,  gauge: 'metre', minor: true },
+    wongwianyai:    { name: 'Wongwian Yai',             city: 'Bangkok',       country: 'th', lat: 13.72,  lon: 100.49, gauge: 'metre', minor: true,
+                      warn: 'A commuter platform behind a shopping centre, not a terminus with a concourse. The Maeklong line starts here and connects to nothing else on the network.' },
+    mahachai:       { name: 'Mahachai',                 city: 'Samut Sakhon',  country: 'th', lat: 13.55,  lon: 100.27, gauge: 'metre', minor: true },
+    banlaem:        { name: 'Ban Laem',                 city: 'Ban Laem',      country: 'th', lat: 13.51,  lon: 100.20, gauge: 'metre', minor: true },
+    maeklong:       { name: 'Maeklong',                 city: 'Samut Songkhram', country: 'th', lat: 13.41, lon: 100.00, gauge: 'metre', minor: true,
+                      warn: 'The platform is the market. Trains arrive through the stalls at walking pace and the awnings come down as they pass.' },
     aranyaprathet:  { name: 'Aranyaprathet',            city: 'Aranyaprathet', country: 'th', lat: 13.69,  lon: 102.50, gauge: 'metre' },
     huahin:         { name: 'Hua Hin',                  city: 'Hua Hin',       country: 'th', lat: 12.57,  lon: 99.96,  gauge: 'metre' },
     chumphon:       { name: 'Chumphon',                 city: 'Chumphon',      country: 'th', lat: 10.50,  lon: 99.18,  gauge: 'metre' },
@@ -568,6 +574,21 @@ const NETWORK = {
     { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, daily: { n: 2, spread: 'morning and afternoon' }, confidence: 'reported' },
     { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, daily: { n: 3, spread: 'timed for the day trip from Bangkok' }, confidence: 'reported',
       note: 'The Death Railway. The Wampo viaduct section is the reason to take it.' },
+
+    // === Maeklong line — the orphan railway ============================
+    // Two stubs of metre gauge that touch nothing else. The only way across
+    // the middle is a boat, which is why this is worth modelling properly
+    // rather than pretending it is one train.
+    { from: 'bkk_thonburi', to: 'wongwianyai', mode: 'road', op: 'transfer', service: 'Taxi or BTS one stop', hours: 0.3, usd: 2, essential: true, confidence: 'structural' },
+    { from: 'wongwianyai', to: 'mahachai', mode: 'rail', op: 'srt', service: 'Mahachai line commuter', hours: 1.0, usd: 0.3, cls: '3rd class fan', scenic: true,
+      daily: { n: 17, spread: 'roughly hourly from 05:30, more at the shoulders', last: '20:10' }, confidence: 'reported',
+      note: 'Ten baht, wooden benches, salt flats and shrimp ponds out of both windows. One of the best-value hours of railway anywhere.' },
+    { from: 'mahachai', to: 'banlaem', mode: 'ferry', op: 'localferry', service: 'Tha Chin river crossing', hours: 0.2, usd: 0.1,
+      daily: { n: 'continuous', spread: 'leaves when it fills, all day' }, confidence: 'reported',
+      note: 'A three-baht longtail across the river mouth. The track simply stops on one bank and starts again on the other.' },
+    { from: 'banlaem', to: 'maeklong', mode: 'rail', op: 'srt', service: 'Maeklong line', hours: 1.0, usd: 0.3, cls: '3rd class fan', scenic: true,
+      daily: { n: 4, spread: 'four a day only — 06:20, 09:00, 11:10, 15:30 southbound', last: '15:30' }, confidence: 'reported',
+      note: 'Four trains. Plan the day around them or you will be taking a minivan back.' },
 
     // === SRT east — Cambodia ===========================================
     { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'metro', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
@@ -1129,6 +1150,9 @@ const NETWORK = {
       bkk_aphiwat:    { dorm: 11, room: 30, comfort: 70 },
       bkk_hualamphong:{ dorm: 11, room: 30, comfort: 70 },
       bkk_thonburi:   { dorm: 11, room: 30, comfort: 70 },
+      wongwianyai:    { dorm: 11, room: 30, comfort: 70 },
+      maeklong:       { dorm: 7, room: 18, comfort: 40,
+                        note: 'Most people day-trip this from Bangkok and never look for a bed. Staying is better: the market runs eight times a day and the early trains are the empty ones.' },
       klsentral:      { dorm: 11, room: 32, comfort: 65 },
       jbsentral:      { dorm: 9, room: 26, comfort: 50,
                         note: 'The cheap side of the Singapore border, and the reason to sleep here rather than there.' },

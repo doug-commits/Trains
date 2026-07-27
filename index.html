@@ -2144,6 +2144,12 @@ const NETWORK = {
     chiangmai:      { name: 'Chiang Mai',               city: 'Chiang Mai',    country: 'th', lat: 18.79,  lon: 98.98,  gauge: 'metre' },
     kanchanaburi:   { name: 'Kanchanaburi',             city: 'Kanchanaburi',  country: 'th', lat: 14.02,  lon: 99.53,  gauge: 'metre' },
     namtok:         { name: 'Nam Tok',                  city: 'Nam Tok',       country: 'th', lat: 14.24,  lon: 99.07,  gauge: 'metre', minor: true },
+    wongwianyai:    { name: 'Wongwian Yai',             city: 'Bangkok',       country: 'th', lat: 13.72,  lon: 100.49, gauge: 'metre', minor: true,
+                      warn: 'A commuter platform behind a shopping centre, not a terminus with a concourse. The Maeklong line starts here and connects to nothing else on the network.' },
+    mahachai:       { name: 'Mahachai',                 city: 'Samut Sakhon',  country: 'th', lat: 13.55,  lon: 100.27, gauge: 'metre', minor: true },
+    banlaem:        { name: 'Ban Laem',                 city: 'Ban Laem',      country: 'th', lat: 13.51,  lon: 100.20, gauge: 'metre', minor: true },
+    maeklong:       { name: 'Maeklong',                 city: 'Samut Songkhram', country: 'th', lat: 13.41, lon: 100.00, gauge: 'metre', minor: true,
+                      warn: 'The platform is the market. Trains arrive through the stalls at walking pace and the awnings come down as they pass.' },
     aranyaprathet:  { name: 'Aranyaprathet',            city: 'Aranyaprathet', country: 'th', lat: 13.69,  lon: 102.50, gauge: 'metre' },
     huahin:         { name: 'Hua Hin',                  city: 'Hua Hin',       country: 'th', lat: 12.57,  lon: 99.96,  gauge: 'metre' },
     chumphon:       { name: 'Chumphon',                 city: 'Chumphon',      country: 'th', lat: 10.50,  lon: 99.18,  gauge: 'metre' },
@@ -2490,6 +2496,21 @@ const NETWORK = {
     { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, daily: { n: 2, spread: 'morning and afternoon' }, confidence: 'reported' },
     { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, daily: { n: 3, spread: 'timed for the day trip from Bangkok' }, confidence: 'reported',
       note: 'The Death Railway. The Wampo viaduct section is the reason to take it.' },
+
+    // === Maeklong line — the orphan railway ============================
+    // Two stubs of metre gauge that touch nothing else. The only way across
+    // the middle is a boat, which is why this is worth modelling properly
+    // rather than pretending it is one train.
+    { from: 'bkk_thonburi', to: 'wongwianyai', mode: 'road', op: 'transfer', service: 'Taxi or BTS one stop', hours: 0.3, usd: 2, essential: true, confidence: 'structural' },
+    { from: 'wongwianyai', to: 'mahachai', mode: 'rail', op: 'srt', service: 'Mahachai line commuter', hours: 1.0, usd: 0.3, cls: '3rd class fan', scenic: true,
+      daily: { n: 17, spread: 'roughly hourly from 05:30, more at the shoulders', last: '20:10' }, confidence: 'reported',
+      note: 'Ten baht, wooden benches, salt flats and shrimp ponds out of both windows. One of the best-value hours of railway anywhere.' },
+    { from: 'mahachai', to: 'banlaem', mode: 'ferry', op: 'localferry', service: 'Tha Chin river crossing', hours: 0.2, usd: 0.1,
+      daily: { n: 'continuous', spread: 'leaves when it fills, all day' }, confidence: 'reported',
+      note: 'A three-baht longtail across the river mouth. The track simply stops on one bank and starts again on the other.' },
+    { from: 'banlaem', to: 'maeklong', mode: 'rail', op: 'srt', service: 'Maeklong line', hours: 1.0, usd: 0.3, cls: '3rd class fan', scenic: true,
+      daily: { n: 4, spread: 'four a day only — 06:20, 09:00, 11:10, 15:30 southbound', last: '15:30' }, confidence: 'reported',
+      note: 'Four trains. Plan the day around them or you will be taking a minivan back.' },
 
     // === SRT east — Cambodia ===========================================
     { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'metro', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
@@ -3051,6 +3072,9 @@ const NETWORK = {
       bkk_aphiwat:    { dorm: 11, room: 30, comfort: 70 },
       bkk_hualamphong:{ dorm: 11, room: 30, comfort: 70 },
       bkk_thonburi:   { dorm: 11, room: 30, comfort: 70 },
+      wongwianyai:    { dorm: 11, room: 30, comfort: 70 },
+      maeklong:       { dorm: 7, room: 18, comfort: 40,
+                        note: 'Most people day-trip this from Bangkok and never look for a bed. Staying is better: the market runs eight times a day and the early trains are the empty ones.' },
       klsentral:      { dorm: 11, room: 32, comfort: 65 },
       jbsentral:      { dorm: 9, room: 26, comfort: 50,
                         note: 'The cheap side of the Singapore border, and the reason to sleep here rather than there.' },
@@ -3215,6 +3239,15 @@ const LANDMARKS = [
   { name: 'Phanom Rung', station: 'buriram', scene: 'temple', country: 'th', lat: 14.532, lon: 102.941,
     commons: 'Phanom Rung Historical Park',
     aka: ['buriram'], last: 'Taxi from Buriram' },
+  { name: 'Maeklong Railway Market', station: 'maeklong', scene: 'market', country: 'th', lat: 13.409, lon: 99.999,
+    commons: 'Maeklong Railway Market',
+    aka: ['maeklong', 'mae klong', 'talad rom hoop', 'umbrella pulldown market', 'samut songkhram'], last: null },
+  { name: 'Amphawa floating market', station: 'maeklong', scene: 'river', country: 'th', lat: 13.425, lon: 99.955,
+    commons: 'Amphawa Floating Market',
+    aka: ['amphawa'], last: 'Songthaew from Maeklong, about 15 minutes — weekend evenings only' },
+  { name: 'Rong Kluea Market', station: 'aranyaprathet', scene: 'market', country: 'th', lat: 13.657, lon: 102.556,
+    commons: 'Rong Kluea Market',
+    aka: ['rong kluea', 'rongkluea', 'talad rong kluea'], last: 'Tuk-tuk from Aranyaprathet to the border, about 6 km' },
   { name: 'Hua Hin beach', station: 'huahin', scene: 'coast', country: 'th', lat: 12.57, lon: 99.96,
     commons: 'Hua Hin Thailand beach', aka: ['hua hin'], last: null },
   { name: 'Railay Beach', station: 'krabi', scene: 'karst', country: 'th', lat: 8.011, lon: 98.838,
@@ -3274,6 +3307,9 @@ const LANDMARKS = [
     aka: ['halong', 'ha long', 'lan ha bay', 'cat ba'], last: null },
   { name: 'Hanoi Old Quarter', station: 'hanoi', scene: 'skyline', country: 'vn', lat: 21.034, lon: 105.851,
     aka: ['hanoi', 'hoan kiem', 'ho chi minh mausoleum'], last: null },
+  { name: 'Hanoi Train Street', station: 'hanoi', scene: 'market', country: 'vn', lat: 21.028, lon: 105.842,
+    commons: 'Hanoi train street',
+    aka: ['train street', 'phung hung', 'tran phu railway'], last: 'Walk from the Old Quarter, ten minutes' },
   { name: 'Sapa rice terraces', station: 'laocai', scene: 'paddy', country: 'vn', lat: 22.336, lon: 103.844,
     commons: 'Sa Pa rice terraces Vietnam',
     aka: ['sapa', 'sa pa', 'fansipan'], last: 'An hour by bus up from Lào Cai' },
@@ -3302,6 +3338,8 @@ const LANDMARKS = [
     aka: ['mekong delta', 'chau doc'], last: null },
 
   // --- Malaysia
+  { name: 'Padang Besar border market', station: 'padangbesar', scene: 'market', country: 'th', lat: 6.658, lon: 100.322,
+    aka: ['padang besar market', 'border market', 'pekan siam'], last: 'Beside the station, on the Thai side of the checkpoint' },
   { name: 'Petronas Towers', station: 'klsentral', scene: 'skyline', country: 'my', lat: 3.158, lon: 101.712,
     aka: ['kuala lumpur', 'klcc', 'batu caves', 'kl'], last: 'One stop on the LRT' },
   { name: 'George Town street art', station: 'georgetown', scene: 'coast', country: 'my', lat: 5.416, lon: 100.338,
@@ -4492,6 +4530,7 @@ const Scene = (() => {
     forest:  { sky: ['#17362f', '#83b06d'], far: '#417049', mid: '#2a5636', near: '#173425', water: null },
     river:   { sky: ['#1b2d3d', '#8b8f74'], far: '#40584f', mid: '#2a3c39', near: '#18242a', water: '#456070' },
     paddy:   { sky: ['#1d3330', '#a7a860'], far: '#5c7146', mid: '#3b4f30', near: '#22301f', water: '#6d7f4a' },
+    market:  { sky: ['#2b2033', '#c4763f'], far: '#5d3c39', mid: '#3a2529', near: '#1d1418', water: null, lit: '#f2b45c' },
   }
 
   const DEFAULT_BY_COUNTRY = {
@@ -4722,6 +4761,66 @@ const Scene = (() => {
       ctx.closePath()
       ctx.fill()
       ctx.globalAlpha = 1
+    },
+
+    /* Rows of awnings closing over a track. The gap down the middle is the
+     * whole point of these places — it is exactly one train wide. */
+    market(ctx, w, h, pal, r) {
+      sun(ctx, w, h, pal, r)
+      const vpx = w * 0.5
+      const horizon = h * 0.6
+      // Stall roofs receding on both sides, larger and lower as they near us.
+      const rows = 7
+      for (let i = 0; i < rows; i++) {
+        const t = i / (rows - 1)
+        const y = horizon + (h - horizon) * (t * t * 0.95)
+        const inner = w * (0.05 + t * 0.2)
+        const depth = h * (0.03 + t * 0.1)
+        for (const side of [-1, 1]) {
+          const x0 = vpx + side * inner
+          const x1 = vpx + side * (inner + w * (0.16 + t * 0.3))
+          ctx.fillStyle = i % 2 ? pal.mid : pal.far
+          ctx.beginPath()
+          ctx.moveTo(x0, y)
+          ctx.lineTo(x1, y - depth * 0.5)
+          ctx.lineTo(x1, y + depth)
+          ctx.lineTo(x0, y + depth * 0.7)
+          ctx.closePath()
+          ctx.fill()
+          // A bulb hung under every second awning.
+          if (r() > 0.45) {
+            ctx.save()
+            ctx.globalAlpha = 0.65
+            ctx.fillStyle = pal.lit
+            ctx.beginPath()
+            ctx.arc(x0 + side * w * 0.04, y + depth * 0.55, h * (0.006 + t * 0.012), 0, Math.PI * 2)
+            ctx.fill()
+            ctx.restore()
+          }
+        }
+      }
+      // The rails themselves, converging on the vanishing point.
+      ctx.save()
+      ctx.globalAlpha = 0.55
+      ctx.strokeStyle = pal.lit
+      ctx.lineWidth = 1.2
+      for (const side of [-1, 1]) {
+        ctx.beginPath()
+        ctx.moveTo(vpx + side * w * 0.008, horizon)
+        ctx.lineTo(vpx + side * w * 0.075, h)
+        ctx.stroke()
+      }
+      ctx.restore()
+      ctx.fillStyle = pal.near
+      ctx.beginPath()
+      ctx.moveTo(0, h)
+      ctx.lineTo(0, h * 0.9)
+      ctx.lineTo(vpx - w * 0.09, h * 0.99)
+      ctx.lineTo(vpx + w * 0.09, h * 0.99)
+      ctx.lineTo(w, h * 0.9)
+      ctx.lineTo(w, h)
+      ctx.closePath()
+      ctx.fill()
     },
 
     paddy(ctx, w, h, pal, r) {

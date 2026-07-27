@@ -667,6 +667,29 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------------ the Maeklong line */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+
+  // The line is two stubs with a river between them. If this ever comes back
+  // without a boat in the middle, someone has quietly bridged the Tha Chin.
+  await page.fill('#askbox', 'bangkok to maeklong railway market')
+  await page.click('#askgo')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const text = await page.textContent('#panel')
+  check('the umbrella market resolves to its own station', /Maeklong/.test(text))
+  check('the river crossing survives merging — it is a boat, not a train',
+    /Tha Chin/.test(text))
+  check('and the four-train constraint is stated', /four a day|Four trains/i.test(text))
+
+  await page.screenshot({ path: join(outDir, '19-maeklong.png') })
+  await context.close()
+}
+
 /* ------------------------------------------------------- the Philippines */
 {
   const { page, context } = await newPage()

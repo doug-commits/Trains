@@ -45,6 +45,7 @@ const Scene = (() => {
     forest:  { sky: ['#17362f', '#83b06d'], far: '#417049', mid: '#2a5636', near: '#173425', water: null },
     river:   { sky: ['#1b2d3d', '#8b8f74'], far: '#40584f', mid: '#2a3c39', near: '#18242a', water: '#456070' },
     paddy:   { sky: ['#1d3330', '#a7a860'], far: '#5c7146', mid: '#3b4f30', near: '#22301f', water: '#6d7f4a' },
+    market:  { sky: ['#2b2033', '#c4763f'], far: '#5d3c39', mid: '#3a2529', near: '#1d1418', water: null, lit: '#f2b45c' },
   }
 
   const DEFAULT_BY_COUNTRY = {
@@ -275,6 +276,66 @@ const Scene = (() => {
       ctx.closePath()
       ctx.fill()
       ctx.globalAlpha = 1
+    },
+
+    /* Rows of awnings closing over a track. The gap down the middle is the
+     * whole point of these places — it is exactly one train wide. */
+    market(ctx, w, h, pal, r) {
+      sun(ctx, w, h, pal, r)
+      const vpx = w * 0.5
+      const horizon = h * 0.6
+      // Stall roofs receding on both sides, larger and lower as they near us.
+      const rows = 7
+      for (let i = 0; i < rows; i++) {
+        const t = i / (rows - 1)
+        const y = horizon + (h - horizon) * (t * t * 0.95)
+        const inner = w * (0.05 + t * 0.2)
+        const depth = h * (0.03 + t * 0.1)
+        for (const side of [-1, 1]) {
+          const x0 = vpx + side * inner
+          const x1 = vpx + side * (inner + w * (0.16 + t * 0.3))
+          ctx.fillStyle = i % 2 ? pal.mid : pal.far
+          ctx.beginPath()
+          ctx.moveTo(x0, y)
+          ctx.lineTo(x1, y - depth * 0.5)
+          ctx.lineTo(x1, y + depth)
+          ctx.lineTo(x0, y + depth * 0.7)
+          ctx.closePath()
+          ctx.fill()
+          // A bulb hung under every second awning.
+          if (r() > 0.45) {
+            ctx.save()
+            ctx.globalAlpha = 0.65
+            ctx.fillStyle = pal.lit
+            ctx.beginPath()
+            ctx.arc(x0 + side * w * 0.04, y + depth * 0.55, h * (0.006 + t * 0.012), 0, Math.PI * 2)
+            ctx.fill()
+            ctx.restore()
+          }
+        }
+      }
+      // The rails themselves, converging on the vanishing point.
+      ctx.save()
+      ctx.globalAlpha = 0.55
+      ctx.strokeStyle = pal.lit
+      ctx.lineWidth = 1.2
+      for (const side of [-1, 1]) {
+        ctx.beginPath()
+        ctx.moveTo(vpx + side * w * 0.008, horizon)
+        ctx.lineTo(vpx + side * w * 0.075, h)
+        ctx.stroke()
+      }
+      ctx.restore()
+      ctx.fillStyle = pal.near
+      ctx.beginPath()
+      ctx.moveTo(0, h)
+      ctx.lineTo(0, h * 0.9)
+      ctx.lineTo(vpx - w * 0.09, h * 0.99)
+      ctx.lineTo(vpx + w * 0.09, h * 0.99)
+      ctx.lineTo(w, h * 0.9)
+      ctx.lineTo(w, h)
+      ctx.closePath()
+      ctx.fill()
     },
 
     paddy(ctx, w, h, pal, r) {
