@@ -65,11 +65,29 @@ function loadPhotos() {
   let bytes = 0
   let skipped = 0
 
+  /* The fetcher is supposed to reject an attribution licence with no author,
+   * but the page is what actually publishes the image, so it refuses too. A
+   * CC BY photograph credited to nobody is a licence breach whatever put it in
+   * the manifest. */
+  // Placeholder, not "no Latin letters" — plenty of these credits are in Thai,
+  // Vietnamese or Chinese, and an earlier version of this check threw one away.
+  const nameless = t =>
+    !String(t).trim() ||
+    /^unknown( author)?$/i.test(String(t).trim()) ||
+    /^no machine-readable author/i.test(String(t).trim())
+  const unattributed = Object.entries(manifest).filter(
+    ([, e]) => /^cc[ -]by/i.test(e.licence || '') && nameless(e.credit)
+  )
+  for (const [id, e] of unattributed) {
+    console.warn(`photos             DROPPED ${id}: ${e.licence} credited to "${e.credit}"`)
+  }
+  const dropped = new Set(unattributed.map(([id]) => id))
+
   /* Smallest first. The budget is going to cut somewhere; spending it on the
    * cheapest photographs buys the most destinations, and it makes the cut
    * deterministic instead of "whatever the manifest happened to list first". */
   const entries = Object.entries(manifest)
-    .filter(([, e]) => existsSync(join(root, 'data/photos', e.file)))
+    .filter(([id, e]) => !dropped.has(id) && existsSync(join(root, 'data/photos', e.file)))
     .sort((a, b) => (a[1].bytes ?? 0) - (b[1].bytes ?? 0))
   skipped += Object.keys(manifest).length - entries.length
 

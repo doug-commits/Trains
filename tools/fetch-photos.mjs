@@ -104,7 +104,19 @@ function cleanAuthor(raw) {
   const s = stripHtml(raw)
   const guessed = s.match(/^No machine-readable author provided\.?\s*([^,]+?)\s+assumed/i)
   if (guessed) return guessed[1].trim()
-  if (/^no machine-readable author/i.test(s) || /^unknown$/i.test(s)) return ''
+
+  const nameless = t => /^no machine-readable author/i.test(t) || /^unknown( author)?$/i.test(t)
+  if (nameless(s)) return ''
+
+  /* Some author templates emit the text twice — a visible copy and one for
+   * screen readers — and stripping the tags welds them into
+   * "Unknown authorUnknown author". Only unweld when doing so reveals a
+   * placeholder; halving a real name that happens to repeat would be worse
+   * than leaving it alone. */
+  const half = s.length / 2
+  if (s.length % 2 === 0 && s.slice(0, half) === s.slice(half) && nameless(s.slice(0, half))) {
+    return ''
+  }
   return s
 }
 

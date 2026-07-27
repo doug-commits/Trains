@@ -740,19 +740,6 @@
     "req": 800,
     "bytes": 47678
   },
-  "kraton-and-solo-batik": {
-    "file": "kraton-and-solo-batik.jpg",
-    "station": "solo",
-    "landmark": "Kraton and Solo batik",
-    "credit": "Unknown authorUnknown author",
-    "licence": "CC BY-SA 3.0",
-    "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:COLLECTIE_TROPENMUSEUM_Interieur_van_de_moskee_in_de_kraton_van_de_Susuhunan_van_Solo_Soerakarta_TMnr_60001442.jpg",
-    "width": 700,
-    "height": 521,
-    "req": 800,
-    "bytes": 74021
-  },
   "stone-forest": {
     "file": "stone-forest.jpg",
     "station": "kunming",
