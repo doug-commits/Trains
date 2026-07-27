@@ -193,17 +193,27 @@ function check(label, condition, detail = '') {
   await page.waitForFunction(() => document.querySelector('#panel h1'))
   await page.waitForTimeout(500)
 
-  // Illustrations are canvases; a blank one is a silent failure.
+  /* Every corridor card carries art — a photograph or a drawing, whichever the
+   * build had room for. Counting canvases alone broke the moment photographs
+   * started displacing them, so ask the real question: does each slot show
+   * something? A blank canvas and an image that never loaded both fail. */
   const art = await page.evaluate(() =>
-    [...document.querySelectorAll('canvas.scene')].map(c => {
+    [...document.querySelectorAll('.corridor-art')].map(slot => {
+      const img = slot.querySelector('img.photo')
+      if (img) return img.complete && img.naturalWidth > 0 ? 'photo' : 'broken image'
+      const c = slot.querySelector('canvas.scene')
+      if (!c) return 'nothing'
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
       const seen = new Set()
       for (let i = 0; i < d.length; i += 800) seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`)
-      return seen.size
+      return seen.size > 5 ? 'drawing' : 'blank canvas'
     })
   )
-  check('destination art renders on every card', art.length >= 6 && art.every(n => n > 5),
-    `${art.length} drawn, min ${Math.min(...art)} colours`)
+  const good = art.filter(a => a === 'photo' || a === 'drawing')
+  check('destination art renders on every card', art.length >= 6 && good.length === art.length,
+    `${art.filter(a => a === 'photo').length} photographed, ${
+      art.filter(a => a === 'drawing').length
+    } drawn${good.length === art.length ? '' : `, BAD: ${art.filter(a => !good.includes(a))}`}`)
 
   await page.fill('#askbox', 'how do I get from Angkor Wat to Ha Long Bay')
   await page.click('#askgo')
@@ -224,6 +234,35 @@ function check(label, condition, detail = '') {
   check('nonsense is refused, not guessed at', /Not sure what you mean/.test(await page.textContent('#asknote')))
 
   await page.screenshot({ path: join(outDir, '16-ask-answer.png') })
+  await context.close()
+}
+
+/* --------------------------------- the fragment, which has no assets beside it
+ * dist/planner.html is published as one file. Any photograph the build linked
+ * rather than embedded cannot resolve there, so every one of them must come
+ * back as a drawing — not as a broken image frame, and not still carrying the
+ * photographer's credit for a picture nobody can see. */
+{
+  const { page, context } = await newPage()
+  await page.goto('file://' + join(root, 'dist/planner.html'))
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(1200)
+
+  const art = await page.evaluate(() =>
+    [...document.querySelectorAll('.corridor-art')].map(slot => {
+      const img = slot.querySelector('img.photo')
+      if (img) return img.complete && img.naturalWidth > 0 ? 'photo' : 'broken image'
+      return slot.querySelector('canvas.scene') ? 'drawing' : 'nothing'
+    })
+  )
+  check('the assetless fragment shows no broken images',
+    art.length > 0 && art.every(a => a === 'photo' || a === 'drawing'), art.join(', '))
+
+  const orphanCredits = await page.evaluate(
+    () => [...document.querySelectorAll('.corridor-art')]
+      .filter(s => !s.querySelector('img.photo') && s.querySelector('.photo-credit')).length
+  )
+  check('no credit left behind by a photo that did not load', orphanCredits === 0)
   await context.close()
 }
 

@@ -14,12 +14,11 @@
  *
  *   node tools/fetch-photos.mjs --dry-run  # show what it would take, fetch nothing
  *
- * NOTE: this has never completed a real run. The environment it was written in
- * blocks outbound access to Wikimedia — the attempt returns 403 at the network
- * edge, with or without the proxy. The request shape follows the documented
- * MediaWiki API, but treat your first run as the thing that proves it. It
- * preflights the connection and reports what it accepted and rejected per
- * landmark so that run is readable rather than a wall of failures.
+ * NOTE: this does not run in the development sandbox — outbound access to
+ * Wikimedia is refused at the network edge with 403, with or without the proxy.
+ * It runs on CI instead (.github/workflows/fetch-photos.yml) and commits what
+ * it gets. It preflights the connection so that failure is reported as the
+ * network problem it is rather than as a wall of missing landmarks.
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs'
@@ -51,6 +50,11 @@ const ALLOWED = [
  * got a photograph. 800 is wide enough for a card that renders about 400 CSS
  * pixels across on a 2x screen, and it roughly halves the bytes. */
 const WIDTH = 800
+
+/* Pace between landmarks. Each one costs a search plus a download, so this is
+ * roughly half the real request rate. Slow enough to stay under Commons' limit
+ * for an unauthenticated client, which is cheaper than being throttled. */
+const PACE = 700
 
 const args = process.argv.slice(2)
 const force = args.includes('--force')
@@ -89,20 +93,48 @@ function licenceOk(name) {
 
 class NetworkError extends Error {}
 
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/* Two failures wear the same clothes and need opposite handling.
+ *
+ * 403 means the request is not going to be allowed — an egress filter, a
+ * blocked User-Agent — and retrying is just a slower way to fail.
+ *
+ * 429 and 5xx mean "not right now". Commons rate-limits an unauthenticated
+ * client somewhere north of forty requests in a minute, which is exactly where
+ * a run over this many landmarks lands. Treating that as fatal is what made the
+ * first two runs stop dead partway down the list and look like Commons had
+ * nothing for the second half of the world. Back off and carry on instead. */
+const BACKOFF = [2000, 5000, 12000, 30000]
+
+async function request(url, headers) {
+  for (let attempt = 0; ; attempt++) {
+    let res
+    try {
+      res = await fetch(url, { headers })
+    } catch (err) {
+      throw new NetworkError(`cannot reach commons.wikimedia.org (${err.message})`)
+    }
+    if (res.status === 403) throw new NetworkError(`Commons ${res.status} ${res.statusText}`)
+    if (res.status === 429 || res.status >= 500) {
+      if (attempt >= BACKOFF.length) {
+        throw new NetworkError(`Commons ${res.status} ${res.statusText} after ${attempt} retries`)
+      }
+      // Retry-After is authoritative when Commons sends it.
+      const after = Number(res.headers.get('retry-after')) * 1000
+      const wait = Number.isFinite(after) && after > 0 ? after : BACKOFF[attempt]
+      console.log(`      ${res.status} from Commons — waiting ${Math.round(wait / 1000)}s`)
+      await sleep(wait)
+      continue
+    }
+    return res
+  }
+}
+
 async function api(params) {
   const url = new URL('https://commons.wikimedia.org/w/api.php')
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  let res
-  try {
-    res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
-  } catch (err) {
-    throw new NetworkError(`cannot reach commons.wikimedia.org (${err.message})`)
-  }
-  // 403 here is almost always an egress filter or a blocked User-Agent, not a
-  // problem with the landmark — worth distinguishing so it is not chased as one.
-  if (res.status === 403 || res.status === 429 || res.status >= 500) {
-    throw new NetworkError(`Commons API ${res.status} ${res.statusText}`)
-  }
+  const res = await request(url, { 'User-Agent': UA, Accept: 'application/json' })
   if (!res.ok) throw new Error(`Commons API ${res.status} ${res.statusText}`)
   return res.json()
 }
@@ -185,12 +217,10 @@ async function findImage(term) {
 }
 
 async function download(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } })
+  const res = await request(new URL(url), { 'User-Agent': UA })
   if (!res.ok) throw new Error(`download ${res.status}`)
   return Buffer.from(await res.arrayBuffer())
 }
-
-const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 async function main() {
   if (!(await preflight())) process.exit(2)
@@ -230,7 +260,7 @@ async function main() {
       if (dryRun) {
         console.log(`  · ${lm.name} — would take ${found.title} (${found.licence}, ${found.credit})`)
         skipped++
-        await sleep(350)
+        await sleep(PACE)
         continue
       }
       const bytes = await download(found.thumburl)
@@ -260,7 +290,7 @@ async function main() {
         break
       }
     }
-    await sleep(350) // be a good citizen of a free API
+    await sleep(PACE)
   }
 
   // Drop manifest entries whose file has gone missing.

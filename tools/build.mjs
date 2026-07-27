@@ -39,21 +39,29 @@ const SCRIPTS = [
   'src/app.js',
 ]
 
-/* Photographs, if tools/fetch-photos.mjs has been run. They are inlined so the
- * page stays a single self-contained file — which is what lets it work offline,
- * survive the Artifact CSP, and deploy without an asset pipeline.
+/* Photographs, if tools/fetch-photos.mjs has been run.
  *
- * That only holds while the set is small. The budget below is the tripwire: if
- * you blow past it, stop inlining and serve data/photos/ as static assets
- * instead, adding them to the Vercel output directory alongside index.html. */
+ * They were originally all inlined, which is what let the page work offline and
+ * survive the Artifact CSP with no asset pipeline. That stopped scaling: the
+ * set is now larger than any sane single file, so the budget below decides how
+ * much travels inside the page and the rest is linked to data/photos/.
+ *
+ * The two outputs therefore differ, deliberately:
+ *   index.html          inlined + linked. Ships beside data/photos/, so the
+ *                       links resolve both off disk and on the deployed site.
+ *   dist/planner.html   inlined only. It is published as one file with nothing
+ *                       beside it, and a link that cannot resolve would mean a
+ *                       failed request for every photograph over the budget. */
 const PHOTO_BUDGET_KB = Number(process.env.PHOTO_BUDGET_KB || 3000)
 
 function loadPhotos() {
   const manifestPath = join(root, 'data/photos.json')
-  if (!existsSync(manifestPath)) return { js: 'const PHOTOS = {};', used: 0, skipped: 0, kb: 0 }
+  const empty = { embedded: {}, linked: {}, skipped: 0, kb: 0 }
+  if (!existsSync(manifestPath)) return empty
 
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  const out = {}
+  const embedded = {}
+  const linked = {}
   let bytes = 0
   let skipped = 0
 
@@ -68,14 +76,10 @@ function loadPhotos() {
   for (const [id, entry] of entries) {
     const file = join(root, 'data/photos', entry.file)
     const buf = readFileSync(file)
-    if ((bytes + buf.length) / 1024 > PHOTO_BUDGET_KB) {
-      skipped++
-      continue
-    }
-    bytes += buf.length
+    const fits = (bytes + buf.length) / 1024 <= PHOTO_BUDGET_KB
     const mime = entry.file.endsWith('.png') ? 'image/png' : entry.file.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
-    out[id] = {
-      src: `data:${mime};base64,${buf.toString('base64')}`,
+
+    const meta = {
       station: entry.station,
       landmark: entry.landmark,
       credit: entry.credit,
@@ -83,14 +87,17 @@ function loadPhotos() {
       licenceUrl: entry.licenceUrl,
       source: entry.source,
     }
+    if (fits) {
+      bytes += buf.length
+      embedded[id] = { src: `data:${mime};base64,${buf.toString('base64')}`, ...meta }
+    } else {
+      linked[id] = { href: `data/photos/${entry.file}`, ...meta }
+    }
   }
-  return {
-    js: `const PHOTOS = ${JSON.stringify(out)};`,
-    used: Object.keys(out).length,
-    skipped,
-    kb: bytes / 1024,
-  }
+  return { embedded, linked, skipped, kb: bytes / 1024 }
 }
+
+const photoJs = set => `const PHOTOS = ${JSON.stringify(set)};`
 
 const photos = loadPhotos()
 
@@ -99,21 +106,19 @@ const fonts = read('src/fonts.css')
 const css = read('src/app.css')
 const shell = read('src/shell.html')
 
-const js = [
-  '/* Built by tools/build.mjs — edit the files in src/ and data/, not this. */',
-  `const BASEMAP = ${basemap};`,
-  photos.js,
-  ...SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`),
-].join('\n')
+const sources = SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n')
 
-const body = `${shell}
+const bodyWith = photoSet => `${shell}
 <style>
 ${fonts}
 ${css}</style>
 <script>
 (function(){
 "use strict";
-${js}
+/* Built by tools/build.mjs — edit the files in src/ and data/, not this. */
+const BASEMAP = ${basemap};
+${photoJs(photoSet)}
+${sources}
 })();
 </script>`
 
@@ -122,7 +127,7 @@ mkdirSync(join(root, 'dist'), { recursive: true })
 // Fragment for publishing: the host supplies doctype, html, head and body.
 writeFileSync(
   join(root, 'dist/planner.html'),
-  `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${body}\n`
+  `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${bodyWith(photos.embedded)}\n`
 )
 
 // Standalone document for opening off disk.
@@ -137,17 +142,20 @@ writeFileSync(
 <meta name="description" content="${DESCRIPTION}">
 </head>
 <body>
-${body}
+${bodyWith({ ...photos.embedded, ...photos.linked })}
 </body>
 </html>
 `
 )
 
 const kb = p => (readFileSync(join(root, p)).length / 1024).toFixed(0)
+const embeddedCount = Object.keys(photos.embedded).length
+const linkedCount = Object.keys(photos.linked).length
 console.log(
-  photos.used
-    ? `photos             ${photos.used} inlined, ${photos.kb.toFixed(0)} KB` +
-      (photos.skipped ? `, ${photos.skipped} skipped (over budget or missing)` : '')
+  embeddedCount || linkedCount
+    ? `photos             ${embeddedCount} inlined (${photos.kb.toFixed(0)} KB), ` +
+      `${linkedCount} linked from index.html only` +
+      (photos.skipped ? `, ${photos.skipped} missing from disk` : '')
     : 'photos             none — destinations fall back to drawn illustrations'
 )
 console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)

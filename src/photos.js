@@ -36,11 +36,24 @@ const Photos = (() => {
     return Object.keys(have).length
   }
 
-  /** The image itself, plus the credit the licence obliges us to show. */
-  function figure(entry, alt) {
+  /** The image itself, plus the credit the licence obliges us to show.
+   *
+   * Photographs past the inline budget carry `href` instead of `src` — a path
+   * to a file beside the page rather than the bytes. That resolves on the
+   * deployed site and off disk, and not in the single-file published fragment,
+   * so a linked image also carries the illustration that should replace it if
+   * it fails to load. src/app.js does the swap. */
+  function figure(entry, alt, fallback) {
     if (!entry) return ''
+    const linked = !entry.src && entry.href
+    const swap =
+      linked && fallback
+        ? ` data-fallback="${esc(fallback.kind)}" data-seed="${esc(fallback.seed)}"`
+        : ''
     return (
-      `<img class="photo" src="${esc(entry.src)}" alt="${esc(alt || entry.landmark)}" loading="lazy" decoding="async">` +
+      `<img class="photo" src="${esc(entry.src || entry.href)}" alt="${esc(
+        alt || entry.landmark
+      )}" loading="lazy" decoding="async"${swap}>` +
       `<span class="photo-credit">${esc(entry.credit)}` +
       (entry.licence ? ` · ${esc(entry.licence)}` : '') +
       `</span>`

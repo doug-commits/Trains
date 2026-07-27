@@ -179,6 +179,27 @@
     Scene.paintAll(panel)
   }
 
+  /* Photographs past the inline budget are linked rather than embedded, so on a
+   * build with no assets beside it — the published single-file fragment — they
+   * will not load. Put the drawn illustration back rather than leaving a broken
+   * image frame. Capture phase, because `error` on an <img> does not bubble. */
+  panel.addEventListener(
+    'error',
+    e => {
+      const img = e.target
+      if (!(img instanceof HTMLImageElement) || !img.dataset.fallback) return
+      const canvas = document.createElement('canvas')
+      canvas.className = 'scene'
+      canvas.dataset.scene = img.dataset.fallback
+      canvas.dataset.seed = img.dataset.seed || ''
+      // The credit belongs to the photograph, not the drawing.
+      img.parentNode.querySelector('.photo-credit')?.remove()
+      img.replaceWith(canvas)
+      Scene.paintAll(panel)
+    },
+    true
+  )
+
   function bindPanel() {
     panel.querySelectorAll('tr.leg').forEach(row => {
       const i = Number(row.dataset.leg)

@@ -138,6 +138,12 @@ node tools/fetch-photos.mjs --force       # refetch
 node tools/fetch-photos.mjs --only borobudur,angkor-wat
 ```
 
+Commons rate-limits an unauthenticated client at around the pace this runs at,
+so 429 and 5xx are retried with backoff while 403 — an egress block — fails
+immediately. Getting that distinction wrong is what made the first two runs stop
+dead halfway down the list and look like Commons had nothing for the second half
+of the world.
+
 It queries Wikimedia Commons, keeps only licences that permit redistribution
 with attribution (CC0, public domain, CC BY, CC BY-SA), and records the author,
 licence and source URL alongside each file. Anything non-commercial,
@@ -155,14 +161,25 @@ network edge — so the fetch runs on CI instead and commits its results.
 `data/landmarks.js` or the workflow itself. A browser test gates the commit, so
 a fetch that breaks the page does not land.
 
-`tools/build.mjs` inlines photos as data URIs so the page stays one
-self-contained file, subject to `PHOTO_BUDGET_KB` (default 3000). It spends the
-budget smallest-file-first, which buys the most destinations and makes the cut
-deterministic; anything left over falls back to an illustration. `WIDTH` in the
-fetcher is the other half of that trade — it is recorded per file as `req`, and
-changing it refetches the whole set rather than leaving a mix of two sizes.
-If the set outgrows the budget for real, serve `data/photos/` as static assets
-and reference them by path instead.
+**The two outputs carry different photo sets, deliberately.** The whole set is
+larger than any sane single file, so `PHOTO_BUDGET_KB` (default 3000) decides
+how much travels inside the page — spent smallest-file-first, which buys the
+most destinations and makes the cut deterministic rather than "whatever the
+manifest listed first".
+
+- `index.html` gets the inlined photographs **and** links to the rest at
+  `data/photos/<file>`. That path resolves off disk and on the deployed site,
+  where `vercel.json` copies the directory into the output.
+- `dist/planner.html` gets the inlined ones only. It is published as a single
+  file with nothing beside it, so a link would just be a guaranteed 404.
+
+Either way a photograph that fails to load is replaced by the drawn
+illustration, credit and all — `src/app.js` listens for the error and swaps in
+the canvas, and the smoke test drives the fragment to prove it.
+
+`WIDTH` in the fetcher is the other half of the size trade. It is recorded per
+file as `req`, so changing it refetches the whole set rather than leaving a mix
+of two sizes.
 
 **Illustrations** otherwise: `src/scene.js` draws an original picture from the
 landform that characterises each place. They are the permanent fallback for any

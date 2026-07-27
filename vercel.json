@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "node tools/build.mjs && mkdir -p public && cp index.html public/index.html",
+  "buildCommand": "node tools/build.mjs && mkdir -p public/data && cp index.html public/index.html && cp -r data/photos public/data/photos",
   "outputDirectory": "public",
   "cleanUrls": true,
   "headers": [

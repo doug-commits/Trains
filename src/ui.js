@@ -131,8 +131,8 @@ const UI = (() => {
    * fallback, so a half-populated photo set still looks finished. */
   function destinationArt(network, stationId, alt) {
     const photo = typeof Photos !== 'undefined' ? Photos.forStation(stationId) : null
-    if (photo) return Photos.figure(photo, alt)
     const kind = typeof Scene !== 'undefined' ? Scene.kindFor(network, LANDMARKS, stationId) : null
+    if (photo) return Photos.figure(photo, alt, kind ? { kind, seed: stationId } : null)
     if (!kind) return ''
     return `<canvas class="scene" data-scene="${esc(kind)}" data-seed="${esc(stationId)}"></canvas>`
   }
@@ -568,7 +568,7 @@ const UI = (() => {
           : ''
         const photo = typeof Photos !== 'undefined' ? Photos.forStation(p.to) : null
         const inner = photo
-          ? Photos.figure(photo, p.label)
+          ? Photos.figure(photo, p.label, p.scene ? { kind: p.scene, seed: p.sceneSeed || p.to } : null)
           : p.scene
             ? `<canvas class="scene" data-scene="${esc(p.scene)}" data-seed="${esc(p.sceneSeed || p.to)}"></canvas>`
             : ''
