@@ -80,7 +80,7 @@
   const panel = $('#panel')
   const tooltip = $('#tip')
 
-  const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS)
+  const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
   // to point the real pointer at a real place instead of sweeping the canvas.
   window.OverlandMap = map

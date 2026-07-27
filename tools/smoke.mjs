@@ -19,6 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const NETWORK = new Function(
   readFileSync(join(root, 'data/network.js'), 'utf8') + '; return NETWORK'
 )()
+const RAILS = JSON.parse(readFileSync(join(root, 'data/rails.json'), 'utf8'))
 const outDir = resolve(process.argv[2] || join(root, 'shots'))
 mkdirSync(outDir, { recursive: true })
 
@@ -869,6 +870,43 @@ function check(label, condition, detail = '') {
 
   await page.screenshot({ path: join(outDir, '06-mobile.png'), fullPage: false })
   await context.close()
+}
+
+/* --------------------------------------------- the track is the real track */
+{
+  const railPairs = new Set(
+    NETWORK.legs.filter(l => l.mode === 'rail').map(l => `${l.from}|${l.to}`)
+  )
+  const matched = Object.keys(RAILS)
+
+  check('rail legs carry real alignments', matched.length > 60,
+    `${matched.length} of ${railPairs.size} pairs`)
+  check('every alignment belongs to a rail leg that exists',
+    matched.every(k => railPairs.has(k)),
+    matched.filter(k => !railPairs.has(k)).join(' ') || 'all accounted for')
+  check('and each is a polyline, not two points',
+    matched.every(k => RAILS[k].length > 2))
+
+  /* The honest half. Natural Earth's railway data predates the Laos–China
+   * Railway, so we have no geometry for it — and a straight line saying "we
+   * know the endpoints, not the route" is the right answer. If a future data
+   * refresh ever fills these in, this flips, and it should be a deliberate
+   * change rather than a surprise. */
+  const lcr = ['kunming|mohan', 'mohan|boten', 'boten|nateuy', 'phonhong|vte_banthen']
+  check('the Laos–China Railway is left straight, not invented',
+    lcr.every(k => !RAILS[k]),
+    lcr.filter(k => RAILS[k]).join(' ') || 'none faked')
+
+  // A matched alignment must actually start and end at its two stations,
+  // or the drawn line would float away from the markers it connects.
+  const off = matched.filter(k => {
+    const [a, b] = k.split('|').map(id => NETWORK.stations[id])
+    const p = RAILS[k]
+    const near = (pt, s) => Math.abs(pt[0] - s.lon) < 0.02 && Math.abs(pt[1] - s.lat) < 0.02
+    return !(near(p[0], a) && near(p[p.length - 1], b))
+  })
+  check('every alignment is anchored to its own two stations', off.length === 0,
+    off.slice(0, 3).join(' ') || 'all anchored')
 }
 
 /* ------------------------------------------------------- the wheel zooms */

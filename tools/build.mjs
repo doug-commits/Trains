@@ -120,6 +120,7 @@ const photoJs = set => `const PHOTOS = ${JSON.stringify(set)};`
 const photos = loadPhotos()
 
 const basemap = readFileSync(join(root, 'data/basemap.json'), 'utf8').trim()
+const rails = readFileSync(join(root, 'data/rails.json'), 'utf8').trim()
 const fonts = read('src/fonts.css')
 const css = read('src/app.css')
 const shell = read('src/shell.html')
@@ -135,6 +136,7 @@ ${css}</style>
 "use strict";
 /* Built by tools/build.mjs — edit the files in src/ and data/, not this. */
 const BASEMAP = ${basemap};
+const RAILS = ${rails};
 ${photoJs(photoSet)}
 ${sources}
 })();

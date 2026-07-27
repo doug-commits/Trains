@@ -37,7 +37,7 @@ const MapView = (() => {
     }
   }
 
-  function create(canvas, network, basemap, landmarks = []) {
+  function create(canvas, network, basemap, landmarks = [], rails = {}) {
     const ctx = canvas.getContext('2d')
     let view = null
     let hit = { stations: [], segments: [] }
@@ -227,6 +227,17 @@ const MapView = (() => {
     function pathFor(leg) {
       const a = P(leg.from)
       const b = P(leg.to)
+
+      /* Where we have the real alignment, draw the real alignment. The Death
+       * Railway follows the Kwai because that is where it goes; the spine bends
+       * through Isan for the same reason. Legs with no geometry — the whole
+       * Laos–China Railway, which postdates this data — stay straight, which
+       * says plainly that we know the endpoints and not the route. */
+      const track = rails[`${leg.from}|${leg.to}`]
+      if (track) {
+        return { a, b, ctrl: null, via: track.map(([lon, lat]) => Proj.project(view, lon, lat)) }
+      }
+
       if (leg.mode !== 'ferry') return { a, b, ctrl: null }
       const mx = (a.x + b.x) / 2
       const my = (a.y + b.y) / 2
@@ -245,11 +256,54 @@ const MapView = (() => {
       ctx.lineCap = style.dash.length ? 'butt' : 'round'
       ctx.setLineDash(style.dash.map(d => d * (width / 3)))
       ctx.beginPath()
-      ctx.moveTo(p.a.x, p.a.y)
-      if (p.ctrl) ctx.quadraticCurveTo(p.ctrl.x, p.ctrl.y, p.b.x, p.b.y)
-      else ctx.lineTo(p.b.x, p.b.y)
+      if (p.via) {
+        ctx.moveTo(p.via[0].x, p.via[0].y)
+        for (let i = 1; i < p.via.length; i++) ctx.lineTo(p.via[i].x, p.via[i].y)
+      } else {
+        ctx.moveTo(p.a.x, p.a.y)
+        if (p.ctrl) ctx.quadraticCurveTo(p.ctrl.x, p.ctrl.y, p.b.x, p.b.y)
+        else ctx.lineTo(p.b.x, p.b.y)
+      }
       ctx.stroke()
       ctx.restore()
+    }
+
+    /* Cut a path off partway along, for the route's draw-in animation. A
+     * polyline has to be walked by length rather than lerped end to end, or a
+     * winding leg would animate at a wildly different speed from a straight
+     * one and arrive early. */
+    function truncate(p, frac) {
+      if (frac >= 1) return p
+      if (!p.via) {
+        return {
+          a: p.a,
+          ctrl: p.ctrl,
+          b: { x: p.a.x + (p.b.x - p.a.x) * frac, y: p.a.y + (p.b.y - p.a.y) * frac },
+        }
+      }
+      const seg = []
+      let total = 0
+      for (let i = 1; i < p.via.length; i++) {
+        const d = Math.hypot(p.via[i].x - p.via[i - 1].x, p.via[i].y - p.via[i - 1].y)
+        seg.push(d)
+        total += d
+      }
+      let want = total * frac
+      const out = [p.via[0]]
+      for (let i = 0; i < seg.length; i++) {
+        if (want >= seg[i]) {
+          out.push(p.via[i + 1])
+          want -= seg[i]
+          continue
+        }
+        const t = seg[i] ? want / seg[i] : 0
+        out.push({
+          x: p.via[i].x + (p.via[i + 1].x - p.via[i].x) * t,
+          y: p.via[i].y + (p.via[i + 1].y - p.via[i].y) * t,
+        })
+        break
+      }
+      return { a: p.a, b: out[out.length - 1], ctrl: null, via: out }
     }
 
     function drawIdleNetwork(usedLegs) {
@@ -328,18 +382,7 @@ const MapView = (() => {
         steps.forEach((step, k) => {
           if (k >= cut) return
           const partial = Math.min(1, cut - k)
-          const p = pathFor(step)
-          const end =
-            partial >= 1
-              ? p
-              : {
-                  a: p.a,
-                  ctrl: p.ctrl,
-                  b: {
-                    x: p.a.x + (p.b.x - p.a.x) * partial,
-                    y: p.a.y + (p.b.y - p.a.y) * partial,
-                  },
-                }
+          const end = truncate(pathFor(step), partial)
           // Halo keeps the line legible where it crosses a coastline.
           strokePath(end, style, colors.sea, style.width + 4, dim ? 0.35 : 0.9)
           strokePath(end, style, color, focused ? style.width + 1.6 : style.width, dim ? 0.35 : 1)
