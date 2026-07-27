@@ -1209,6 +1209,88 @@ table { width: 100%; border-collapse: collapse; }
 }
 .ask-go:hover { filter: brightness(1.1); }
 
+/* How often the thing runs. Sits under the service name, quieter than the
+   service but louder than a note, because on a once-a-day boat it is the most
+   important fact on the row. */
+.freq {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.freq b { color: var(--ink-soft); font-weight: 600; }
+.freq.none { font-style: italic; opacity: 0.75; }
+.freq .last {
+  color: var(--alert);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Day by day. A shape for the journey, not a timetable. */
+.days { display: grid; gap: 0.5rem; }
+.day {
+  padding: 0.6rem 0.7rem;
+  background: var(--raise);
+  border-left: 2px solid var(--panel-edge);
+  border-radius: 2px;
+}
+.day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+.day-n {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rail);
+}
+.day-hours {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.day-legs { margin: 0; padding: 0; list-style: none; }
+.day-legs li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.day-legs li .mode-dot { align-self: center; }
+.day-legs b { color: var(--ink); font-weight: 600; }
+.day-legs .arrow { color: var(--muted); }
+.day-legs .d-svc {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.day-legs .d-time {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.night {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.night.sleeper { color: var(--rail); }
+.night.end { color: var(--ink-soft); font-weight: 600; }
+
 /* What it decided, shown rather than assumed — including the road gap it
    cannot cover, which is the part that would otherwise be a nasty surprise. */
 .ask-note {

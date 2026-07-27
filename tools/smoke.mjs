@@ -276,6 +276,49 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ---------------------------------------------- frequency and the day plan
+ * The nearest thing to a timetable this project will produce, and the point of
+ * the exercise is what it refuses to say. A frequency and a last sailing are
+ * structural; a departure time is a date-specific fact nobody here publishes,
+ * and stating one would be the single most dangerous thing on the page. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+
+  // A route with a once-or-twice-a-day boat and a hard last sailing.
+  await page.fill('#askbox', 'bangkok to koh samet')
+  await page.click('#askgo')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const freqs = await page.locator('.route .freq').count()
+  const legs = await page.locator('.route tr.leg').count()
+  check('every leg says how often it runs', freqs === legs, `${freqs} of ${legs}`)
+  check('nothing is left as "not recorded"',
+    (await page.locator('.route .freq.none').count()) === 0)
+
+  const lastCalls = await page.locator('.route .freq .last').allTextContents()
+  check('the last sailing is called out', lastCalls.length > 0, lastCalls.join(', '))
+
+  const panelText = await page.textContent('#panel')
+  check('and it is still not pretending to be a timetable',
+    /not departures/i.test(panelText) && /publish nothing in common/i.test(panelText))
+
+  // The day plan must agree with the day count in the headline stats.
+  const dayCards = await page.locator('.days .day').count()
+  const statDays = await page.evaluate(() => {
+    const stat = [...document.querySelectorAll('.stat')].find(s => /days?/.test(s.textContent))
+    return stat ? Number(stat.querySelector('b').textContent) : null
+  })
+  check('the day plan agrees with the day count', dayCards === statDays, `${dayCards} cards, ${statDays} in stats`)
+  check('every day but the last says where the night goes',
+    (await page.locator('.days .night').count()) === dayCards)
+
+  await page.screenshot({ path: join(outDir, '25-schedule.png'), fullPage: false })
+  await context.close()
+}
+
 /* --------------------------------- the fragment, which has no assets beside it
  * dist/planner.html is published as one file. Any photograph the build linked
  * rather than embedded cannot resolve there, so every one of them must come

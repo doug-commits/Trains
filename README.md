@@ -52,6 +52,27 @@ stranded at Padang Besar overnight. So it gives you legs, operators, running
 times, buffers and booking links, and tells you to read the real clock on the
 operator's site.
 
+**What it gives instead is frequency**, which is the number people actually
+need. "Every 30 minutes" and "two or three sailings a week" are different
+journeys, and the difference decides whether a missed connection costs an hour
+or three days. Every leg carries a `daily` count — from the leg where the route
+makes it specific, from the operator where it is a property of the mode — and a
+**last departure** where missing it strands you: the 17:00 boat off Ban Phe, the
+16:00 from Satun, the 21:30 jetty run to Boracay.
+
+A frequency changes with a timetable revision once or twice a year. A departure
+time is specific to a date, a direction and a day of the week. That is the whole
+line, and it is why 2GO's Manila sailings say *"2–3 a week — a shipping line,
+not a ferry"* rather than a time.
+
+The **Day by day** block is the same discipline applied to the whole journey:
+which legs fall on which day, how many hours each costs, and where the night
+goes — aboard a sleeper or in a bed. It is computed from running times, the
+connection buffers and your chosen pace, and it states no departure anywhere.
+Board a 22-hour overnight and it gives you a card for the morning you actually
+step off, because calling that "one day" invites someone to book a connection
+for that evening.
+
 Every leg carries a confidence label — **structural** (gauges, which stations
 exist, who stamps where), **reported** (consistent across operator pages, Seat61
 and Richard Barrow's Thai train guide), or **verify** (volatile, or known to

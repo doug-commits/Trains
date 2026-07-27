@@ -1323,6 +1323,88 @@ table { width: 100%; border-collapse: collapse; }
 }
 .ask-go:hover { filter: brightness(1.1); }
 
+/* How often the thing runs. Sits under the service name, quieter than the
+   service but louder than a note, because on a once-a-day boat it is the most
+   important fact on the row. */
+.freq {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.freq b { color: var(--ink-soft); font-weight: 600; }
+.freq.none { font-style: italic; opacity: 0.75; }
+.freq .last {
+  color: var(--alert);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Day by day. A shape for the journey, not a timetable. */
+.days { display: grid; gap: 0.5rem; }
+.day {
+  padding: 0.6rem 0.7rem;
+  background: var(--raise);
+  border-left: 2px solid var(--panel-edge);
+  border-radius: 2px;
+}
+.day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+.day-n {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rail);
+}
+.day-hours {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.day-legs { margin: 0; padding: 0; list-style: none; }
+.day-legs li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.day-legs li .mode-dot { align-self: center; }
+.day-legs b { color: var(--ink); font-weight: 600; }
+.day-legs .arrow { color: var(--muted); }
+.day-legs .d-svc {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.day-legs .d-time {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.night {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.night.sleeper { color: var(--rail); }
+.night.end { color: var(--ink-soft); font-weight: 600; }
+
 /* What it decided, shown rather than assumed — including the road gap it
    cannot cover, which is the part that would otherwise be a nasty surprise. */
 .ask-note {
@@ -1561,115 +1643,115 @@ const NETWORK = {
   operators: {
     // --- rail
     lcr:   { name: 'Laos–China Railway', short: 'LCR', mono: 'LCR', livery: '#c8102e', ink: '#fff',
-             gauge: 'standard', punctual: 'good', book: null, bookVia: 'aggregator',
+             gauge: 'standard', daily: { n: '6–8', spread: 'through the day; only a couple cross the Chinese border' }, punctual: 'good', book: null, bookVia: 'aggregator',
              bookNote: 'Station counters and the Lao ticketing app. From abroad an agent or aggregator is the practical route in — this is the hardest ticket in the region to buy independently, and the sale window is short.',
              note: 'Chinese-operated, keeps time. The risk is ticket availability, not delay.' },
     srt:   { name: 'State Railway of Thailand', short: 'SRT', mono: 'SRT', livery: '#e4002b', ink: '#fff',
-             gauge: 'metre', punctual: 'poor', book: 'https://dticket.railway.co.th',
+             gauge: 'metre', daily: { n: 'several', spread: 'day and overnight departures on the main lines; branch lines get one or two' }, punctual: 'poor', book: 'https://dticket.railway.co.th',
              bookNote: 'The official e-ticket site. Foreign cards fail on it fairly often, and an aggregator is the usual fallback when they do.',
              note: 'Long-distance services routinely run 30–90 min late. Southbound to Hat Yai is the worst offender.' },
     ktmb:  { name: 'KTMB', short: 'KTMB', mono: 'KTM', livery: '#003da5', ink: '#fff',
-             gauge: 'metre', punctual: 'good', book: 'https://online.ktmb.com.my',
+             gauge: 'metre', daily: { n: 'frequent', spread: 'ETS runs through the day on the west coast; the Jungle Railway does not' }, punctual: 'good', book: 'https://online.ktmb.com.my',
              bookNote: 'Reliable and genuinely bookable from abroad. Use it directly rather than a reseller — you gain nothing by going through one.',
              note: 'Genuinely punctual. You can plan to it.' },
     rrc:   { name: 'Royal Railway Cambodia', short: 'Royal', mono: 'RRC', livery: '#b8912f', ink: '#1a1a1a',
-             gauge: 'metre', punctual: 'poor', book: 'https://www.royal-railway.com',
+             gauge: 'metre', daily: { n: '0–2', spread: 'selected days only — confirm the train runs on your date before anything else' }, punctual: 'poor', book: 'https://www.royal-railway.com',
              bookNote: 'Schedule changes are announced informally, often on Facebook rather than the site. Confirm the train runs on your date before you plan anything around it.',
              note: 'Limited frequency — often weekends plus selected days, not daily.' },
     dsvn:  { name: 'Vietnam Railways', short: 'DSVN', mono: 'DSVN', livery: '#0f6baf', ink: '#fff',
-             gauge: 'metre', punctual: 'fair', book: 'https://dsvn.vn',
+             gauge: 'metre', daily: { n: '5–6', spread: 'the Reunification services, spread across the day and night' }, punctual: 'fair', book: 'https://dsvn.vn',
              bookNote: 'dsvn.vn is the genuine official site. Several convincing lookalike domains are resellers, so check the address bar before you pay.',
              note: 'The private carriages attached to these trains — Livitrans, Violette, Lotus — are usually the better product.' },
     kai:   { name: 'KAI', short: 'KAI', mono: 'KAI', livery: '#1b3a8c', ink: '#fff',
-             gauge: 'metre', punctual: 'good', book: 'https://booking.kai.id',
+             gauge: 'metre', daily: { n: 'frequent', spread: 'Java\'s main corridors run all day' }, punctual: 'good', book: 'https://booking.kai.id',
              bookNote: 'Good site, bookable from abroad. The Access by KAI app is easier once you are in Indonesia.',
              note: 'The best rail in Southeast Asia — punctual, cheap, scenic.' },
     pnr:   { name: 'Philippine National Railways', short: 'PNR', mono: 'PNR', livery: '#1f7a3d', ink: '#fff',
-             gauge: 'cape', punctual: 'poor', book: null, bookVia: 'counter',
+             gauge: 'cape', daily: { n: 2, spread: 'when it is running at all' }, punctual: 'poor', book: null, bookVia: 'counter',
              bookNote: 'Tickets at the station on the day. There is no usable online booking and no reason to plan a connection around one.',
              note: 'What is left of it. The Manila commuter line is closed for the North–South Commuter Railway works and the Bicol shuttles run when they run — the only Philippine operator on this map whose services you should confirm the week you travel.' },
 
     // --- sea
     lomprayah:     { name: 'Lomprayah', short: 'Lomprayah', mono: 'LOM', livery: '#00868b', ink: '#fff',
-                     punctual: 'weather', book: 'https://www.lomprayah.com',
+                     daily: { n: '2–3', spread: 'timed off the overnight trains from Bangkok; nothing after mid-afternoon' }, punctual: 'weather', book: 'https://www.lomprayah.com',
                      bookNote: 'Sells combined train-plus-boat tickets from Bangkok, which removes the transfer problem entirely.',
                      note: 'Catamarans, timed off the overnight trains into Chumphon.' },
     rajaferry:     { name: 'Raja Ferry', short: 'Raja', mono: 'RAJA', livery: '#e07b28', ink: '#1a1a1a',
-                     punctual: 'weather', book: 'https://www.rajaferryport.com',
+                     daily: { n: 'every 1–2 hours', spread: '05:00 to 19:00' }, punctual: 'weather', book: 'https://www.rajaferryport.com',
                      bookNote: 'Vehicle ferry, frequent, rarely sold out. Combined train-bus-boat tickets are widely sold.', note: '' },
     asdp:          { name: 'ASDP Indonesia Ferry', short: 'ASDP', mono: 'ASDP', livery: '#0e4c92', ink: '#fff',
-                     punctual: 'weather', book: 'https://ferizy.com',
+                     daily: { n: 'every 30–60 min', spread: 'around the clock on the main crossings' }, punctual: 'weather', book: 'https://ferizy.com',
                      bookNote: 'Ferizy is ASDP\'s official booking platform. Crossings are frequent enough that walking up usually works too.', note: '' },
     penangferry:   { name: 'Penang Ferry', short: 'Penang Ferry', mono: 'PGF', livery: '#4f7f3a', ink: '#fff',
-                     punctual: 'good', book: null, bookVia: 'counter',
+                     daily: { n: 'every 20–30 min', spread: '06:00 to midnight' }, punctual: 'good', book: null, bookVia: 'counter',
                      bookNote: 'Pay at the terminal beside Butterworth station. A few ringgit, no booking, no queue worth worrying about.', note: '' },
     langkawiferry: { name: 'Langkawi ferry lines', short: 'Langkawi Ferry', mono: 'LGK', livery: '#1b7fa8', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     daily: { n: 'several', spread: 'daylight hours only, and they stop early' }, punctual: 'weather', book: null, bookVia: 'aggregator',
                      bookNote: 'Several small operators share these routes and their own sites come and go. An aggregator is the reliable way to see what is actually sailing on your date.', note: '' },
     mekongboat:    { name: 'Mekong slow boat', short: 'Slow boat', mono: 'MEK', livery: '#8a6a3b', ink: '#fff',
-                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     daily: { n: 1, spread: 'one boat a day, leaving around 09:00 and not waiting' }, punctual: 'fair', book: null, bookVia: 'aggregator',
                      bookNote: 'Bought through guesthouses and agents in Huay Xai, or an aggregator. Buy the day before — it leaves early and does not wait.', note: '' },
     tonlesap:      { name: 'Tonlé Sap boat', short: 'Tonlé Sap', mono: 'TSB', livery: '#4e7a6b', ink: '#fff',
-                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     daily: { n: 1, spread: 'one morning departure, and only when the lake is high' }, punctual: 'fair', book: null, bookVia: 'aggregator',
                      bookNote: 'Sold through guesthouses and aggregators. Only runs when the lake is high, roughly August to March.', note: '' },
     speedferry:    { name: 'Speed Ferry Cambodia', short: 'Speed Ferry', mono: 'SFC', livery: '#2e7da8', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'counter', bookNote: 'Bought at the Sihanoukville pier or through your guesthouse.', note: '' },
+                     daily: { n: '4–6', spread: '08:00 to 18:00' }, punctual: 'weather', book: null, bookVia: 'counter', bookNote: 'Bought at the Sihanoukville pier or through your guesthouse.', note: '' },
     hangchau:      { name: 'Hang Chau / Blue Cruiser', short: 'Mekong boat', mono: 'HC', livery: '#7a5c9e', ink: '#fff',
-                     punctual: 'fair', book: null, bookVia: 'aggregator',
+                     daily: { n: 2, spread: 'morning departures only' }, punctual: 'fair', book: null, bookVia: 'aggregator',
                      bookNote: 'Sold as a through ticket that includes the border formalities. Aggregators carry both operators.', note: '' },
     riauferry:     { name: 'Riau / Straits ferries', short: 'Straits ferry', mono: 'RIAU', livery: '#3e7b8c', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     daily: { n: 'several', spread: 'daylight hours; the international routes far less often' }, punctual: 'weather', book: null, bookVia: 'aggregator',
                      bookNote: 'Operators on the Straits routes change often. Check what is currently sailing before you commit to a date.', note: '' },
     localferry:    { name: 'Local ferry', short: 'Local ferry', mono: 'FRY', livery: '#4b7c8c', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'counter',
+                     daily: { n: 'several', spread: 'through daylight hours — check the last departure when you arrive' }, punctual: 'weather', book: null, bookVia: 'counter',
                      bookNote: 'Bought at the pier. Turn up, check the last departure when you arrive, and do not be the one still on the dock.', note: '' },
     twogo:         { name: '2GO Travel', short: '2GO', mono: '2GO', livery: '#0a5ba8', ink: '#fff',
-                     punctual: 'weather', book: 'https://travel.2go.com.ph',
+                     daily: { n: '1–3 a week', spread: 'a shipping line, not a ferry — check the sailing list first' }, punctual: 'weather', book: 'https://travel.2go.com.ph',
                      bookNote: 'The Philippines\' main long-haul shipping line, and genuinely bookable from abroad. Cabin classes are worth the small difference over the open tourist deck on anything overnight.',
                      note: 'Manila to Cebu, Iloilo, Cagayan de Oro and Palawan — one or two nights aboard, not a hop.' },
     oceanjet:      { name: 'OceanJet', short: 'OceanJet', mono: 'OJ', livery: '#0f8ab0', ink: '#fff',
-                     punctual: 'weather', book: 'https://www.oceanjet.net',
+                     daily: { n: 'several', spread: 'roughly hourly on Cebu–Bohol, less on the rest' }, punctual: 'weather', book: 'https://www.oceanjet.net',
                      bookNote: 'Books online. The Cebu–Bohol sailings fill at weekends and around holidays; the rest of the network is usually walk-up.',
                      note: 'Fast craft around the Visayas — Cebu, Bohol, Dumaguete, Siquijor. This is the network that makes island-hopping there feel like a bus timetable.' },
     montenegro:    { name: 'Montenegro Shipping Lines', short: 'Montenegro', mono: 'MSL', livery: '#1d5c3a', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     daily: { n: 'several', spread: 'frequent on the Batangas routes, once or twice a day on the long ones' }, punctual: 'weather', book: null, bookVia: 'aggregator',
                      bookNote: 'RORO ferries sold at the port, or through a Philippine ferry aggregator. Sailings are frequent enough on the Batangas routes that turning up works.',
                      note: 'The workhorse of the Nautical Highway — vehicle ferries that carry the buses across the straits.' },
     roro:          { name: 'Nautical Highway RORO', short: 'RORO', mono: 'RORO', livery: '#8a5c2e', ink: '#fff',
-                     punctual: 'weather', book: null, bookVia: 'counter',
+                     daily: { n: 'every 1–2 hours', spread: 'through the day, suspended entirely under a typhoon signal' }, punctual: 'weather', book: null, bookVia: 'counter',
                      bookNote: 'Pay at the port terminal, usually minutes before sailing. If you are on a through bus your ferry ticket is already in the fare.',
                      note: 'The short island-to-island crossings the Strong Republic Nautical Highway is built from. Frequent, cheap, and suspended outright when a typhoon signal is raised.' },
 
     // --- road
     greenbus:  { name: 'Green Bus', short: 'Green Bus', mono: 'GRN', livery: '#2e7d32', ink: '#fff',
-                 punctual: 'fair', book: 'https://www.greenbusthailand.com',
+                 daily: { n: 'several', spread: '06:30 to 17:00 on most routes' }, punctual: 'fair', book: 'https://www.greenbusthailand.com',
                  bookNote: 'Northern Thailand\'s main intercity operator, bookable online and comfortable enough.', note: '' },
     damri:     { name: 'Damri', short: 'Damri', mono: 'DMR', livery: '#c1272d', ink: '#fff',
-                 punctual: 'fair', book: 'https://damri.co.id',
+                 daily: { n: 'frequent', spread: 'through the day, often sold with the ferry' }, punctual: 'fair', book: 'https://damri.co.id',
                  bookNote: 'Indonesia\'s state bus operator. Often sold as a through ticket with the ferry.', note: '' },
     giantibis: { name: 'Giant Ibis', short: 'Giant Ibis', mono: 'GI', livery: '#6b4e3d', ink: '#fff',
-                 punctual: 'fair', book: 'https://www.giantibis.com',
+                 daily: { n: '4–6', spread: 'morning and overnight departures' }, punctual: 'fair', book: 'https://www.giantibis.com',
                  bookNote: 'Handles the border formalities as a group and is worth the small premium over the local buses.', note: '' },
     philtranco: { name: 'Philtranco', short: 'Philtranco', mono: 'PHT', livery: '#c8471f', ink: '#fff',
-                 punctual: 'fair', book: null, bookVia: 'counter',
+                 daily: { n: 'several', spread: 'through the day and overnight' }, punctual: 'fair', book: null, bookVia: 'counter',
                  bookNote: 'Booked at the terminal — PITX in Manila for anything southbound. Buy the day before for the Bicol and Mindanao runs; same day is fine for the rest.',
                  note: 'The operator that actually runs Manila to Davao, ferries included, as one ticket. Two and a half days in a seat, and the reason the Nautical Highway exists.' },
     victoryliner: { name: 'Victory Liner', short: 'Victory Liner', mono: 'VL', livery: '#1c4f9c', ink: '#fff',
-                 punctual: 'fair', book: null, bookVia: 'counter',
+                 daily: { n: 'frequent', spread: 'around the clock on the Baguio run' }, punctual: 'fair', book: null, bookVia: 'counter',
                  bookNote: 'Terminal counters in Manila (Cubao, Pasay) and online through the operator\'s own booking pages when they are up. The Baguio deluxe services are worth reserving.',
                  note: 'Northern Luzon\'s main intercity operator.' },
     ceres:     { name: 'Ceres Liner', short: 'Ceres', mono: 'CRS', livery: '#e0a300', ink: '#1a1a1a',
-                 punctual: 'fair', book: null, bookVia: 'counter',
+                 daily: { n: 'every 30–60 min', spread: 'through the day; they simply run another bus' }, punctual: 'fair', book: null, bookVia: 'counter',
                  bookNote: 'Pay the conductor on board or at the terminal. Nothing to reserve and nothing that sells out — they simply run another bus.',
                  note: 'Yellow buses all over the Visayas and Mindanao, frequent enough that a timetable is beside the point.' },
     coach:     { name: 'Long-distance coach', short: 'Coach', mono: 'BUS', livery: '#8c7b6b', ink: '#fff',
-                 punctual: 'fair', book: null, bookVia: 'aggregator',
+                 daily: { n: 'several', spread: 'through the day, with overnight departures on the long runs' }, punctual: 'fair', book: null, bookVia: 'aggregator',
                  bookNote: 'Several operators run these corridors at varying quality. An aggregator is the sane way to compare them.', note: '' },
     transfer:  { name: 'Local transfer', short: 'Transfer', mono: 'TRF', livery: '#6e828c', ink: '#fff',
-                 punctual: 'fair', book: null, bookVia: 'counter',
+                 daily: { n: 'on demand', spread: 'taxis, tuk-tuks and songthaews wait at the station; nothing to time' }, punctual: 'fair', book: null, bookVia: 'counter',
                  bookNote: 'Taxi, tuk-tuk, songthaew or minivan at the station. Agree the fare before you get in.', note: '' },
     metro:     { name: 'Urban metro', short: 'Metro', mono: 'MTR', livery: '#4a6b8a', ink: '#fff',
-                 punctual: 'good', book: null, bookVia: 'counter',
+                 daily: { n: 'every few minutes', spread: 'roughly 06:00 to midnight' }, punctual: 'good', book: null, bookVia: 'counter',
                  bookNote: 'Contactless or a stored-value card at the station. Nothing to plan.', note: '' },
   },
 
@@ -2021,28 +2103,28 @@ const NETWORK = {
    */
   legs: [
     // === Laos–China Railway (standard gauge) ============================
-    { from: 'kunming', to: 'mohan', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 4.5, usd: 40, cls: '2nd class seat', confidence: 'reported' },
+    { from: 'kunming', to: 'mohan', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 4.5, usd: 40, cls: '2nd class seat', daily: { n: 4, spread: 'through the day; the cross-border pair are morning departures' }, confidence: 'reported' },
     { from: 'mohan', to: 'boten', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.4, usd: 3, border: 'boten', confidence: 'structural' },
-    { from: 'boten', to: 'nateuy', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
+    { from: 'boten', to: 'nateuy', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, daily: { n: 6, spread: 'spread across the day' }, confidence: 'reported' },
     { from: 'nateuy', to: 'namo', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.3, usd: 2, confidence: 'reported' },
     { from: 'namo', to: 'oudomxay', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.3, usd: 3, confidence: 'reported' },
     { from: 'oudomxay', to: 'nga', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
     { from: 'nga', to: 'luangprabang', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
-    { from: 'luangprabang', to: 'kasi', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, scenic: true, confidence: 'reported' },
+    { from: 'luangprabang', to: 'kasi', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, scenic: true, daily: { n: 8, spread: 'roughly every two hours, first around 07:00, last around 19:00' }, confidence: 'reported' },
     { from: 'kasi', to: 'vangvieng', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, scenic: true, confidence: 'reported' },
     { from: 'vangvieng', to: 'phonhong', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
-    { from: 'phonhong', to: 'vte_banthen', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, confidence: 'reported' },
+    { from: 'phonhong', to: 'vte_banthen', mode: 'rail', op: 'lcr', service: 'Laos–China Railway EMU', hours: 0.5, usd: 4, daily: { n: 8, spread: 'roughly every two hours' }, confidence: 'reported' },
 
     // === The Vientiane gauge break =====================================
     { from: 'vte_banthen', to: 'vte_khamsavath', mode: 'road', op: 'transfer', service: 'Taxi across Vientiane', hours: 0.75, usd: 12, essential: true, km: 15,
-      confidence: 'structural',
+      daily: { n: 'on demand', spread: 'taxis wait for arrivals; a full train empties the rank in minutes' }, confidence: 'structural',
       note: 'Two unconnected railways on two gauges, 15 km apart. There is no rail link and there will not be one soon. Expect a taxi queue when a full train empties out.' },
 
     // === Thai–Lao metre gauge ==========================================
-    { from: 'vte_khamsavath', to: 'nongkhai', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 0.4, usd: 2, border: 'nongkhai', confidence: 'structural' },
+    { from: 'vte_khamsavath', to: 'nongkhai', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 0.4, usd: 2, border: 'nongkhai', daily: { n: 4, spread: 'two shuttles and two through trains' }, confidence: 'structural' },
 
     // === SRT northeast =================================================
-    { from: 'nongkhai', to: 'udonthani', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 1.0, usd: 3, confidence: 'reported' },
+    { from: 'nongkhai', to: 'udonthani', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 1.0, usd: 3, daily: { n: 5, spread: 'two by day, three overnight to Bangkok' }, confidence: 'reported' },
     { from: 'udonthani', to: 'khonkaen', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 2.0, usd: 6, confidence: 'reported' },
     { from: 'khonkaen', to: 'korat', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 3.0, usd: 9, confidence: 'reported' },
     { from: 'korat', to: 'pakchong', mode: 'rail', op: 'srt', service: 'Rapid 133/134 · Special Express 25/26', hours: 1.5, usd: 5, confidence: 'reported' },
@@ -2052,23 +2134,23 @@ const NETWORK = {
     { from: 'surin', to: 'ubon', mode: 'rail', op: 'srt', service: 'Special Express / Rapid (Isaan)', hours: 2.5, usd: 5, confidence: 'reported' },
 
     // === SRT north =====================================================
-    { from: 'bkk_aphiwat', to: 'ayutthaya', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 1.3, usd: 2, confidence: 'reported' },
+    { from: 'bkk_aphiwat', to: 'ayutthaya', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 1.3, usd: 2, daily: { n: 20, spread: 'hourly or better — the busiest stretch of Thai railway' }, confidence: 'reported' },
     { from: 'ayutthaya', to: 'lopburi', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 1, usd: 3, confidence: 'reported' },
     { from: 'lopburi', to: 'phitsanulok', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 2.5, usd: 8, confidence: 'reported' },
-    { from: 'phitsanulok', to: 'lampang', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 5, usd: 15, sleeper: true, scenic: true, confidence: 'reported',
+    { from: 'phitsanulok', to: 'lampang', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 5, usd: 15, sleeper: true, scenic: true, daily: { n: 6, spread: 'three by day, three overnight' }, confidence: 'reported',
       note: 'Trains 9/10 are the region\'s best sleeper. 2nd class A/C lower berth is the value sweet spot.' },
-    { from: 'lampang', to: 'chiangmai', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 2.5, usd: 7, scenic: true, confidence: 'reported' },
+    { from: 'lampang', to: 'chiangmai', mode: 'rail', op: 'srt', service: 'Special Express 9/10 · northern line', hours: 2.5, usd: 7, scenic: true, daily: { n: 6, spread: 'three by day, three overnight' }, confidence: 'reported' },
 
     // === Death Railway branch ==========================================
     { from: 'bkk_aphiwat', to: 'bkk_thonburi', mode: 'road', op: 'transfer', service: 'Taxi / MRT across Bangkok', hours: 0.6, usd: 5, essential: true, confidence: 'structural' },
-    { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, confidence: 'reported' },
-    { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, confidence: 'reported',
+    { from: 'bkk_thonburi', to: 'kanchanaburi', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.5, usd: 3, scenic: true, daily: { n: 2, spread: 'morning and afternoon' }, confidence: 'reported' },
+    { from: 'kanchanaburi', to: 'namtok', mode: 'rail', op: 'srt', service: 'Ordinary 257/259', hours: 2.0, usd: 2, scenic: true, daily: { n: 3, spread: 'timed for the day trip from Bangkok' }, confidence: 'reported',
       note: 'The Death Railway. The Wampo viaduct section is the reason to take it.' },
 
     // === SRT east — Cambodia ===========================================
     { from: 'bkk_aphiwat', to: 'bkk_hualamphong', mode: 'road', op: 'metro', service: 'MRT Blue Line, 2 stops', hours: 0.4, usd: 1, essential: true, confidence: 'structural' },
-    { from: 'bkk_hualamphong', to: 'chachoengsao', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 1.5, usd: 0.6, cls: '3rd class fan', confidence: 'reported' },
-    { from: 'chachoengsao', to: 'aranyaprathet', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 4, usd: 1.4, cls: '3rd class fan', confidence: 'reported' },
+    { from: 'bkk_hualamphong', to: 'chachoengsao', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 1.5, usd: 0.6, cls: '3rd class fan', daily: { n: 10, spread: 'ordinary trains through the day' }, confidence: 'reported' },
+    { from: 'chachoengsao', to: 'aranyaprathet', mode: 'rail', op: 'srt', service: 'Ordinary 275/279', hours: 4, usd: 1.4, cls: '3rd class fan', daily: { n: 2, spread: 'one each way, morning and afternoon — miss it and it is a bus', last: '13:00' }, confidence: 'reported' },
     { from: 'aranyaprathet', to: 'poipet', mode: 'road', op: 'transfer', service: 'Tuk-tuk / on foot through the border complex', hours: 0.5, usd: 2, essential: true, border: 'poipet', confidence: 'structural' },
     { from: 'poipet', to: 'sisophon', mode: 'rail', op: 'rrc', service: 'Royal Railway northern line', hours: 1, usd: 1.5, confidence: 'verify',
       note: 'Verify the train runs at all on your date — frequency is often weekends plus selected days.' },
@@ -2082,19 +2164,19 @@ const NETWORK = {
       note: 'No railway exists on this corridor and none is under construction. This is a bus, and calling it anything else would be dishonest.' },
 
     // === SRT south =====================================================
-    { from: 'bkk_aphiwat', to: 'huahin', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 3.5, usd: 9, confidence: 'reported' },
+    { from: 'bkk_aphiwat', to: 'huahin', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 3.5, usd: 9, daily: { n: 8, spread: 'four by day and four overnight southbound' }, confidence: 'reported' },
     { from: 'huahin', to: 'prachuap', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 1.5, usd: 4, confidence: 'reported' },
-    { from: 'prachuap', to: 'chumphon', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 2.5, usd: 7, sleeper: true, confidence: 'reported' },
+    { from: 'prachuap', to: 'chumphon', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 2.5, usd: 7, sleeper: true, daily: { n: 8, spread: 'mostly overnight southbound' }, confidence: 'reported' },
     { from: 'chumphon', to: 'suratthani', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 2.5, usd: 7, confidence: 'reported' },
     { from: 'suratthani', to: 'phatthalung', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 3.5, usd: 9, confidence: 'reported' },
     { from: 'phatthalung', to: 'hatyai', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 1.5, usd: 4, confidence: 'reported' },
     { from: 'suratthani', to: 'trang', mode: 'rail', op: 'srt', service: 'Trang branch via Thung Song', hours: 3.5, usd: 9, confidence: 'reported' },
-    { from: 'hatyai', to: 'padangbesar', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 1.0, usd: 3, border: 'padangbesar', confidence: 'reported' },
+    { from: 'hatyai', to: 'padangbesar', mode: 'rail', op: 'srt', service: 'Special Express 45/46 (Bangkok – Padang Besar)', hours: 1.0, usd: 3, border: 'padangbesar', daily: { n: 4, spread: 'two SRT shuttles and two through services', last: '17:00' }, confidence: 'reported' },
     { from: 'hatyai', to: 'sungaikolok', mode: 'rail', op: 'srt', service: 'Rapid / Ordinary', hours: 4.0, usd: 6, advisory: 'deepsouth', confidence: 'reported' },
 
     // === Thai island branches ==========================================
     { from: 'suratthani', to: 'donsak', mode: 'road', op: 'transfer', service: 'Connecting bus from Phun Phin station', hours: 1.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'donsak', to: 'kohsamui', mode: 'ferry', op: 'rajaferry', service: 'Raja / Seatran vehicle ferry', hours: 1.5, usd: 6, seasonal: 'gulf', confidence: 'reported',
+    { from: 'donsak', to: 'kohsamui', mode: 'ferry', op: 'rajaferry', service: 'Raja / Seatran vehicle ferry', hours: 1.5, usd: 6, seasonal: 'gulf', daily: { n: 'every 1–2 hours', spread: '05:00 to 19:00', last: '19:00' }, confidence: 'reported',
       note: 'Combined train + bus + ferry tickets are widely sold and remove most of the friction.' },
     { from: 'trang', to: 'kohlanta', mode: 'ferry', op: 'localferry', service: 'Minivan to pier, then ferry', hours: 3.0, usd: 15, seasonal: 'andaman', confidence: 'verify' },
     { from: 'chumphon', to: 'ranong', mode: 'road', op: 'coach', service: 'Local bus', hours: 3.0, usd: 5, confidence: 'reported' },
@@ -2105,20 +2187,20 @@ const NETWORK = {
     { from: 'rantaupanjang', to: 'wakafbaharu', mode: 'road', op: 'transfer', service: 'Local taxi / bus', hours: 0.75, usd: 6, essential: true, confidence: 'reported' },
     { from: 'wakafbaharu', to: 'dabong', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 3, usd: 2.5, scenic: true, confidence: 'reported' },
     { from: 'dabong', to: 'guamusang', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 2, usd: 2, scenic: true, confidence: 'reported' },
-    { from: 'guamusang', to: 'kualalipis', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 2, usd: 1.5, scenic: true, confidence: 'reported' },
+    { from: 'guamusang', to: 'kualalipis', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 2, usd: 1.5, scenic: true, daily: { n: 2, spread: 'the day Shuttle Timuran and the overnight' }, confidence: 'reported' },
     { from: 'kualalipis', to: 'jerantut', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 1.5, usd: 1.5, scenic: true, confidence: 'reported',
       note: 'Slow, scenic, cult status. Take it because the journey is the point, not to get anywhere.' },
     { from: 'jerantut', to: 'gemas', mode: 'rail', op: 'ktmb', service: 'Shuttle Timuran (Jungle Railway)', hours: 4.5, usd: 4.5, scenic: true, confidence: 'reported' },
 
     // === KTMB west coast spine =========================================
-    { from: 'padangbesar', to: 'arau', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.4, usd: 2, confidence: 'reported' },
+    { from: 'padangbesar', to: 'arau', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.4, usd: 2, daily: { n: 8, spread: 'ETS through the day, first around 06:00' }, confidence: 'reported' },
     { from: 'arau', to: 'alorsetar', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.6, usd: 2, confidence: 'reported' },
     { from: 'alorsetar', to: 'sungaipetani', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.6, usd: 2, confidence: 'reported' },
     { from: 'sungaipetani', to: 'butterworth', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.7, usd: 2, confidence: 'reported' },
     { from: 'butterworth', to: 'taiping', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 0.8, usd: 3, confidence: 'reported' },
-    { from: 'taiping', to: 'ipoh', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 1, usd: 4, confidence: 'reported' },
-    { from: 'ipoh', to: 'klsentral', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 2.3, usd: 10, confidence: 'reported' },
-    { from: 'klsentral', to: 'seremban', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 0.8, usd: 3, confidence: 'reported' },
+    { from: 'taiping', to: 'ipoh', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 1, usd: 4, daily: { n: 14, spread: 'ETS roughly hourly' }, confidence: 'reported' },
+    { from: 'ipoh', to: 'klsentral', mode: 'rail', op: 'ktmb', service: 'ETS (Padang Besar – KL Sentral)', hours: 2.3, usd: 10, daily: { n: 18, spread: 'ETS every 30–60 minutes' }, confidence: 'reported' },
+    { from: 'klsentral', to: 'seremban', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 0.8, usd: 3, daily: { n: 16, spread: 'ETS and KTM Komuter through the day' }, confidence: 'reported' },
     { from: 'seremban', to: 'gemas', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 1.4, usd: 5, confidence: 'reported' },
     { from: 'gemas', to: 'segamat', mode: 'rail', op: 'ktmb', service: 'ETS (KL Sentral – JB Sentral)', hours: 0.4, usd: 2, confidence: 'reported',
       note: 'Electrified December 2025. KL–JB is now about 4h10 end to end; guides written before then still say 7 hours and a change at Gemas.' },
@@ -2129,20 +2211,20 @@ const NETWORK = {
     { from: 'klsentral', to: 'portklang', mode: 'rail', op: 'ktmb', service: 'KTM Komuter', hours: 1.2, usd: 2, confidence: 'reported' },
 
     // === Malaysian sea branches ========================================
-    { from: 'butterworth', to: 'georgetown', mode: 'ferry', op: 'penangferry', service: 'Penang ferry', hours: 0.25, usd: 1, essential: true, scenic: true, confidence: 'structural',
+    { from: 'butterworth', to: 'georgetown', mode: 'ferry', op: 'penangferry', service: 'Penang ferry', hours: 0.25, usd: 1, essential: true, scenic: true, daily: { n: 'every 20–30 min', spread: '06:00 to midnight', last: '00:00' }, confidence: 'structural',
       note: 'Berths beside the KTMB station. Take it over the bridge bus every time — the approach to George Town by water is one of the better moments on the whole spine.' },
     { from: 'arau', to: 'kualaperlis', mode: 'road', op: 'transfer', service: 'Taxi from Arau station', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'kualaperlis', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Langkawi fast ferry', hours: 1.25, usd: 5, seasonal: 'andaman', confidence: 'reported',
+    { from: 'kualaperlis', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Langkawi fast ferry', hours: 1.25, usd: 5, seasonal: 'andaman', daily: { n: 'every 1–2 hours', spread: '07:00 to 19:00', last: '19:00' }, confidence: 'reported',
       note: 'Puts a genuine rest day right at the Thai–Malaysian border, which is exactly where a long spine journey needs one.' },
     { from: 'tampin', to: 'melaka', mode: 'road', op: 'transfer', service: 'Bus / taxi from Pulau Sebang', hours: 0.75, usd: 5, essential: true, confidence: 'reported' },
 
     // === Malaysia ↔ Singapore ==========================================
-    { from: 'jbsentral', to: 'woodlands', mode: 'rail', op: 'ktmb', service: 'Shuttle Tebrau', hours: 0.1, usd: 1.2, border: 'woodlands', confidence: 'structural',
+    { from: 'jbsentral', to: 'woodlands', mode: 'rail', op: 'ktmb', service: 'Shuttle Tebrau', hours: 0.1, usd: 1.2, border: 'woodlands', daily: { n: 30, spread: 'every 30 minutes from 05:00 to 23:45 — five minutes of track', last: '23:45' }, confidence: 'structural',
       note: 'Five minutes of track and the most reliably sold-out service in Southeast Asia. Book it the instant the window opens.' },
     { from: 'woodlands', to: 'singapore', mode: 'road', op: 'metro', service: 'MRT Thomson–East Coast Line', hours: 0.5, usd: 1.5, essential: true, confidence: 'structural' },
 
     // === Singapore / Malaysia ↔ Indonesia ==============================
-    { from: 'singapore', to: 'batam', mode: 'ferry', op: 'riauferry', service: 'HarbourFront or Tanah Merah fast ferry', hours: 1.0, usd: 18, border: 'batam', confidence: 'reported',
+    { from: 'singapore', to: 'batam', mode: 'ferry', op: 'riauferry', service: 'HarbourFront or Tanah Merah fast ferry', hours: 1.0, usd: 18, border: 'batam', daily: { n: 20, spread: 'roughly hourly from HarbourFront and Tanah Merah', last: '21:00' }, confidence: 'reported',
       note: 'This is how you get past Singapore\'s dead end. Full immigration both ends.' },
     { from: 'batam', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Riau inter-island ferry', hours: 6.0, usd: 30, confidence: 'verify',
       note: 'Schedules and operators on the Riau routes change often. Verify before you rely on it.' },
@@ -2154,49 +2236,49 @@ const NETWORK = {
 
     // === Sumatra =======================================================
     { from: 'belawan', to: 'medan', mode: 'road', op: 'transfer', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'medan', to: 'pekanbaru', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 14.0, usd: 20, confidence: 'reported',
+    { from: 'medan', to: 'pekanbaru', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 14.0, usd: 20, daily: { n: 4, spread: 'mostly overnight' }, confidence: 'reported',
       note: 'North Sumatra\'s railway does not reach south Sumatra\'s. This gap is road, and it is the least pleasant day of any Singapore–Bali itinerary.' },
     { from: 'dumai', to: 'pekanbaru', mode: 'road', op: 'coach', service: 'Coach', hours: 3.0, usd: 8, confidence: 'reported' },
-    { from: 'pekanbaru', to: 'palembang', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 12.0, usd: 20, confidence: 'reported' },
+    { from: 'pekanbaru', to: 'palembang', mode: 'road', op: 'coach', service: 'Long-distance coach', hours: 12.0, usd: 20, daily: { n: 4, spread: 'mostly overnight' }, confidence: 'reported' },
     { from: 'palembang', to: 'bandarlampung', mode: 'rail', op: 'kai', service: 'Rajabasa / Sriwijaya', hours: 9.0, usd: 8, sleeper: true, confidence: 'reported',
       note: 'South Sumatra\'s isolated network. Pleasant, and a relief after the coaches.' },
     { from: 'bandarlampung', to: 'bakauheni', mode: 'road', op: 'damri', service: 'Damri bus', hours: 2.0, usd: 4, essential: true, confidence: 'reported' },
-    { from: 'bakauheni', to: 'merak', mode: 'ferry', op: 'asdp', service: 'ASDP ferry', hours: 2.0, usd: 1.5, essential: true, confidence: 'reported',
+    { from: 'bakauheni', to: 'merak', mode: 'ferry', op: 'asdp', service: 'ASDP ferry', hours: 2.0, usd: 1.5, essential: true, daily: { n: 'every 30–60 min', spread: 'around the clock' }, confidence: 'reported',
       note: 'Very frequent, around the clock. Usually taken as a through bus-plus-ferry ticket.' },
 
     // === Java ==========================================================
-    { from: 'merak', to: 'jakarta', mode: 'rail', op: 'kai', service: 'KAI Commuter via Rangkasbitung', hours: 3.5, usd: 1, confidence: 'reported' },
-    { from: 'jakarta', to: 'bandung', mode: 'rail', op: 'kai', service: 'Whoosh high-speed', hours: 0.75, usd: 15, confidence: 'reported',
+    { from: 'merak', to: 'jakarta', mode: 'rail', op: 'kai', service: 'KAI Commuter via Rangkasbitung', hours: 3.5, usd: 1, daily: { n: 12, spread: 'KAI Commuter via Rangkasbitung, roughly hourly' }, confidence: 'reported' },
+    { from: 'jakarta', to: 'bandung', mode: 'rail', op: 'kai', service: 'Whoosh high-speed', hours: 0.75, usd: 15, daily: { n: 30, spread: 'Whoosh every 30–60 minutes, plus the slower Argo Parahyangan' }, confidence: 'reported',
       note: 'Whoosh runs Halim–Tegalluar in about 45 minutes. The conventional Argo Parahyangan from Gambir takes ~3 h and is the prettier ride.' },
     { from: 'bandung', to: 'purwokerto', mode: 'rail', op: 'kai', service: 'Argo Wilis / Turangga', hours: 4, usd: 8, scenic: true, confidence: 'reported' },
     { from: 'purwokerto', to: 'yogyakarta', mode: 'rail', op: 'kai', service: 'Argo Wilis / Turangga', hours: 2.5, usd: 4, scenic: true, confidence: 'reported' },
-    { from: 'yogyakarta', to: 'solo', mode: 'rail', op: 'kai', service: 'Argo / Bima', hours: 1, usd: 2, confidence: 'reported' },
+    { from: 'yogyakarta', to: 'solo', mode: 'rail', op: 'kai', service: 'Argo / Bima', hours: 1, usd: 2, daily: { n: 25, spread: 'mainline trains plus the local commuter, all day' }, confidence: 'reported' },
     { from: 'solo', to: 'surabaya', mode: 'rail', op: 'kai', service: 'Argo / Bima', hours: 3.5, usd: 8, confidence: 'reported' },
-    { from: 'surabaya', to: 'probolinggo', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 3, confidence: 'reported' },
+    { from: 'surabaya', to: 'probolinggo', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 3, daily: { n: 8, spread: 'through the day' }, confidence: 'reported' },
     { from: 'probolinggo', to: 'jember', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2.5, usd: 3, scenic: true, confidence: 'reported' },
-    { from: 'jember', to: 'banyuwangi', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 2, scenic: true, confidence: 'reported' },
-    { from: 'banyuwangi', to: 'gilimanuk', mode: 'ferry', op: 'asdp', service: 'ASDP Ketapang–Gilimanuk', hours: 0.75, usd: 1, essential: true, confidence: 'structural',
+    { from: 'jember', to: 'banyuwangi', mode: 'rail', op: 'kai', service: 'Mutiara Timur / Probowangi', hours: 2, usd: 2, scenic: true, daily: { n: 6, spread: 'first around 05:00, last mid-evening' }, confidence: 'reported' },
+    { from: 'banyuwangi', to: 'gilimanuk', mode: 'ferry', op: 'asdp', service: 'ASDP Ketapang–Gilimanuk', hours: 0.75, usd: 1, essential: true, daily: { n: 'every 30–60 min', spread: 'around the clock, all year' }, confidence: 'structural',
       note: 'Runs around the clock, pier beside the station. The dawn crossing is the one people remember.' },
     { from: 'gilimanuk', to: 'denpasar', mode: 'road', op: 'transfer', service: 'Bus / private car', hours: 4.0, usd: 10, essential: true, confidence: 'reported' },
 
     // === Vietnam =======================================================
-    { from: 'vte_khamsavath', to: 'hanoi', mode: 'road', op: 'coach', service: 'Sleeper coach via Nam Phao / Cau Treo', hours: 20.0, usd: 30, border: 'namphao', confidence: 'reported',
+    { from: 'vte_khamsavath', to: 'hanoi', mode: 'road', op: 'coach', service: 'Sleeper coach via Nam Phao / Cau Treo', hours: 20.0, usd: 30, border: 'namphao', daily: { n: 1, spread: 'one sleeper coach in the evening, from the bus terminal not the station', last: '18:00' }, confidence: 'reported',
       note: 'There is no railway between Laos and Vietnam. None is built and none is imminent. This is a twenty-hour bus and it should be planned as one — the coach leaves from Vientiane\'s bus terminal, not from either railway station.' },
-    { from: 'hanoi', to: 'ninhbinh', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 2, usd: 4, confidence: 'reported' },
+    { from: 'hanoi', to: 'ninhbinh', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 2, usd: 4, daily: { n: 6, spread: 'the Reunification services plus regional trains' }, confidence: 'reported' },
     { from: 'ninhbinh', to: 'thanhhoa', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 1.5, usd: 3, confidence: 'reported' },
     { from: 'thanhhoa', to: 'vinh', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 2.5, usd: 5, sleeper: true, confidence: 'reported' },
     { from: 'vinh', to: 'donghoi', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 4, usd: 8, sleeper: true, confidence: 'reported' },
     { from: 'donghoi', to: 'hue', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3, usd: 7, confidence: 'reported' },
-    { from: 'hue', to: 'danang', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3.0, usd: 5, scenic: true, confidence: 'reported',
+    { from: 'hue', to: 'danang', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3.0, usd: 5, scenic: true, daily: { n: 7, spread: 'through the day — take a daytime one for the Hải Vân pass' }, confidence: 'reported',
       note: 'The Hải Vân pass. Among the best rail scenery in Asia — take a daytime train and sit on the sea side.' },
     { from: 'danang', to: 'quangngai', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3, usd: 6, confidence: 'reported' },
     { from: 'quangngai', to: 'dieutri', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3.5, usd: 8, sleeper: true, confidence: 'reported' },
     { from: 'dieutri', to: 'nhatrang', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 3.5, usd: 8, confidence: 'reported' },
     { from: 'nhatrang', to: 'thapcham', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 1.5, usd: 4, confidence: 'reported' },
     { from: 'thapcham', to: 'muongman', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 2.5, usd: 6, confidence: 'reported' },
-    { from: 'muongman', to: 'saigon', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 4, usd: 8, sleeper: true, confidence: 'reported' },
-    { from: 'hanoi', to: 'laocai', mode: 'rail', op: 'dsvn', service: 'SP1–SP4 (overnight, for Sapa)', hours: 8.0, usd: 20, sleeper: true, confidence: 'reported' },
-    { from: 'hanoi', to: 'haiphong', mode: 'rail', op: 'dsvn', service: 'HP1/HP2/LP3', hours: 2.5, usd: 4, confidence: 'reported' },
+    { from: 'muongman', to: 'saigon', mode: 'rail', op: 'dsvn', service: 'Reunification Express (SE1–SE8)', hours: 4, usd: 8, sleeper: true, daily: { n: 6, spread: 'mostly arriving early morning' }, confidence: 'reported' },
+    { from: 'hanoi', to: 'laocai', mode: 'rail', op: 'dsvn', service: 'SP1–SP4 (overnight, for Sapa)', hours: 8.0, usd: 20, sleeper: true, daily: { n: 4, spread: 'all overnight, leaving Hanoi around 20:00–22:00' }, confidence: 'reported' },
+    { from: 'hanoi', to: 'haiphong', mode: 'rail', op: 'dsvn', service: 'HP1/HP2/LP3', hours: 2.5, usd: 4, daily: { n: 4, spread: 'morning, midday and evening' }, confidence: 'reported' },
     { from: 'hanoi', to: 'dongdang', mode: 'rail', op: 'dsvn', service: 'DD3/DD4', hours: 4.0, usd: 6, confidence: 'verify',
       note: 'Cross-border passenger service to China from here has been intermittent for years. Treat the frontier as closed unless you have confirmed otherwise.' },
 
@@ -2207,58 +2289,58 @@ const NETWORK = {
     { from: 'surabaya', to: 'malang', mode: 'rail', op: 'kai', service: 'KAI (Surabaya – Malang)', hours: 2, usd: 4, scenic: true, confidence: 'reported' },
 
     // === Mekong slow boat ==============================================
-    { from: 'chiangmai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus via Chiang Rai', hours: 6, usd: 12, essential: true, confidence: 'reported' },
+    { from: 'chiangmai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus via Chiang Rai', hours: 6, usd: 12, essential: true, daily: { n: 6, spread: '06:30 to 17:00', last: '17:00' }, confidence: 'reported' },
     { from: 'chiangkhong', to: 'huayxai', mode: 'road', op: 'transfer', service: 'Shuttle over the Fourth Thai–Lao Friendship Bridge', hours: 0.5, usd: 2, essential: true, border: 'huayxai', confidence: 'structural' },
-    { from: 'huayxai', to: 'pakbeng', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 1)', hours: 6, usd: 15, scenic: true, confidence: 'reported',
+    { from: 'huayxai', to: 'pakbeng', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 1)', hours: 6, usd: 15, scenic: true, daily: { n: 1, spread: 'one boat a day, leaving Huay Xai around 09:00 and not waiting', last: '09:30' }, confidence: 'reported',
       note: 'Two days downriver with a night at Pakbeng. The speedboat alternative does it in one day and has a genuinely bad safety record — take the slow boat.' },
-    { from: 'pakbeng', to: 'luangprabang', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 2)', hours: 8, usd: 15, scenic: true, confidence: 'reported' },
+    { from: 'pakbeng', to: 'luangprabang', mode: 'ferry', op: 'mekongboat', service: 'Mekong slow boat (day 2)', hours: 8, usd: 15, scenic: true, daily: { n: 1, spread: 'one boat a day, leaving Pakbeng around 09:00', last: '09:30' }, confidence: 'reported' },
 
     // === Gulf of Thailand islands ======================================
-    { from: 'chumphon', to: 'kohtao', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah / Songserm catamaran', hours: 1.75, usd: 17, seasonal: 'gulf', confidence: 'reported',
+    { from: 'chumphon', to: 'kohtao', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah / Songserm catamaran', hours: 1.75, usd: 17, seasonal: 'gulf', daily: { n: 2, spread: 'timed off the overnight trains from Bangkok — morning and early afternoon', last: '13:00' }, confidence: 'reported',
       note: 'The pier is at Thung Makham Noi, a short transfer from Chumphon station, and the boats are timed off the overnight trains from Bangkok.' },
-    { from: 'kohtao', to: 'kohphangan', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah catamaran', hours: 1.5, usd: 12, seasonal: 'gulf', scenic: true, confidence: 'reported' },
+    { from: 'kohtao', to: 'kohphangan', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah catamaran', hours: 1.5, usd: 12, seasonal: 'gulf', scenic: true, daily: { n: 3, spread: 'morning, midday, late afternoon', last: '15:00' }, confidence: 'reported' },
     { from: 'kohphangan', to: 'kohsamui', mode: 'ferry', op: 'lomprayah', service: 'Lomprayah / Raja ferry', hours: 0.5, usd: 9, seasonal: 'gulf', confidence: 'reported' },
 
     // === Andaman islands ===============================================
     { from: 'trang', to: 'krabi', mode: 'road', op: 'transfer', service: 'Minivan', hours: 2, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'krabi', to: 'kohphiphi', mode: 'ferry', op: 'localferry', service: 'Andaman Wave / Ao Nang Princess', hours: 2, usd: 14, seasonal: 'andaman', scenic: true, confidence: 'reported' },
+    { from: 'krabi', to: 'kohphiphi', mode: 'ferry', op: 'localferry', service: 'Andaman Wave / Ao Nang Princess', hours: 2, usd: 14, seasonal: 'andaman', scenic: true, daily: { n: 3, spread: 'morning and early afternoon only', last: '15:30' }, confidence: 'reported' },
     { from: 'kohphiphi', to: 'kohlanta', mode: 'ferry', op: 'localferry', service: 'Island-hopper ferry', hours: 1.5, usd: 12, seasonal: 'andaman', confidence: 'verify',
       note: 'Runs in high season only. Out of season the connection is back via Krabi by road.' },
-    { from: 'kohphiphi', to: 'phuket', mode: 'ferry', op: 'localferry', service: 'Phi Phi – Rassada ferry', hours: 2, usd: 14, seasonal: 'andaman', confidence: 'reported' },
+    { from: 'kohphiphi', to: 'phuket', mode: 'ferry', op: 'localferry', service: 'Phi Phi – Rassada ferry', hours: 2, usd: 14, seasonal: 'andaman', daily: { n: 4, spread: 'through the middle of the day', last: '15:30' }, confidence: 'reported' },
 
     // === Thailand ↔ Malaysia by sea ====================================
     { from: 'hatyai', to: 'satun', mode: 'road', op: 'transfer', service: 'Minivan to Tammalang pier', hours: 2, usd: 7, essential: true, confidence: 'reported' },
-    { from: 'satun', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Tammalang – Kuah international ferry', hours: 1.5, usd: 12, border: 'satun', seasonal: 'andaman', confidence: 'verify',
+    { from: 'satun', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Tammalang – Kuah international ferry', hours: 1.5, usd: 12, border: 'satun', seasonal: 'andaman', daily: { n: 3, spread: 'a handful of sailings and they stop early — this is the one that strands people', last: '16:00' }, confidence: 'verify',
       note: 'A sea border, and the one way to reach Malaysia from Thailand without touching Padang Besar. Sailings are few per day and stop early — missing the last one strands you in Satun.' },
 
     // === More Langkawi piers ===========================================
     { from: 'alorsetar', to: 'kualakedah', mode: 'road', op: 'transfer', service: 'Taxi from Alor Setar station', hours: 0.4, usd: 4, essential: true, confidence: 'reported' },
-    { from: 'kualakedah', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Kuala Kedah – Kuah ferry', hours: 1.75, usd: 6, seasonal: 'andaman', confidence: 'reported' },
+    { from: 'kualakedah', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Kuala Kedah – Kuah ferry', hours: 1.75, usd: 6, seasonal: 'andaman', daily: { n: 'every 1–2 hours', spread: '07:00 to 19:00', last: '19:00' }, confidence: 'reported' },
     { from: 'georgetown', to: 'langkawi', mode: 'ferry', op: 'langkawiferry', service: 'Penang – Langkawi ferry', hours: 2.75, usd: 18, seasonal: 'andaman', confidence: 'verify',
       note: 'Operates seasonally and has suspended before. Verify it is running rather than assuming it.' },
 
     // === Cambodia: Angkor, the Tonlé Sap and the islands ===============
     { from: 'sisophon', to: 'siemreap', mode: 'road', op: 'transfer', service: 'Bus / shared taxi', hours: 2, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'phnompenh', to: 'siemreap', mode: 'ferry', op: 'tonlesap', service: 'Tonlé Sap fast boat', hours: 6, usd: 35, scenic: true, confidence: 'verify',
+    { from: 'phnompenh', to: 'siemreap', mode: 'ferry', op: 'tonlesap', service: 'Tonlé Sap fast boat', hours: 6, usd: 35, scenic: true, daily: { n: 1, spread: 'one departure in the morning, and only when the lake is high', last: '07:30' }, confidence: 'verify',
       note: 'Only runs when the lake is high, roughly August to March, and it is a hot crowded six hours. People take it for the floating villages, not the comfort.' },
-    { from: 'sihanoukville', to: 'kohrong', mode: 'ferry', op: 'speedferry', service: 'Speed Ferry Cambodia', hours: 0.75, usd: 12, scenic: true, confidence: 'reported' },
+    { from: 'sihanoukville', to: 'kohrong', mode: 'ferry', op: 'speedferry', service: 'Speed Ferry Cambodia', hours: 0.75, usd: 12, scenic: true, daily: { n: 6, spread: '08:00 to 18:00', last: '18:00' }, confidence: 'reported' },
 
     // === Vietnam by water ==============================================
-    { from: 'haiphong', to: 'catba', mode: 'ferry', op: 'localferry', service: 'Cát Bà fast ferry', hours: 1, usd: 10, scenic: true, confidence: 'reported',
+    { from: 'haiphong', to: 'catba', mode: 'ferry', op: 'localferry', service: 'Cát Bà fast ferry', hours: 1, usd: 10, scenic: true, daily: { n: 6, spread: 'through the day', last: '17:00' }, confidence: 'reported',
       note: 'The practical way into Hạ Long Bay from the railway, rather than a coach from Hanoi.' },
-    { from: 'saigon', to: 'chaudoc', mode: 'road', op: 'coach', service: 'Coach into the Mekong Delta', hours: 6, usd: 12, confidence: 'reported' },
-    { from: 'chaudoc', to: 'phnompenh', mode: 'ferry', op: 'hangchau', service: 'Mekong river boat (Hang Chau / Blue Cruiser)', hours: 5, usd: 35, border: 'chaudoc', scenic: true, confidence: 'verify',
+    { from: 'saigon', to: 'chaudoc', mode: 'road', op: 'coach', service: 'Coach into the Mekong Delta', hours: 6, usd: 12, daily: { n: 6, spread: 'through the day', last: '15:00' }, confidence: 'reported' },
+    { from: 'chaudoc', to: 'phnompenh', mode: 'ferry', op: 'hangchau', service: 'Mekong river boat (Hang Chau / Blue Cruiser)', hours: 5, usd: 35, border: 'chaudoc', scenic: true, daily: { n: 2, spread: 'morning departures only', last: '13:00' }, confidence: 'verify',
       note: 'The only Vietnam–Cambodia crossing that is not a road. Immigration happens on the riverbank at Vĩnh Xương and Kaam Samnor while the boat waits.' },
 
     // === Sabah ↔ Brunei ================================================
-    { from: 'kotakinabalu', to: 'labuan', mode: 'ferry', op: 'localferry', service: 'Labuan express ferry', hours: 3, usd: 15, confidence: 'reported' },
-    { from: 'labuan', to: 'bandarseri', mode: 'ferry', op: 'localferry', service: 'Labuan – Muara ferry', hours: 1.5, usd: 12, border: 'brunei', confidence: 'verify' },
+    { from: 'kotakinabalu', to: 'labuan', mode: 'ferry', op: 'localferry', service: 'Labuan express ferry', hours: 3, usd: 15, daily: { n: 2, spread: 'morning and early afternoon', last: '15:00' }, confidence: 'reported' },
+    { from: 'labuan', to: 'bandarseri', mode: 'ferry', op: 'localferry', service: 'Labuan – Muara ferry', hours: 1.5, usd: 12, border: 'brunei', daily: { n: 3, spread: 'morning and early afternoon', last: '16:30' }, confidence: 'verify' },
 
     // === Bali onward ===================================================
     { from: 'denpasar', to: 'padangbai', mode: 'road', op: 'transfer', service: 'Shuttle to the port', hours: 1.5, usd: 6, essential: true, confidence: 'reported' },
-    { from: 'padangbai', to: 'mataram', mode: 'ferry', op: 'asdp', service: 'ASDP Padangbai – Lembar', hours: 4.5, usd: 4, scenic: true, confidence: 'reported',
+    { from: 'padangbai', to: 'mataram', mode: 'ferry', op: 'asdp', service: 'ASDP Padangbai – Lembar', hours: 4.5, usd: 4, scenic: true, daily: { n: 'every 1–2 hours', spread: 'around the clock, but the night crossings are rough' }, confidence: 'reported',
       note: 'Slow, cheap and rolls in the strait. The tourist fast boats do it in under two hours from Padangbai or Serangan.' },
-    { from: 'mataram', to: 'gili', mode: 'ferry', op: 'localferry', service: 'Bangsal – Gili public boat', hours: 0.75, usd: 3, scenic: true, confidence: 'reported' },
+    { from: 'mataram', to: 'gili', mode: 'ferry', op: 'localferry', service: 'Bangsal – Gili public boat', hours: 0.75, usd: 3, scenic: true, daily: { n: 'frequent', spread: 'public boats leave when full, roughly 08:00 to 17:00', last: '17:00' }, confidence: 'reported' },
 
     // === Sabah (isolated) ==============================================
     { from: 'kotakinabalu', to: 'tenom', mode: 'rail', op: 'ktmb', service: 'Sabah State Railway', hours: 2.5, usd: 5, scenic: true, confidence: 'reported' },
@@ -2280,78 +2362,78 @@ const NETWORK = {
     // --- Luzon north
     { from: 'manila', to: 'clark', mode: 'road', op: 'coach', service: 'Airport and provincial coach', hours: 2, usd: 6, confidence: 'reported',
       note: 'The North–South Commuter Railway will run here and is under construction the whole way. Until it opens this is a bus, and the bus is fine.' },
-    { from: 'manila', to: 'baguio', mode: 'road', op: 'victoryliner', service: 'Victory Liner deluxe', hours: 6, usd: 12, scenic: true, confidence: 'reported',
+    { from: 'manila', to: 'baguio', mode: 'road', op: 'victoryliner', service: 'Victory Liner deluxe', hours: 6, usd: 12, scenic: true, daily: { n: 20, spread: 'roughly every half hour, around the clock' }, confidence: 'reported',
       note: 'The last hour up Kennon Road or Marcos Highway is the scenic part, and the part that closes after heavy rain.' },
     { from: 'baguio', to: 'vigan', mode: 'road', op: 'coach', service: 'Provincial bus via Tagudin', hours: 5, usd: 8, confidence: 'reported' },
     { from: 'manila', to: 'vigan', mode: 'road', op: 'coach', service: 'Partas overnight coach', hours: 9, usd: 15, confidence: 'reported' },
     { from: 'baguio', to: 'banaue', mode: 'road', op: 'coach', service: 'Cordillera bus via Bontoc', hours: 8, usd: 12, scenic: true, confidence: 'verify',
       note: 'A mountain road, sometimes a landslide, occasionally neither bus of the day runs. The alternative is the overnight direct from Manila.' },
-    { from: 'manila', to: 'banaue', mode: 'road', op: 'coach', service: 'Ohayami / Coda overnight', hours: 9, usd: 14, confidence: 'reported' },
+    { from: 'manila', to: 'banaue', mode: 'road', op: 'coach', service: 'Ohayami / Coda overnight', hours: 9, usd: 14, daily: { n: 2, spread: 'overnight only, leaving Manila around 21:00', last: '22:00' }, confidence: 'reported' },
 
     // --- Luzon south: the Bicol line, what is left of it
-    { from: 'manila_pitx', to: 'naga', mode: 'road', op: 'philtranco', service: 'Philtranco / Isarog to Bicol', hours: 8, usd: 16, confidence: 'reported',
+    { from: 'manila_pitx', to: 'naga', mode: 'road', op: 'philtranco', service: 'Philtranco / Isarog to Bicol', hours: 8, usd: 16, daily: { n: 12, spread: 'through the day and overnight' }, confidence: 'reported',
       note: 'This used to be the Bicol Express. The train is suspended, the bus is not, and the bus is faster.' },
-    { from: 'sipocot', to: 'naga', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 1.25, usd: 1, confidence: 'verify',
+    { from: 'sipocot', to: 'naga', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 1.25, usd: 1, daily: { n: 2, spread: 'when it is running at all' }, confidence: 'verify',
       note: 'A short shuttle over what is left of the southern main line. It has suspended and resumed more than once. Confirm it is running the week you travel rather than the month.' },
-    { from: 'naga', to: 'legazpi', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 3.5, usd: 3, scenic: true, confidence: 'verify',
+    { from: 'naga', to: 'legazpi', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 3.5, usd: 3, scenic: true, daily: { n: 2, spread: 'when it is running at all' }, confidence: 'verify',
       note: 'The only intercity passenger train still running in the Philippines, and it runs beside Mayon for the last half hour. Worth building a day around; not worth building a connection around.' },
     { from: 'naga', to: 'legazpi', mode: 'road', op: 'ceres', service: 'Provincial bus', hours: 2.5, usd: 5, confidence: 'reported',
       note: 'The fallback for when the train is not running, which is often.' },
     { from: 'legazpi', to: 'matnog', mode: 'road', op: 'philtranco', service: 'Bus to the ferry ramp', hours: 3.5, usd: 6, essential: true, confidence: 'reported' },
 
     // --- The Nautical Highway: Luzon to Mindanao
-    { from: 'matnog', to: 'allen', mode: 'ferry', op: 'roro', service: 'Matnog – Allen RORO', hours: 1.5, usd: 3, essential: true, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'matnog', to: 'allen', mode: 'ferry', op: 'roro', service: 'Matnog – Allen RORO', hours: 1.5, usd: 3, essential: true, seasonal: 'typhoon', daily: { n: 'every 1–2 hours', spread: 'around the clock in good weather; nothing at all under a typhoon signal' }, confidence: 'reported',
       note: 'The crossing that makes a Manila–Davao bus ticket possible. Frequent in good weather, stopped outright under a typhoon signal — and this strait sits in the path of most of them.' },
     { from: 'allen', to: 'catbalogan', mode: 'road', op: 'philtranco', service: 'Maharlika Highway coach', hours: 3, usd: 5, confidence: 'reported' },
     { from: 'catbalogan', to: 'tacloban', mode: 'road', op: 'philtranco', service: 'Coach over the San Juanico Bridge', hours: 3, usd: 5, scenic: true, confidence: 'reported',
       note: 'The San Juanico Bridge from Samar to Leyte — two kilometres of it, and the only place on this route where the bus is the view.' },
     { from: 'tacloban', to: 'ormoc', mode: 'road', op: 'ceres', service: 'Provincial bus across Leyte', hours: 2.5, usd: 4, confidence: 'reported' },
     { from: 'tacloban', to: 'liloan_leyte', mode: 'road', op: 'philtranco', service: 'Coach down the Leyte coast', hours: 4, usd: 7, confidence: 'reported' },
-    { from: 'liloan_leyte', to: 'surigao', mode: 'ferry', op: 'roro', service: 'Liloan – Lipata RORO', hours: 3, usd: 6, essential: true, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'liloan_leyte', to: 'surigao', mode: 'ferry', op: 'roro', service: 'Liloan – Lipata RORO', hours: 3, usd: 6, essential: true, seasonal: 'typhoon', daily: { n: 6, spread: 'through the day and night' }, confidence: 'reported',
       note: 'Leyte to Mindanao across the Surigao Strait. The second of the two crossings a through bus ticket covers.' },
     { from: 'surigao', to: 'cagayandeoro', mode: 'road', op: 'ceres', service: 'Bus via Butuan', hours: 7, usd: 12, confidence: 'reported' },
-    { from: 'surigao', to: 'davao', mode: 'road', op: 'philtranco', service: 'Coach via Butuan and Tagum', hours: 9, usd: 15, confidence: 'reported' },
+    { from: 'surigao', to: 'davao', mode: 'road', op: 'philtranco', service: 'Coach via Butuan and Tagum', hours: 9, usd: 15, daily: { n: 6, spread: 'through the day and overnight' }, confidence: 'reported' },
     { from: 'cagayandeoro', to: 'davao', mode: 'road', op: 'ceres', service: 'Bus via Bukidnon', hours: 6, usd: 11, scenic: true, confidence: 'reported',
       note: 'Over the Bukidnon plateau — pine, pineapple and the only cool air in Mindanao.' },
     { from: 'davao', to: 'generalsantos', mode: 'road', op: 'ceres', service: 'Provincial bus', hours: 3, usd: 6, confidence: 'reported' },
     { from: 'cagayandeoro', to: 'balingoan', mode: 'road', op: 'ceres', service: 'Bus to the Camiguin ferry', hours: 1.5, usd: 3, essential: true, confidence: 'reported' },
-    { from: 'balingoan', to: 'camiguin', mode: 'ferry', op: 'roro', service: 'Balingoan – Benoni RORO', hours: 1.25, usd: 3, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'balingoan', to: 'camiguin', mode: 'ferry', op: 'roro', service: 'Balingoan – Benoni RORO', hours: 1.25, usd: 3, seasonal: 'typhoon', daily: { n: 8, spread: '06:00 to 17:30', last: '17:30' }, confidence: 'reported' },
     { from: 'cagayandeoro', to: 'zamboanga', mode: 'road', op: 'ceres', service: 'Bus via Pagadian', hours: 12, usd: 20, advisory: 'sulu', confidence: 'verify',
       note: 'A long day and a half across western Mindanao. Check your government\'s current advice for the peninsula before treating this as routine.' },
 
     // --- Manila by sea
-    { from: 'manila_pier', to: 'cebu', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cebu', hours: 22, usd: 35, sleeper: true, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'manila_pier', to: 'cebu', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cebu', hours: 22, usd: 35, sleeper: true, seasonal: 'typhoon', daily: { n: '2–3 a week', spread: 'NOT daily — this is a scheduled shipping line, not a ferry. Check the sailing list before anything else in a Philippine itinerary.' }, confidence: 'reported',
       note: 'A night and most of a day. The cabin classes are cheap enough that the open tourist deck is a choice rather than a necessity.' },
-    { from: 'manila_pier', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Manila – Iloilo', hours: 22, usd: 32, sleeper: true, seasonal: 'typhoon', confidence: 'reported' },
-    { from: 'manila_pier', to: 'cagayandeoro', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cagayan de Oro', hours: 30, usd: 40, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
-    { from: 'manila_pier', to: 'coron', mode: 'ferry', op: 'twogo', service: '2GO Manila – Coron', hours: 14, usd: 28, sleeper: true, scenic: true, seasonal: 'typhoon', confidence: 'verify',
+    { from: 'manila_pier', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Manila – Iloilo', hours: 22, usd: 32, sleeper: true, seasonal: 'typhoon', daily: { n: '2–3 a week', spread: 'not daily — check the sailing list' }, confidence: 'reported' },
+    { from: 'manila_pier', to: 'cagayandeoro', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cagayan de Oro', hours: 30, usd: 40, sleeper: true, seasonal: 'typhoon', daily: { n: '1–2 a week', spread: 'not daily, and the least frequent 2GO route on this map' }, confidence: 'verify' },
+    { from: 'manila_pier', to: 'coron', mode: 'ferry', op: 'twogo', service: '2GO Manila – Coron', hours: 14, usd: 28, sleeper: true, scenic: true, seasonal: 'typhoon', daily: { n: '1–2 a week', spread: 'not daily; the schedule moves' }, confidence: 'verify',
       note: 'Sails a couple of times a week rather than daily, and the schedule moves. This is the leg to confirm before the rest of a Palawan itinerary is built on it.' },
-    { from: 'manila_pier', to: 'puertoprincesa', mode: 'ferry', op: 'twogo', service: '2GO Manila – Puerto Princesa', hours: 26, usd: 35, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+    { from: 'manila_pier', to: 'puertoprincesa', mode: 'ferry', op: 'twogo', service: '2GO Manila – Puerto Princesa', hours: 26, usd: 35, sleeper: true, seasonal: 'typhoon', daily: { n: '1–2 a week', spread: 'not daily' }, confidence: 'verify' },
 
     // --- Mindoro and the western Visayas
     { from: 'manila_pitx', to: 'batangas', mode: 'road', op: 'coach', service: 'Bus to Batangas Pier', hours: 2.5, usd: 4, essential: true, confidence: 'reported' },
-    { from: 'batangas', to: 'calapan', mode: 'ferry', op: 'montenegro', service: 'Batangas – Calapan RORO', hours: 1.5, usd: 4, essential: true, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'batangas', to: 'calapan', mode: 'ferry', op: 'montenegro', service: 'Batangas – Calapan RORO', hours: 1.5, usd: 4, essential: true, seasonal: 'typhoon', daily: { n: 'every 30–60 min', spread: 'around the clock' }, confidence: 'reported',
       note: 'Hourly or better through the day. The start of the western Nautical Highway.' },
-    { from: 'batangas', to: 'puertogalera', mode: 'ferry', op: 'localferry', service: 'Batangas – Puerto Galera fast craft', hours: 1.25, usd: 8, scenic: true, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'batangas', to: 'puertogalera', mode: 'ferry', op: 'localferry', service: 'Batangas – Puerto Galera fast craft', hours: 1.25, usd: 8, scenic: true, seasonal: 'typhoon', daily: { n: 6, spread: '07:00 to 16:00', last: '16:00' }, confidence: 'reported' },
     { from: 'calapan', to: 'puertogalera', mode: 'road', op: 'transfer', service: 'Van along the north Mindoro coast', hours: 1, usd: 4, essential: true, confidence: 'reported' },
     { from: 'calapan', to: 'roxas_mindoro', mode: 'road', op: 'ceres', service: 'Bus down the Mindoro east coast', hours: 3.5, usd: 6, confidence: 'reported' },
-    { from: 'roxas_mindoro', to: 'caticlan', mode: 'ferry', op: 'montenegro', service: 'Roxas – Caticlan RORO', hours: 4, usd: 10, seasonal: 'typhoon', confidence: 'verify',
+    { from: 'roxas_mindoro', to: 'caticlan', mode: 'ferry', op: 'montenegro', service: 'Roxas – Caticlan RORO', hours: 4, usd: 10, seasonal: 'typhoon', daily: { n: 2, spread: 'one or two sailings a day — aim for the first', last: '13:00' }, confidence: 'verify',
       note: 'The overland way to Boracay, and the reason people who refuse to fly still get there. One or two sailings a day, and the first is the one to aim for.' },
-    { from: 'caticlan', to: 'boracay', mode: 'ferry', op: 'roro', service: 'Caticlan – Cagban jetty boat', hours: 0.25, usd: 2, essential: true, seasonal: 'typhoon', confidence: 'structural',
+    { from: 'caticlan', to: 'boracay', mode: 'ferry', op: 'roro', service: 'Caticlan – Cagban jetty boat', hours: 0.25, usd: 2, essential: true, seasonal: 'typhoon', daily: { n: 'every 10–15 min', spread: '05:00 to 21:30, then a night boat for a premium', last: '21:30' }, confidence: 'structural',
       note: 'Ten minutes across the channel, plus terminal and environmental fees collected on the Caticlan side. There is no bridge and there is not going to be one.' },
     { from: 'caticlan', to: 'kalibo', mode: 'road', op: 'ceres', service: 'Van or bus across Aklan', hours: 2, usd: 4, confidence: 'reported' },
     { from: 'kalibo', to: 'iloilo', mode: 'road', op: 'ceres', service: 'Bus down Panay', hours: 4, usd: 7, confidence: 'reported' },
-    { from: 'iloilo', to: 'bacolod', mode: 'ferry', op: 'oceanjet', service: 'Guimaras Strait fast craft', hours: 1.25, usd: 7, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'iloilo', to: 'bacolod', mode: 'ferry', op: 'oceanjet', service: 'Guimaras Strait fast craft', hours: 1.25, usd: 7, seasonal: 'typhoon', daily: { n: 'every 30–60 min', spread: '05:00 to 18:00', last: '18:00' }, confidence: 'reported',
       note: 'Every hour or so, and far quicker than it looks on a map. Panay and Negros function as one place because of it.' },
     { from: 'bacolod', to: 'dumaguete', mode: 'road', op: 'ceres', service: 'Ceres bus down the Negros coast', hours: 6, usd: 9, scenic: true, confidence: 'reported' },
 
     // --- The Cebu hub
-    { from: 'ormoc', to: 'cebu', mode: 'ferry', op: 'oceanjet', service: 'Ormoc – Cebu fast craft', hours: 2.5, usd: 13, seasonal: 'typhoon', confidence: 'reported' },
-    { from: 'cebu', to: 'tagbilaran', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Cebu – Tagbilaran', hours: 2, usd: 12, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'ormoc', to: 'cebu', mode: 'ferry', op: 'oceanjet', service: 'Ormoc – Cebu fast craft', hours: 2.5, usd: 13, seasonal: 'typhoon', daily: { n: 5, spread: '05:00 to 18:00', last: '18:00' }, confidence: 'reported' },
+    { from: 'cebu', to: 'tagbilaran', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Cebu – Tagbilaran', hours: 2, usd: 12, seasonal: 'typhoon', daily: { n: 10, spread: 'roughly hourly, 06:00 to 18:00', last: '18:00' }, confidence: 'reported',
       note: 'Hourly-ish and the busiest tourist crossing in the country. Weekends and holidays genuinely sell out — this is the one Philippine boat worth booking ahead.' },
-    { from: 'tagbilaran', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Bohol – Siquijor', hours: 1.5, usd: 11, seasonal: 'typhoon', confidence: 'verify' },
-    { from: 'dumaguete', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'Dumaguete – Siquijor fast craft', hours: 1, usd: 7, seasonal: 'typhoon', confidence: 'reported' },
-    { from: 'dumaguete', to: 'santander', mode: 'ferry', op: 'roro', service: 'Sibulan – Liloan crossing', hours: 0.5, usd: 2, essential: true, seasonal: 'typhoon', confidence: 'reported',
+    { from: 'tagbilaran', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Bohol – Siquijor', hours: 1.5, usd: 11, seasonal: 'typhoon', daily: { n: 2, spread: 'morning and early afternoon', last: '14:00' }, confidence: 'verify' },
+    { from: 'dumaguete', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'Dumaguete – Siquijor fast craft', hours: 1, usd: 7, seasonal: 'typhoon', daily: { n: 5, spread: '06:00 to 17:00', last: '17:00' }, confidence: 'reported' },
+    { from: 'dumaguete', to: 'santander', mode: 'ferry', op: 'roro', service: 'Sibulan – Liloan crossing', hours: 0.5, usd: 2, essential: true, seasonal: 'typhoon', daily: { n: 'every 30–60 min', spread: '05:00 to 18:00', last: '18:00' }, confidence: 'reported',
       note: 'Twenty-five minutes between Negros and Cebu, running most of the day. The cheapest border-free crossing on this map.' },
     { from: 'santander', to: 'cebu', mode: 'road', op: 'ceres', service: 'Ceres bus up the Cebu south coast', hours: 4, usd: 5, scenic: true, confidence: 'reported' },
     { from: 'cebu', to: 'cagayandeoro', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Cagayan de Oro', hours: 9, usd: 20, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
@@ -2359,46 +2441,46 @@ const NETWORK = {
     { from: 'cebu', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Iloilo', hours: 12, usd: 22, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
 
     // === Thailand: the Eastern Line and the eastern seaboard ===========
-    { from: 'chachoengsao', to: 'pattaya', mode: 'rail', op: 'srt', service: 'Eastern Line 283/284 (Bangkok – Ban Phlu Ta Luang)', hours: 2, usd: 3, confidence: 'verify',
+    { from: 'chachoengsao', to: 'pattaya', mode: 'rail', op: 'srt', service: 'Eastern Line 283/284 (Bangkok – Ban Phlu Ta Luang)', hours: 2, usd: 3, daily: { n: 1, spread: 'one train each way, weekdays, early morning southbound', last: '07:00' }, confidence: 'verify',
       note: 'One train each way on weekdays, and it takes longer than the bus. People ride it because it is a train, which is a good enough reason — but do not build a connection on it.' },
     { from: 'pattaya', to: 'rayong', mode: 'road', op: 'coach', service: 'Provincial bus or minivan', hours: 1.5, usd: 3, confidence: 'reported' },
     { from: 'rayong', to: 'banphe', mode: 'road', op: 'transfer', service: 'Songthaew to the pier', hours: 0.5, usd: 2, essential: true, confidence: 'reported' },
-    { from: 'banphe', to: 'kohsamet', mode: 'ferry', op: 'localferry', service: 'Ban Phe – Na Dan ferry', hours: 0.5, usd: 3, seasonal: 'gulf', confidence: 'reported',
+    { from: 'banphe', to: 'kohsamet', mode: 'ferry', op: 'localferry', service: 'Ban Phe – Na Dan ferry', hours: 0.5, usd: 3, seasonal: 'gulf', daily: { n: 'every 1–2 hours', spread: '08:00 to 17:00; speedboats later for more money', last: '17:00' }, confidence: 'reported',
       note: 'Half an hour, frequent through the day. There is a national park fee collected on arrival that catches people out.' },
     { from: 'rayong', to: 'trat', mode: 'road', op: 'coach', service: 'Eastern seaboard coach', hours: 3, usd: 7, confidence: 'reported' },
-    { from: 'trat', to: 'kohchang', mode: 'ferry', op: 'localferry', service: 'Songthaew to Laem Ngop, then the Koh Chang ferry', hours: 1.25, usd: 6, essential: true, seasonal: 'gulf', confidence: 'reported',
+    { from: 'trat', to: 'kohchang', mode: 'ferry', op: 'localferry', service: 'Songthaew to Laem Ngop, then the Koh Chang ferry', hours: 1.25, usd: 6, essential: true, seasonal: 'gulf', daily: { n: 'every 45–60 min', spread: '06:30 to 19:00', last: '19:00' }, confidence: 'reported',
       note: 'Two ferry companies from two different piers. Whichever your minibus is going to is the right one.' },
 
     // === Thailand: north of the railhead ===============================
     { from: 'chiangmai', to: 'chiangrai', mode: 'road', op: 'greenbus', service: 'Green Bus V-Class', hours: 3.5, usd: 8, confidence: 'reported' },
     { from: 'chiangrai', to: 'chiangkhong', mode: 'road', op: 'greenbus', service: 'Green Bus to the border', hours: 2.5, usd: 5, essential: true, confidence: 'reported' },
-    { from: 'chiangmai', to: 'pai', mode: 'road', op: 'transfer', service: 'Aya Service minivan', hours: 3.5, usd: 6, scenic: true, confidence: 'reported',
+    { from: 'chiangmai', to: 'pai', mode: 'road', op: 'transfer', service: 'Aya Service minivan', hours: 3.5, usd: 6, scenic: true, daily: { n: 10, spread: 'minivans roughly hourly, 07:00 to 17:30', last: '17:30' }, confidence: 'reported',
       note: 'Seven hundred and sixty-two curves, and the minivan drives them like it is late. Sit at the front and take something for it.' },
 
     // === Laos: the Route 13 south corridor =============================
-    { from: 'ubon', to: 'pakse', mode: 'road', op: 'coach', service: 'Cross-border coach via Chong Mek', hours: 4, usd: 12, border: 'chongmek', confidence: 'reported',
+    { from: 'ubon', to: 'pakse', mode: 'road', op: 'coach', service: 'Cross-border coach via Chong Mek', hours: 4, usd: 12, border: 'chongmek', daily: { n: 2, spread: 'morning departures; the border keeps office hours', last: '09:30' }, confidence: 'reported',
       note: 'The way into southern Laos from the Thai railway, and the only one that is not a long detour through Vientiane.' },
-    { from: 'pakse', to: 'siphandon', mode: 'road', op: 'coach', service: 'Minibus to Nakasang, then a longtail', hours: 3, usd: 10, essential: true, scenic: true, confidence: 'reported' },
+    { from: 'pakse', to: 'siphandon', mode: 'road', op: 'coach', service: 'Minibus to Nakasang, then a longtail', hours: 3, usd: 10, essential: true, scenic: true, daily: { n: 4, spread: 'minibuses through the morning; the last longtail from Nakasang goes at dusk', last: '17:00' }, confidence: 'reported' },
     { from: 'pakse', to: 'savannakhet', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 5, usd: 10, confidence: 'reported' },
     { from: 'savannakhet', to: 'thakhek', mode: 'road', op: 'coach', service: 'Route 13 coach', hours: 2.5, usd: 6, confidence: 'reported' },
     { from: 'thakhek', to: 'vte_khamsavath', mode: 'road', op: 'coach', service: 'Route 13 coach to Vientiane', hours: 5, usd: 12, confidence: 'reported',
       note: 'Arrives at Vientiane\'s southern bus terminal, not at either railway station. Allow a tuk-tuk and half an hour on top.' },
 
     // === Vietnam: south of the mainline ================================
-    { from: 'saigon', to: 'vungtau', mode: 'ferry', op: 'localferry', service: 'Greenlines DP hydrofoil', hours: 1.5, usd: 12, scenic: true, confidence: 'reported',
+    { from: 'saigon', to: 'vungtau', mode: 'ferry', op: 'localferry', service: 'Greenlines DP hydrofoil', hours: 1.5, usd: 12, scenic: true, daily: { n: 4, spread: '08:00 to 16:00', last: '16:00' }, confidence: 'reported',
       note: 'Down the Saigon river and out into the sea. Quicker than the road and much better company.' },
-    { from: 'thapcham', to: 'dalat', mode: 'road', op: 'transfer', service: 'Minibus up the pass', hours: 2.5, usd: 6, essential: true, scenic: true, confidence: 'reported',
+    { from: 'thapcham', to: 'dalat', mode: 'road', op: 'transfer', service: 'Minibus up the pass', hours: 2.5, usd: 6, essential: true, scenic: true, daily: { n: 8, spread: 'minibuses through the day', last: '17:00' }, confidence: 'reported',
       note: 'Tháp Chàm is the mainline station for Đà Lạt and the bottom of the old rack railway. The climb is 1,500 m in two hours.' },
     { from: 'nhatrang', to: 'dalat', mode: 'road', op: 'coach', service: 'Sleeper bus over the Khánh Lê pass', hours: 4, usd: 8, scenic: true, confidence: 'reported' },
     { from: 'saigon', to: 'cantho', mode: 'road', op: 'coach', service: 'Mekong Delta coach', hours: 4, usd: 8, confidence: 'reported' },
 
     // === Malaysian Borneo: Sarawak =====================================
     { from: 'bandarseri', to: 'miri', mode: 'road', op: 'coach', service: 'Cross-border coach via Sungai Tujoh', hours: 4, usd: 15, border: 'sungaitujoh', confidence: 'reported' },
-    { from: 'miri', to: 'kuching', mode: 'road', op: 'coach', service: 'Overnight coast coach', hours: 14, usd: 20, confidence: 'reported',
+    { from: 'miri', to: 'kuching', mode: 'road', op: 'coach', service: 'Overnight coast coach', hours: 14, usd: 20, daily: { n: 4, spread: 'mostly overnight' }, confidence: 'reported',
       note: 'Fourteen hours down the Sarawak coast. There is no railway and no ferry — this is the overland answer and it is a long one.' },
 
     // --- Palawan
-    { from: 'coron', to: 'elnido', mode: 'ferry', op: 'localferry', service: 'Montenegro / Jomalia fast craft', hours: 4, usd: 30, scenic: true, seasonal: 'typhoon', confidence: 'verify',
+    { from: 'coron', to: 'elnido', mode: 'ferry', op: 'localferry', service: 'Montenegro / Jomalia fast craft', hours: 4, usd: 30, scenic: true, seasonal: 'typhoon', daily: { n: 1, spread: 'one sailing most days in season, none in rough months', last: '08:00' }, confidence: 'verify',
       note: 'Weather-dependent and cancelled outright in rough months. Nothing else connects northern Palawan to the Calamianes.' },
     { from: 'elnido', to: 'puertoprincesa', mode: 'road', op: 'coach', service: 'Van or bus down the Palawan highway', hours: 6, usd: 10, confidence: 'reported' },
   ],
@@ -3384,6 +3466,11 @@ const Plan = (() => {
         essential: parts.every(l => l.essential),
         advisory: parts.find(l => l.advisory)?.advisory,
         seasonal: [...new Set(parts.map(l => l.seasonal).filter(Boolean))],
+        /* How often the thing runs. Recorded on whichever segment of a run we
+         * know it for — the frequency of a through train belongs to the train,
+         * not to each station pair it passes. Absent means unrecorded, and the
+         * page says so rather than inventing a number. */
+        daily: parts.find(l => l.daily)?.daily || null,
         confidence,
         note: [...new Set(parts.map(l => l.note).filter(Boolean))].join(' '),
         borderIds: parts.map(l => l.border).filter(Boolean),
@@ -3523,6 +3610,77 @@ const Plan = (() => {
     deepsouth: 'Check your own government\'s current travel advice and decide deliberately. There is a west-coast alternative via Padang Besar that avoids this entirely.',
     myanmar: 'Check your own government\'s current travel advice. There is no through rail here in any case, so nothing is lost by leaving it out.',
     sulu: 'Check what your government says about the specific provinces rather than about Mindanao as a whole. The Nautical Highway corridor through Surigao, Cagayan de Oro and Davao is a different proposition from the Zamboanga peninsula, and reaching Zamboanga by sea from Manila or Iloilo skips the road entirely.',
+  }
+
+  /* ------------------------------------------------------- the day plan
+   * The nearest thing to a schedule this project will produce, and the line it
+   * will not cross is departure times. Nobody publishes them in a common
+   * format, so a stated departure would be a remembered one, and a remembered
+   * departure is how somebody sleeps on a platform.
+   *
+   * What can be said honestly is shape: which legs fall on which day, how many
+   * hours each day costs, and where the night goes — aboard a sleeper or in a
+   * bed. That comes out of running times, connection buffers and the chosen
+   * pace, all of which are ours to compute rather than to recall.
+   */
+  function buildDays(legs, junctions, paceHours) {
+    const days = []
+    let open = null
+
+    const start = () => {
+      open = { n: days.length + 1, legs: [], hours: 0, night: null, nightAt: null }
+      days.push(open)
+    }
+
+    legs.forEach((entry, i) => {
+      const leg = entry.leg
+      // An overnight sleeper is not part of a day, it *is* the night.
+      const overnight = leg.sleeper && leg.hours >= 7
+      const buffer = (junctions[i]?.minutes ?? 0) / 60
+
+      if (!open) start()
+      // Starting a leg that would blow through the pace means starting it
+      // tomorrow instead — unless nothing has happened today yet, in which case
+      // it is simply a long day and saying otherwise would be a fiction.
+      else if (!overnight && open.legs.length && open.hours + leg.hours > paceHours) start()
+
+      open.legs.push(i)
+      open.hours += leg.hours + buffer
+
+      if (overnight) {
+        open.night = 'sleeper'
+        open.nightAt = entry.leg.service
+        open = null
+      }
+    })
+
+    // Every night between days that is not spent moving is spent in a bed.
+    days.forEach((d, i) => {
+      if (i === days.length - 1) return
+      if (d.night) return
+      d.night = 'hotel'
+      const lastLeg = legs[d.legs[d.legs.length - 1]]
+      d.nightAt = lastLeg ? lastLeg.toCity : null
+    })
+
+    /* Boarding an overnight is not arriving. Manila to Cebu is one 22-hour
+     * sailing, and calling that "1 day" tells someone they can land and make a
+     * connection the same evening. You get off the next morning, so the next
+     * morning gets a card. */
+    const last = days[days.length - 1]
+    if (last && last.night === 'sleeper') {
+      const arriveAt = legs[legs.length - 1]
+      days.push({
+        n: days.length + 1,
+        legs: [],
+        hours: 0,
+        night: null,
+        nightAt: null,
+        arriveAt: arriveAt ? arriveAt.toCity : null,
+      })
+    }
+
+    return days
   }
 
   /* -------------------------------------------------------------- risks */
@@ -3720,9 +3878,13 @@ const Plan = (() => {
     const movingHours = railHours + seaHours + roadHours + bufferHours
 
     const pace = PACE_HOURS[opts.pace] ?? PACE_HOURS.standard
-    const days = Math.max(1, Math.ceil(movingHours / pace))
-    const sleeperNights = legs.filter(e => e.leg.sleeper && e.leg.hours >= 7).length
-    const hotelNights = Math.max(0, days - 1 - sleeperNights)
+    /* Day count comes from the day plan rather than dividing total hours by the
+     * pace. The two used to disagree — a route with one 22-hour ferry rounded
+     * to two days while the schedule below plainly showed three. */
+    const schedule = buildDays(legs, junctions, pace)
+    const days = schedule.length
+    const sleeperNights = schedule.filter(d => d.night === 'sleeper').length
+    const hotelNights = schedule.filter(d => d.night === 'hotel').length
 
     const transportUsd = legs.reduce((n, e) => n + (e.leg.usd ?? 0), 0)
     const lodgingUsd = hotelNights * HOTEL_USD
@@ -3760,6 +3922,7 @@ const Plan = (() => {
       zones,
       seasons,
       detours,
+      schedule,
       risks: buildRisks(network, legs, junctions, seasons, opts),
       booking: bookingOrder(network, legs),
       totals: {
@@ -5313,6 +5476,7 @@ const UI = (() => {
                 <span class="tag ${conf.tone}" title="${esc(conf.title)}">${esc(conf.label)}</span>
               </span>
               <span class="svc">${esc(leg.service)}${cls}</span>
+              ${frequencyLine(leg, op)}
               ${viaLine(entry.via)}
               ${leg.note ? `<span class="leg-note">${esc(leg.note)}</span>` : ''}
               ${bookLine(network, op, leg.mode)}
@@ -5340,15 +5504,112 @@ const UI = (() => {
     return `
       <section class="block">
         <h2>The route</h2>
-        <p class="sub">Durations are typical scheduled running times, not departures. No planner in this
-        region can give you a departure time you should trust — the operators publish nothing in common.
-        Take these legs to the booking sites below and read the real clock there.</p>
+        <p class="sub">Durations are typical scheduled running times, not departures, and the figure
+        under each service is how often it runs — the number that decides whether a missed connection
+        costs you an hour or a day. Where a last departure is shown it is the one worth setting an alarm
+        for. No planner in this region can give you a departure time you should trust: the operators
+        publish nothing in common. Take these legs to the booking sites below and read the real clock
+        there.</p>
         <div class="table-wrap">
           <table class="route">
             <thead><tr><th></th><th>Leg &amp; operator</th><th class="num-col">Time</th><th class="num-col">Fare</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
+      </section>`
+  }
+
+  /* How many run in a day, and the last one where missing it costs you a night.
+   *
+   * This is the closest the page comes to a timetable, and the distinction is
+   * deliberate: a frequency is structural — it changes with a timetable revision
+   * once or twice a year — while a departure time is specific to a date and a
+   * direction and is exactly the thing that strands people. A last sailing is
+   * the one clock time worth stating, because it is the one that turns a missed
+   * connection into a night on the wrong side of the water. */
+  function frequencyLine(leg, operator) {
+    // The leg knows best; the operator is the fallback for services whose
+    // frequency is a property of the mode rather than of any one route.
+    const d = leg.daily || (operator && operator.daily)
+    if (!d) {
+      return `<span class="freq none">Frequency not recorded — check the operator</span>`
+    }
+    const count = typeof d.n === 'number' ? `${d.n} a day` : esc(d.n)
+    return (
+      `<span class="freq">` +
+      `<b>${esc(count)}</b>` +
+      (d.spread ? ` · ${esc(d.spread)}` : '') +
+      (d.last ? ` <span class="last">last ${esc(d.last)}</span>` : '') +
+      `</span>`
+    )
+  }
+
+  /* The day-by-day shape of the journey. Not a timetable — no departure is
+   * stated anywhere in it — but it answers the question people actually mean
+   * when they ask for one: how many days is this, what happens on each, and
+   * where do I sleep. */
+  function scheduleBlock(network, plan) {
+    if (!plan.schedule || plan.schedule.length < 2) return ''
+
+    const rows = plan.schedule
+      .map(day => {
+        // A day that exists only because you were asleep on a boat or a train
+        // when it started. No legs, but it is a real day of your trip.
+        if (!day.legs.length) {
+          return `
+            <div class="day arrive-only">
+              <div class="day-head"><span class="day-n">Day ${day.n}</span></div>
+              <span class="night end">Step off in the morning${
+                day.arriveAt ? ` at ${esc(day.arriveAt)}` : ''
+              }</span>
+            </div>`
+        }
+        const items = day.legs
+          .map(i => {
+            const e = plan.legs[i]
+            // "Manila → Manila" for a cross-town transfer helps nobody; when
+            // both ends share a city, name the stations instead.
+            const same = e.fromCity === e.toCity
+            const a = same ? e.fromName : e.fromCity
+            const b = same ? e.toName : e.toCity
+            return `<li>
+              <span class="mode-dot ${e.leg.mode}" aria-hidden="true"></span>
+              <span class="d-route">
+                <b>${esc(a)}</b> <span class="arrow" aria-hidden="true">→</span> <b>${esc(b)}</b>
+                <span class="d-svc">${esc(e.leg.service)}</span>
+              </span>
+              <span class="d-time">${esc(hours(e.leg.hours))}</span>
+            </li>`
+          })
+          .join('')
+
+        const night =
+          day.night === 'sleeper'
+            ? `<span class="night sleeper">Night aboard — ${esc(day.nightAt || 'the sleeper')}</span>`
+            : day.night === 'hotel'
+              ? `<span class="night hotel">Night in ${esc(day.nightAt || 'town')}</span>`
+              : `<span class="night end">Arrive</span>`
+
+        return `
+          <div class="day">
+            <div class="day-head">
+              <span class="day-n">Day ${day.n}</span>
+              <span class="day-hours">${esc(hours(day.hours))} moving</span>
+            </div>
+            <ul class="day-legs">${items}</ul>
+            ${night}
+          </div>`
+      })
+      .join('')
+
+    return `
+      <section class="block">
+        <h2>Day by day</h2>
+        <p class="sub">Shape, not a timetable. This is built from running times, the connection buffers
+        above and your chosen pace — it deliberately states no departure time, because none of these
+        operators publish one this page could stand behind. Use it to decide how many nights to book
+        and where; use the operator sites for the clock.</p>
+        <div class="days">${rows}</div>
       </section>`
   }
 
@@ -5576,6 +5837,7 @@ const UI = (() => {
           : ''
       }
       ${routeTable(network, plan)}
+      ${scheduleBlock(network, plan)}
       ${borderSection(network, plan)}
       ${risksSection(plan)}
       ${bookingSection(network, plan)}

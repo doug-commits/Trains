@@ -203,6 +203,7 @@ const UI = (() => {
                 <span class="tag ${conf.tone}" title="${esc(conf.title)}">${esc(conf.label)}</span>
               </span>
               <span class="svc">${esc(leg.service)}${cls}</span>
+              ${frequencyLine(leg, op)}
               ${viaLine(entry.via)}
               ${leg.note ? `<span class="leg-note">${esc(leg.note)}</span>` : ''}
               ${bookLine(network, op, leg.mode)}
@@ -230,15 +231,112 @@ const UI = (() => {
     return `
       <section class="block">
         <h2>The route</h2>
-        <p class="sub">Durations are typical scheduled running times, not departures. No planner in this
-        region can give you a departure time you should trust — the operators publish nothing in common.
-        Take these legs to the booking sites below and read the real clock there.</p>
+        <p class="sub">Durations are typical scheduled running times, not departures, and the figure
+        under each service is how often it runs — the number that decides whether a missed connection
+        costs you an hour or a day. Where a last departure is shown it is the one worth setting an alarm
+        for. No planner in this region can give you a departure time you should trust: the operators
+        publish nothing in common. Take these legs to the booking sites below and read the real clock
+        there.</p>
         <div class="table-wrap">
           <table class="route">
             <thead><tr><th></th><th>Leg &amp; operator</th><th class="num-col">Time</th><th class="num-col">Fare</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
+      </section>`
+  }
+
+  /* How many run in a day, and the last one where missing it costs you a night.
+   *
+   * This is the closest the page comes to a timetable, and the distinction is
+   * deliberate: a frequency is structural — it changes with a timetable revision
+   * once or twice a year — while a departure time is specific to a date and a
+   * direction and is exactly the thing that strands people. A last sailing is
+   * the one clock time worth stating, because it is the one that turns a missed
+   * connection into a night on the wrong side of the water. */
+  function frequencyLine(leg, operator) {
+    // The leg knows best; the operator is the fallback for services whose
+    // frequency is a property of the mode rather than of any one route.
+    const d = leg.daily || (operator && operator.daily)
+    if (!d) {
+      return `<span class="freq none">Frequency not recorded — check the operator</span>`
+    }
+    const count = typeof d.n === 'number' ? `${d.n} a day` : esc(d.n)
+    return (
+      `<span class="freq">` +
+      `<b>${esc(count)}</b>` +
+      (d.spread ? ` · ${esc(d.spread)}` : '') +
+      (d.last ? ` <span class="last">last ${esc(d.last)}</span>` : '') +
+      `</span>`
+    )
+  }
+
+  /* The day-by-day shape of the journey. Not a timetable — no departure is
+   * stated anywhere in it — but it answers the question people actually mean
+   * when they ask for one: how many days is this, what happens on each, and
+   * where do I sleep. */
+  function scheduleBlock(network, plan) {
+    if (!plan.schedule || plan.schedule.length < 2) return ''
+
+    const rows = plan.schedule
+      .map(day => {
+        // A day that exists only because you were asleep on a boat or a train
+        // when it started. No legs, but it is a real day of your trip.
+        if (!day.legs.length) {
+          return `
+            <div class="day arrive-only">
+              <div class="day-head"><span class="day-n">Day ${day.n}</span></div>
+              <span class="night end">Step off in the morning${
+                day.arriveAt ? ` at ${esc(day.arriveAt)}` : ''
+              }</span>
+            </div>`
+        }
+        const items = day.legs
+          .map(i => {
+            const e = plan.legs[i]
+            // "Manila → Manila" for a cross-town transfer helps nobody; when
+            // both ends share a city, name the stations instead.
+            const same = e.fromCity === e.toCity
+            const a = same ? e.fromName : e.fromCity
+            const b = same ? e.toName : e.toCity
+            return `<li>
+              <span class="mode-dot ${e.leg.mode}" aria-hidden="true"></span>
+              <span class="d-route">
+                <b>${esc(a)}</b> <span class="arrow" aria-hidden="true">→</span> <b>${esc(b)}</b>
+                <span class="d-svc">${esc(e.leg.service)}</span>
+              </span>
+              <span class="d-time">${esc(hours(e.leg.hours))}</span>
+            </li>`
+          })
+          .join('')
+
+        const night =
+          day.night === 'sleeper'
+            ? `<span class="night sleeper">Night aboard — ${esc(day.nightAt || 'the sleeper')}</span>`
+            : day.night === 'hotel'
+              ? `<span class="night hotel">Night in ${esc(day.nightAt || 'town')}</span>`
+              : `<span class="night end">Arrive</span>`
+
+        return `
+          <div class="day">
+            <div class="day-head">
+              <span class="day-n">Day ${day.n}</span>
+              <span class="day-hours">${esc(hours(day.hours))} moving</span>
+            </div>
+            <ul class="day-legs">${items}</ul>
+            ${night}
+          </div>`
+      })
+      .join('')
+
+    return `
+      <section class="block">
+        <h2>Day by day</h2>
+        <p class="sub">Shape, not a timetable. This is built from running times, the connection buffers
+        above and your chosen pace — it deliberately states no departure time, because none of these
+        operators publish one this page could stand behind. Use it to decide how many nights to book
+        and where; use the operator sites for the clock.</p>
+        <div class="days">${rows}</div>
       </section>`
   }
 
@@ -466,6 +564,7 @@ const UI = (() => {
           : ''
       }
       ${routeTable(network, plan)}
+      ${scheduleBlock(network, plan)}
       ${borderSection(network, plan)}
       ${risksSection(plan)}
       ${bookingSection(network, plan)}

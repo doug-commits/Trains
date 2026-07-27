@@ -156,6 +156,11 @@ const Plan = (() => {
         essential: parts.every(l => l.essential),
         advisory: parts.find(l => l.advisory)?.advisory,
         seasonal: [...new Set(parts.map(l => l.seasonal).filter(Boolean))],
+        /* How often the thing runs. Recorded on whichever segment of a run we
+         * know it for — the frequency of a through train belongs to the train,
+         * not to each station pair it passes. Absent means unrecorded, and the
+         * page says so rather than inventing a number. */
+        daily: parts.find(l => l.daily)?.daily || null,
         confidence,
         note: [...new Set(parts.map(l => l.note).filter(Boolean))].join(' '),
         borderIds: parts.map(l => l.border).filter(Boolean),
@@ -295,6 +300,77 @@ const Plan = (() => {
     deepsouth: 'Check your own government\'s current travel advice and decide deliberately. There is a west-coast alternative via Padang Besar that avoids this entirely.',
     myanmar: 'Check your own government\'s current travel advice. There is no through rail here in any case, so nothing is lost by leaving it out.',
     sulu: 'Check what your government says about the specific provinces rather than about Mindanao as a whole. The Nautical Highway corridor through Surigao, Cagayan de Oro and Davao is a different proposition from the Zamboanga peninsula, and reaching Zamboanga by sea from Manila or Iloilo skips the road entirely.',
+  }
+
+  /* ------------------------------------------------------- the day plan
+   * The nearest thing to a schedule this project will produce, and the line it
+   * will not cross is departure times. Nobody publishes them in a common
+   * format, so a stated departure would be a remembered one, and a remembered
+   * departure is how somebody sleeps on a platform.
+   *
+   * What can be said honestly is shape: which legs fall on which day, how many
+   * hours each day costs, and where the night goes — aboard a sleeper or in a
+   * bed. That comes out of running times, connection buffers and the chosen
+   * pace, all of which are ours to compute rather than to recall.
+   */
+  function buildDays(legs, junctions, paceHours) {
+    const days = []
+    let open = null
+
+    const start = () => {
+      open = { n: days.length + 1, legs: [], hours: 0, night: null, nightAt: null }
+      days.push(open)
+    }
+
+    legs.forEach((entry, i) => {
+      const leg = entry.leg
+      // An overnight sleeper is not part of a day, it *is* the night.
+      const overnight = leg.sleeper && leg.hours >= 7
+      const buffer = (junctions[i]?.minutes ?? 0) / 60
+
+      if (!open) start()
+      // Starting a leg that would blow through the pace means starting it
+      // tomorrow instead — unless nothing has happened today yet, in which case
+      // it is simply a long day and saying otherwise would be a fiction.
+      else if (!overnight && open.legs.length && open.hours + leg.hours > paceHours) start()
+
+      open.legs.push(i)
+      open.hours += leg.hours + buffer
+
+      if (overnight) {
+        open.night = 'sleeper'
+        open.nightAt = entry.leg.service
+        open = null
+      }
+    })
+
+    // Every night between days that is not spent moving is spent in a bed.
+    days.forEach((d, i) => {
+      if (i === days.length - 1) return
+      if (d.night) return
+      d.night = 'hotel'
+      const lastLeg = legs[d.legs[d.legs.length - 1]]
+      d.nightAt = lastLeg ? lastLeg.toCity : null
+    })
+
+    /* Boarding an overnight is not arriving. Manila to Cebu is one 22-hour
+     * sailing, and calling that "1 day" tells someone they can land and make a
+     * connection the same evening. You get off the next morning, so the next
+     * morning gets a card. */
+    const last = days[days.length - 1]
+    if (last && last.night === 'sleeper') {
+      const arriveAt = legs[legs.length - 1]
+      days.push({
+        n: days.length + 1,
+        legs: [],
+        hours: 0,
+        night: null,
+        nightAt: null,
+        arriveAt: arriveAt ? arriveAt.toCity : null,
+      })
+    }
+
+    return days
   }
 
   /* -------------------------------------------------------------- risks */
@@ -492,9 +568,13 @@ const Plan = (() => {
     const movingHours = railHours + seaHours + roadHours + bufferHours
 
     const pace = PACE_HOURS[opts.pace] ?? PACE_HOURS.standard
-    const days = Math.max(1, Math.ceil(movingHours / pace))
-    const sleeperNights = legs.filter(e => e.leg.sleeper && e.leg.hours >= 7).length
-    const hotelNights = Math.max(0, days - 1 - sleeperNights)
+    /* Day count comes from the day plan rather than dividing total hours by the
+     * pace. The two used to disagree — a route with one 22-hour ferry rounded
+     * to two days while the schedule below plainly showed three. */
+    const schedule = buildDays(legs, junctions, pace)
+    const days = schedule.length
+    const sleeperNights = schedule.filter(d => d.night === 'sleeper').length
+    const hotelNights = schedule.filter(d => d.night === 'hotel').length
 
     const transportUsd = legs.reduce((n, e) => n + (e.leg.usd ?? 0), 0)
     const lodgingUsd = hotelNights * HOTEL_USD
@@ -532,6 +612,7 @@ const Plan = (() => {
       zones,
       seasons,
       detours,
+      schedule,
       risks: buildRisks(network, legs, junctions, seasons, opts),
       booking: bookingOrder(network, legs),
       totals: {
