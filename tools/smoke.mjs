@@ -7,11 +7,18 @@
  */
 
 import { chromium } from 'playwright'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+/* The page bundles its sources into a closure, so nothing is reachable on
+ * window. Where an assertion needs a count from the data rather than a literal
+ * that rots on the next edit, read the data file here instead. */
+const NETWORK = new Function(
+  readFileSync(join(root, 'data/network.js'), 'utf8') + '; return NETWORK'
+)()
 const outDir = resolve(process.argv[2] || join(root, 'shots'))
 mkdirSync(outDir, { recursive: true })
 
@@ -52,7 +59,10 @@ function check(label, condition, detail = '') {
   // Count comes from the preset list, not a magic number that rots on edit.
   const chips = await page.locator('.corridor').count()
   check('corridor cards render', chips >= 6, `${chips} cards`)
-  check('myths render', (await page.locator('.myths li').count()) === 7)
+  // Again from the data, not a literal — the last one of these rotted the first
+  // time a myth was added.
+  check('myths render', (await page.locator('.myths li').count()) === NETWORK.myths.length,
+    `${NETWORK.myths.length} myths`)
 
   // The canvas must actually have painted something, not just be sized.
   const painted = await page.evaluate(() => {
@@ -214,6 +224,40 @@ function check(label, condition, detail = '') {
   check('nonsense is refused, not guessed at', /Not sure what you mean/.test(await page.textContent('#asknote')))
 
   await page.screenshot({ path: join(outDir, '16-ask-answer.png') })
+  await context.close()
+}
+
+/* ------------------------------------------------------- the Philippines */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+
+  // The overland answer to a route everybody flies. If this ever comes back as
+  // a single leg, a boat has been invented somewhere.
+  await page.locator('.corridor', { hasText: 'Manila → Boracay' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(900)
+
+  const text = await page.textContent('#panel')
+  const legs = await page.locator('.route tbody tr').count()
+  check('Boracay reached without flying', legs >= 4, `${legs} legs`)
+  check('the jetty crossing is named', /Caticlan/.test(text))
+  check('Philippine operators named, not "ferry"', /Montenegro/.test(text))
+
+  await page.screenshot({ path: join(outDir, '17-manila-boracay.png') })
+
+  // Asking for a route into the archipelago must explain the world, not
+  // report a missing edge.
+  await page.fill('#askbox', 'how do I get from Bangkok to Manila')
+  await page.click('#askgo')
+  await page.waitForTimeout(900)
+  const cut = await page.textContent('#panel')
+  check('the sea gap is explained, not shrugged at', /Not a gap in the map/.test(cut))
+  check('the suspended Sandakan ferry is named', /Sandakan/.test(cut))
+  check('and the country is not written off as railless', /PNR|Bicol/.test(cut))
+
+  await page.screenshot({ path: join(outDir, '18-philippines-unreachable.png') })
   await context.close()
 }
 

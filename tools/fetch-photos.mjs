@@ -44,7 +44,13 @@ const ALLOWED = [
   /^cc[ -]by[ -][0-9.]+/i,
 ]
 
-const WIDTH = 1200 // Commons resizes server-side, so nothing is processed here.
+/* Commons resizes server-side, so nothing is processed here — but the width
+ * asked for decides whether the whole set fits in the page. At 1200 the files
+ * ran 300–700 KB and half of them fell out of tools/build.mjs's inline budget,
+ * which is a silent, arbitrary loss: whichever landmarks happened to sort first
+ * got a photograph. 800 is wide enough for a card that renders about 400 CSS
+ * pixels across on a 2x screen, and it roughly halves the bytes. */
+const WIDTH = 800
 
 const args = process.argv.slice(2)
 const force = args.includes('--force')
@@ -201,7 +207,10 @@ async function main() {
   for (const lm of targets) {
     const id = slug(lm.name)
     const file = `${id}.jpg`
-    if (!force && manifest[id] && existsSync(join(OUT_DIR, file))) {
+    // Refetch when WIDTH changes, otherwise raising or lowering it only affects
+    // landmarks added afterwards and the set ends up a mix of two sizes.
+    const current = manifest[id]?.req === WIDTH
+    if (!force && current && existsSync(join(OUT_DIR, file))) {
       skipped++
       continue
     }
@@ -236,6 +245,7 @@ async function main() {
         source: found.source,
         width: found.width,
         height: found.height,
+        req: WIDTH, // what was asked for; `width` is what Commons could give
         bytes: bytes.length,
       }
       got++

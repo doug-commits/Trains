@@ -16,7 +16,7 @@ the typefaces all travel inside the page.
 ## What it actually does
 
 The routing is the easy part. The graph of Southeast Asian railways is small
-enough to hold in your head, and Dijkstra over a hundred and fifty edges is not
+enough to hold in your head, and Dijkstra over a couple of hundred edges is not
 an achievement. The work is in **feasibility** — the reasons a route that looks
 fine on a map fails in reality:
 
@@ -36,6 +36,11 @@ fine on a map fails in reality:
 - **Booking order.** Scarcest inventory first, not chronological. The shortest
   leg on the whole spine — five minutes across the Johor Strait — sells out
   before anything else.
+- **Places you cannot get to.** The Philippines is on the map with forty
+  stations and a full bus-and-ferry network, and no leg joins it to anything
+  else, because no scheduled passenger ship does. Ask for Bangkok to Manila and
+  the planner says why rather than reporting a missing edge — see
+  `disconnected` in `data/network.js`.
 
 ### What it deliberately does not do
 
@@ -58,8 +63,9 @@ legs is worth more than one that presents everything with false confidence.
 ## Layout
 
 ```
-data/network.js      Stations, legs, borders, seasons, booking windows.
-                     This is the product; everything else is plumbing.
+data/network.js      182 stations, 208 legs, 15 borders, 31 operators, plus
+                     seasons, advisories, booking windows and the countries
+                     nothing sails to. This is the product; the rest is plumbing.
 data/landmarks.js    Landmarks mapped to the railhead you actually get off at.
 data/basemap.json    Simplified SE Asia coastline, generated, committed.
 data/photos.json     Photo manifest with credits. Absent until fetched.
@@ -107,7 +113,8 @@ no affiliate links in this project and the output says so. If that ever changes
 it has to be disclosed in the page, not just in a commit message.
 
 `operators` in `data/network.js` covers named ferry and bus companies as well as
-the railways — Lomprayah, ASDP, Giant Ibis, Green Bus and so on — because
+the railways — Lomprayah, ASDP, Giant Ibis, Green Bus, 2GO, OceanJet, Ceres and
+so on — because
 "Ferry" in an operator column tells a traveller nothing. Each carries a `mono`
 and a `livery` colour that render as a plate beside the leg. **These are our own
 marks, not the operators' logos**: the logos are trademarks and redistributing
@@ -142,16 +149,25 @@ with `--only`.
 image itself and the full list renders with the itinerary, both generated from
 the manifest. Do not hand-edit those out.
 
+The build environment cannot reach Wikimedia — the request is refused at the
+network edge — so the fetch runs on CI instead and commits its results.
+`.github/workflows/fetch-photos.yml` fires on any push that touches the fetcher,
+`data/landmarks.js` or the workflow itself. A browser test gates the commit, so
+a fetch that breaks the page does not land.
+
 `tools/build.mjs` inlines photos as data URIs so the page stays one
-self-contained file, subject to `PHOTO_BUDGET_KB` (default 3000). Past that it
-stops inlining and those destinations fall back to illustrations — at which
-point serve `data/photos/` as static assets and reference them by path instead.
+self-contained file, subject to `PHOTO_BUDGET_KB` (default 3000). It spends the
+budget smallest-file-first, which buys the most destinations and makes the cut
+deterministic; anything left over falls back to an illustration. `WIDTH` in the
+fetcher is the other half of that trade — it is recorded per file as `req`, and
+changing it refetches the whole set rather than leaving a mix of two sizes.
+If the set outgrows the budget for real, serve `data/photos/` as static assets
+and reference them by path instead.
 
 **Illustrations** otherwise: `src/scene.js` draws an original picture from the
-landform that characterises each place. Photographs were not available when this
-was written — every image host is blocked from the build environment — so the
-drawn set is what ships by default, and it is the permanent fallback for any
-destination without a photograph. To exercise the photo path without network:
+landform that characterises each place. They are the permanent fallback for any
+destination without a photograph, and what ships for a landmark Commons has
+nothing usable for. To exercise the photo path without network:
 
 ```sh
 node tools/make-fixture-photos.mjs   # placeholder images, clearly marked
@@ -192,7 +208,10 @@ python3 tools/build-fonts.py <dir-of-ttfs> src/fonts.css
 
 Timetable and border facts are assembled per operator and cross-checked against
 [Seat61](https://www.seat61.com/asia-trains.htm) and Richard Barrow's
-[Thai Train Guide](https://www.thaitrainguide.com). Coastlines are
+[Thai Train Guide](https://www.thaitrainguide.com). Philippine sailings are
+cross-checked against the shipping lines' own schedules and a ferry aggregator,
+which is the best available: the RORO crossings publish nothing and run on
+weather anyway. Coastlines are
 [Natural Earth](https://www.naturalearthdata.com) (public domain). Typefaces are
 Barlow Condensed, Spectral and IBM Plex Mono, all SIL Open Font License 1.1.
 

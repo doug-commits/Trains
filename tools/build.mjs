@@ -57,12 +57,16 @@ function loadPhotos() {
   let bytes = 0
   let skipped = 0
 
-  for (const [id, entry] of Object.entries(manifest)) {
+  /* Smallest first. The budget is going to cut somewhere; spending it on the
+   * cheapest photographs buys the most destinations, and it makes the cut
+   * deterministic instead of "whatever the manifest happened to list first". */
+  const entries = Object.entries(manifest)
+    .filter(([, e]) => existsSync(join(root, 'data/photos', e.file)))
+    .sort((a, b) => (a[1].bytes ?? 0) - (b[1].bytes ?? 0))
+  skipped += Object.keys(manifest).length - entries.length
+
+  for (const [id, entry] of entries) {
     const file = join(root, 'data/photos', entry.file)
-    if (!existsSync(file)) {
-      skipped++
-      continue
-    }
     const buf = readFileSync(file)
     if ((bytes + buf.length) / 1024 > PHOTO_BUDGET_KB) {
       skipped++

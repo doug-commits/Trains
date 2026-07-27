@@ -487,6 +487,34 @@ const UI = (() => {
     const from = network.stations[fromId]
     const to = network.stations[toId]
 
+    /* Some pairs fail because the world is like that, not because the data has
+     * a hole in it. When one end sits in a country nothing sails to, say so and
+     * say why — "no route found" reads as a missing edge, and the difference
+     * between a gap in a graph and a suspended ferry is the whole point. */
+    const cut =
+      network.disconnected?.[to.country] && !network.disconnected[from.country]
+        ? { info: network.disconnected[to.country], side: to }
+        : network.disconnected?.[from.country] && !network.disconnected[to.country]
+          ? { info: network.disconnected[from.country], side: from }
+          : null
+
+    if (cut) {
+      return `
+        <header class="head">
+          <p class="eyebrow">Not a gap in the map</p>
+          <h1>${esc(from.city)} <span aria-hidden="true">→</span> ${esc(to.city)}</h1>
+        </header>
+        <div class="callout alert">
+          <h3>You cannot reach ${esc(cut.info.name)} overland or by sea</h3>
+          <p>${esc(cut.info.why)}</p>
+        </div>
+        <section class="block">
+          <h2>What this planner can do instead</h2>
+          <p>${esc(cut.info.inside)}</p>
+          ${cut.info.rail ? `<p>${esc(cut.info.rail)}</p>` : ''}
+        </section>`
+    }
+
     // Name the station where the rails actually stop, on the destination's side.
     const target = network.stations[toId]
     let nearest = null

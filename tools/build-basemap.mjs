@@ -23,9 +23,15 @@ const KEEP = new Map([
   ['PHL', 'ph'], ['TLS', 'tl'], ['BGD', 'bd'], ['IND', 'in'],
 ])
 
-const BBOX = { west: 92, east: 122, south: -12, north: 29 }
+// East to 127 so the Philippines is whole. Clipped at 122 — where this sat
+// until the archipelago was added — Luzon lost its tail and Samar, Leyte,
+// Bohol and eastern Mindanao fell off the edge entirely.
+const BBOX = { west: 92, east: 127, south: -12, north: 29 }
 const TOLERANCE = 0.035 // degrees; ~4 km — plenty for a 1000px-wide map
-const MIN_AREA = 0.02 // drop specks that would render as sub-pixel dust
+// Drop specks that would render as sub-pixel dust. ~0.01 sq degrees is around
+// 120 km²: small enough to keep Siquijor and Camiguin, which the ferry network
+// calls at and which look like omissions when they are missing.
+const MIN_AREA = 0.01
 
 // --- Sutherland-Hodgman clip against each bbox edge ------------------------
 

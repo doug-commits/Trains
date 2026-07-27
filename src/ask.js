@@ -25,7 +25,7 @@ const Ask = (() => {
 
   const COUNTRY_LABEL = {
     cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
-    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', mm: 'Myanmar',
+    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', ph: 'Philippines', mm: 'Myanmar',
   }
 
   /* Phrases people wrap the actual question in. Stripped before matching so

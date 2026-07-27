@@ -49,7 +49,7 @@ const Scene = (() => {
 
   const DEFAULT_BY_COUNTRY = {
     th: 'temple', la: 'karst', kh: 'temple', vn: 'karst',
-    my: 'forest', sg: 'skyline', id: 'volcano', cn: 'karst', bn: 'coast', mm: 'hills',
+    my: 'forest', sg: 'skyline', id: 'volcano', cn: 'karst', bn: 'coast', ph: 'coast', mm: 'hills',
   }
 
   /** Which illustration a station should carry. */

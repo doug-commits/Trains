@@ -5,9 +5,9 @@
 ;(function () {
   const COUNTRY_NAME = {
     cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
-    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', mm: 'Myanmar',
+    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', ph: 'Philippines', mm: 'Myanmar',
   }
-  const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'bn', 'id', 'mm']
+  const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'bn', 'id', 'ph', 'mm']
 
   const PRESETS = [
     { label: 'The Spine', from: 'kunming', to: 'singapore', note: 'Kunming to Singapore — the only continuous rail corridor in the region' },
@@ -17,6 +17,8 @@
     { label: 'Bangkok → Hanoi', from: 'bkk_aphiwat', to: 'hanoi', note: 'There is no rail answer. See what the honest one looks like' },
     { label: 'The Jungle Railway', from: 'klsentral', to: 'wakafbaharu', note: 'Slow, scenic, cult status — the journey as the point' },
     { label: 'The Mekong slow boat', from: 'chiangmai', to: 'luangprabang', note: 'Two days downriver into Laos, with a night at Pakbeng' },
+    { label: 'Manila → Davao', from: 'manila', to: 'davao', note: 'The length of the Philippines without flying. Two nights at sea and a mountain bus' },
+    { label: 'Manila → Boracay', from: 'manila', to: 'boracay', note: 'Everyone flies. You do not have to, and this is what the alternative costs' },
   ]
 
   const $ = sel => document.querySelector(sel)
@@ -41,7 +43,7 @@
   }
 
   /* Real numbers on the corridor cards, so the choice is informed before the
-     click. Six Dijkstra runs over 155 edges — cheap enough to do at boot. */
+     click. One Dijkstra run per corridor over ~200 edges — cheap at boot. */
   function withStats(presets) {
     // Several corridors end in the same kind of place, and three identical
     // skylines in a row reads as a rendering bug. Where the terminus repeats,

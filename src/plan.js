@@ -8,7 +8,7 @@
  */
 
 const Plan = (() => {
-  const UTC_OFFSET = { cn: 8, la: 7, th: 7, kh: 7, vn: 7, my: 8, sg: 8, bn: 8, id: 7, mm: 6.5 }
+  const UTC_OFFSET = { cn: 8, la: 7, th: 7, kh: 7, vn: 7, my: 8, sg: 8, bn: 8, id: 7, ph: 8, mm: 6.5 }
   // Indonesia spans three zones; Bali is WITA, an hour ahead of Java.
   const TZ_OVERRIDE = { denpasar: 8, gilimanuk: 8, banyuwangi: 7, kotakinabalu: 8, tenom: 8 }
 
@@ -87,6 +87,21 @@ const Plan = (() => {
       cost: '+2 nights',
       text: 'You are already passing through. Yogyakarta is an hour back down the line from Solo and is the reason most people stop on Java at all.',
     },
+    cebu: {
+      title: 'Bohol, an hour and a half from the pier',
+      cost: '+2 nights, ~$24',
+      text: 'OceanJet runs Cebu to Tagbilaran most of the day. Chocolate Hills, the Loboc river and Panglao\'s beaches are all inside a day of the port, and Siquijor is one more boat beyond. If you are passing through Cebu at all, this is the cheapest good decision available.',
+    },
+    legazpi: {
+      title: 'Ride the last intercity train in the Philippines',
+      cost: '+1 day, ~$3',
+      text: 'PNR still works a shuttle between Legazpi, Naga and Sipocot — the only intercity passenger service left in the country, running beside Mayon for the last half hour. It suspends and resumes, so confirm it the week you travel. Take it because it is the train, not because it is the quicker way; the bus is faster.',
+    },
+    matnog: {
+      title: 'Stay on the Nautical Highway rather than fly over it',
+      cost: '+0 nights',
+      text: 'You are at the ramp for the crossing the whole Strong Republic Nautical Highway is built around — Luzon to Samar, and from there a through bus ticket runs all the way to Davao. Sail in daylight if you can choose: the strait is short and the view of Bulusan going astern is the reason to be on deck.',
+    },
     banyuwangi: {
       title: 'Take the dawn crossing to Bali',
       cost: '+0 nights',
@@ -140,6 +155,7 @@ const Plan = (() => {
         scenic: parts.some(l => l.scenic),
         essential: parts.every(l => l.essential),
         advisory: parts.find(l => l.advisory)?.advisory,
+        seasonal: [...new Set(parts.map(l => l.seasonal).filter(Boolean))],
         confidence,
         note: [...new Set(parts.map(l => l.note).filter(Boolean))].join(' '),
         borderIds: parts.map(l => l.border).filter(Boolean),
@@ -234,12 +250,18 @@ const Plan = (() => {
   }
 
   /* ---------------------------------------------------------- seasonality */
-  function seasonHits(network, dateStr) {
+  /* A season only matters if the route actually enters a country it hits.
+   * Without the country test, Philippine typhoon season — six months long —
+   * would headline a Bangkok–Singapore itinerary that never leaves the
+   * mainland, and a warning that fires on everything gets read as noise. */
+  function seasonHits(network, dateStr, countries) {
     if (!dateStr) return []
     const md = dateStr.slice(5, 10)
+    const on = new Set(countries)
     return network.seasons.filter(s => {
       // Ranges here never wrap the year end, so a plain string compare is safe.
-      return md >= s.from && md <= s.to
+      if (md < s.from || md > s.to) return false
+      return !s.hits || s.hits.some(c => on.has(c))
     })
   }
 
@@ -264,17 +286,39 @@ const Plan = (() => {
     }
   }
 
+  const listOf = xs =>
+    xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+
+  /* What to actually do about each advisory. The generic fallback tells people
+   * to read their own government's advice; these say where the way round is. */
+  const ADVISORY_FIX = {
+    deepsouth: 'Check your own government\'s current travel advice and decide deliberately. There is a west-coast alternative via Padang Besar that avoids this entirely.',
+    myanmar: 'Check your own government\'s current travel advice. There is no through rail here in any case, so nothing is lost by leaving it out.',
+    sulu: 'Check what your government says about the specific provinces rather than about Mindanao as a whole. The Nautical Highway corridor through Surigao, Cagayan de Oro and Davao is a different proposition from the Zamboanga peninsula, and reaching Zamboanga by sea from Manila or Iloilo skips the road entirely.',
+  }
+
   /* -------------------------------------------------------------- risks */
   function buildRisks(network, legs, junctions, seasons, opts) {
     const risks = []
     const seenBorders = new Set()
 
     for (const s of seasons) {
+      // Name the legs that actually carry this season, so the warning points at
+      // something instead of hanging over the whole itinerary.
+      const exposed = legs.filter(e => e.seasonal?.includes(s.id))
+      const named = exposed.length
+        ? ` On this route it lands on ${listOf(exposed.map(e => `${e.fromName} – ${e.toName}`))}.`
+        : ''
       risks.push({
         severity: 'critical',
         title: `Your dates fall in ${s.name}`,
-        text: s.text + (s.fixed ? '' : ' These dates move each year — the window shown here is approximate.'),
-        fix: 'Move the trip by a week either side if you possibly can. If you cannot, book the moment every window opens and accept that some legs will be unobtainable in your preferred class.',
+        text:
+          s.text +
+          (s.fixed ? '' : ' These dates move each year — the window shown here is approximate.') +
+          named,
+        fix: exposed.length
+          ? 'Leave a spare day either side of those crossings rather than connecting straight through them, and do not put the last one before a flight home.'
+          : 'Move the trip by a week either side if you possibly can. If you cannot, book the moment every window opens and accept that some legs will be unobtainable in your preferred class.',
       })
     }
 
@@ -286,7 +330,7 @@ const Plan = (() => {
           severity: 'critical',
           title: `Security advisory on the ${entry.fromName} – ${entry.toName} leg`,
           text: network.advisories[leg.advisory],
-          fix: 'Check your own government\'s current travel advice and decide deliberately. There is a west-coast alternative via Padang Besar that avoids this entirely.',
+          fix: ADVISORY_FIX[leg.advisory] || 'Check your own government\'s current travel advice for this specific route and decide deliberately.',
           legIndex: i,
         })
       }
@@ -469,7 +513,8 @@ const Plan = (() => {
     }
 
     const zones = [...new Set(stationIds.map(id => tzOf(network, id)))].sort((a, b) => a - b)
-    const seasons = seasonHits(network, opts.date)
+    const countries = countriesOn(network, stationIds)
+    const seasons = seasonHits(network, opts.date, countries)
 
     const detours = Object.entries(DETOURS)
       .filter(([id]) => stationIds.includes(id))
@@ -483,7 +528,7 @@ const Plan = (() => {
       borders,
       stationIds,
       stopIds,
-      countries: countriesOn(network, stationIds),
+      countries,
       zones,
       seasons,
       detours,

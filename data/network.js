@@ -25,7 +25,8 @@ const NETWORK = {
     'Padang Besar to Kuala Lumpur to JB Sentral to Singapore. Everything else is a branch or ' +
     'an island. Cambodia hangs off that spine at Aranyaprathet. Vietnam is a self-contained ' +
     'north-south line touching no neighbour\'s passenger network. Indonesia is reachable only ' +
-    'by sea. Myanmar is isolated.',
+    'by sea. Myanmar is isolated. The Philippines is a network of its own — buses and ferries, ' +
+    'no scheduled ship to anywhere else in the region, and one surviving intercity train.',
 
   myths: [
     { belief: 'You can take a train from Singapore to Beijing.',
@@ -42,6 +43,12 @@ const NETWORK = {
       reality: 'Closed to passengers since 2024. It is a freight dry port now. Khamsavath is the station.' },
     { belief: '"Vientiane station"',
       reality: 'There are two, 15 km apart, on different gauges, serving opposite directions. Always name which one.' },
+    { belief: 'There are no railways in the Philippines.',
+      reality: 'There are. Manila has three metro lines, and PNR still runs a Bicol shuttle between Sipocot, Naga and Legazpi. What there is not is a network — no track on any island but Luzon, and the Manila commuter line shut since 2024 for construction.' },
+    { belief: 'I\'ll take a ferry from Borneo to the Philippines.',
+      reality: 'Not since 2017. The Zamboanga–Sandakan service is suspended and the Davao–Bitung link carries freight. You fly into the Philippines; everything after that is a bus or a boat.' },
+    { belief: 'Boracay must be a flight.',
+      reality: 'No. Bus to Batangas, ferry to Mindoro, bus down the island, ferry to Caticlan, ten minutes across the channel. Two days, and it is a real route people use.' },
   ],
 
   /* ------------------------------------------------------------- operators
@@ -81,6 +88,10 @@ const NETWORK = {
              gauge: 'metre', punctual: 'good', book: 'https://booking.kai.id',
              bookNote: 'Good site, bookable from abroad. The Access by KAI app is easier once you are in Indonesia.',
              note: 'The best rail in Southeast Asia — punctual, cheap, scenic.' },
+    pnr:   { name: 'Philippine National Railways', short: 'PNR', mono: 'PNR', livery: '#1f7a3d', ink: '#fff',
+             gauge: 'cape', punctual: 'poor', book: null, bookVia: 'counter',
+             bookNote: 'Tickets at the station on the day. There is no usable online booking and no reason to plan a connection around one.',
+             note: 'What is left of it. The Manila commuter line is closed for the North–South Commuter Railway works and the Bicol shuttles run when they run — the only Philippine operator on this map whose services you should confirm the week you travel.' },
 
     // --- sea
     lomprayah:     { name: 'Lomprayah', short: 'Lomprayah', mono: 'LOM', livery: '#00868b', ink: '#fff',
@@ -116,6 +127,22 @@ const NETWORK = {
     localferry:    { name: 'Local ferry', short: 'Local ferry', mono: 'FRY', livery: '#4b7c8c', ink: '#fff',
                      punctual: 'weather', book: null, bookVia: 'counter',
                      bookNote: 'Bought at the pier. Turn up, check the last departure when you arrive, and do not be the one still on the dock.', note: '' },
+    twogo:         { name: '2GO Travel', short: '2GO', mono: '2GO', livery: '#0a5ba8', ink: '#fff',
+                     punctual: 'weather', book: 'https://travel.2go.com.ph',
+                     bookNote: 'The Philippines\' main long-haul shipping line, and genuinely bookable from abroad. Cabin classes are worth the small difference over the open tourist deck on anything overnight.',
+                     note: 'Manila to Cebu, Iloilo, Cagayan de Oro and Palawan — one or two nights aboard, not a hop.' },
+    oceanjet:      { name: 'OceanJet', short: 'OceanJet', mono: 'OJ', livery: '#0f8ab0', ink: '#fff',
+                     punctual: 'weather', book: 'https://www.oceanjet.net',
+                     bookNote: 'Books online. The Cebu–Bohol sailings fill at weekends and around holidays; the rest of the network is usually walk-up.',
+                     note: 'Fast craft around the Visayas — Cebu, Bohol, Dumaguete, Siquijor. This is the network that makes island-hopping there feel like a bus timetable.' },
+    montenegro:    { name: 'Montenegro Shipping Lines', short: 'Montenegro', mono: 'MSL', livery: '#1d5c3a', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'aggregator',
+                     bookNote: 'RORO ferries sold at the port, or through a Philippine ferry aggregator. Sailings are frequent enough on the Batangas routes that turning up works.',
+                     note: 'The workhorse of the Nautical Highway — vehicle ferries that carry the buses across the straits.' },
+    roro:          { name: 'Nautical Highway RORO', short: 'RORO', mono: 'RORO', livery: '#8a5c2e', ink: '#fff',
+                     punctual: 'weather', book: null, bookVia: 'counter',
+                     bookNote: 'Pay at the port terminal, usually minutes before sailing. If you are on a through bus your ferry ticket is already in the fare.',
+                     note: 'The short island-to-island crossings the Strong Republic Nautical Highway is built from. Frequent, cheap, and suspended outright when a typhoon signal is raised.' },
 
     // --- road
     greenbus:  { name: 'Green Bus', short: 'Green Bus', mono: 'GRN', livery: '#2e7d32', ink: '#fff',
@@ -127,6 +154,18 @@ const NETWORK = {
     giantibis: { name: 'Giant Ibis', short: 'Giant Ibis', mono: 'GI', livery: '#6b4e3d', ink: '#fff',
                  punctual: 'fair', book: 'https://www.giantibis.com',
                  bookNote: 'Handles the border formalities as a group and is worth the small premium over the local buses.', note: '' },
+    philtranco: { name: 'Philtranco', short: 'Philtranco', mono: 'PHT', livery: '#c8471f', ink: '#fff',
+                 punctual: 'fair', book: null, bookVia: 'counter',
+                 bookNote: 'Booked at the terminal — PITX in Manila for anything southbound. Buy the day before for the Bicol and Mindanao runs; same day is fine for the rest.',
+                 note: 'The operator that actually runs Manila to Davao, ferries included, as one ticket. Two and a half days in a seat, and the reason the Nautical Highway exists.' },
+    victoryliner: { name: 'Victory Liner', short: 'Victory Liner', mono: 'VL', livery: '#1c4f9c', ink: '#fff',
+                 punctual: 'fair', book: null, bookVia: 'counter',
+                 bookNote: 'Terminal counters in Manila (Cubao, Pasay) and online through the operator\'s own booking pages when they are up. The Baguio deluxe services are worth reserving.',
+                 note: 'Northern Luzon\'s main intercity operator.' },
+    ceres:     { name: 'Ceres Liner', short: 'Ceres', mono: 'CRS', livery: '#e0a300', ink: '#1a1a1a',
+                 punctual: 'fair', book: null, bookVia: 'counter',
+                 bookNote: 'Pay the conductor on board or at the terminal. Nothing to reserve and nothing that sells out — they simply run another bus.',
+                 note: 'Yellow buses all over the Visayas and Mindanao, frequent enough that a timetable is beside the point.' },
     coach:     { name: 'Long-distance coach', short: 'Coach', mono: 'BUS', livery: '#8c7b6b', ink: '#fff',
                  punctual: 'fair', book: null, bookVia: 'aggregator',
                  bookNote: 'Several operators run these corridors at varying quality. An aggregator is the sane way to compare them.', note: '' },
@@ -144,6 +183,7 @@ const NETWORK = {
   aggregators: [
     { name: '12Go', url: 'https://12go.asia', note: 'Widest coverage in the region, including boats and minivans.' },
     { name: 'Baolau', url: 'https://www.baolau.com', note: 'Stronger on Vietnamese and Cambodian rail.' },
+    { name: 'Barkota', url: 'https://www.barkota.com', note: 'Philippine ferries — 2GO, OceanJet, Montenegro and the small RORO lines in one place.' },
   ],
 
   /* ---------------------------------------------------------------- stations
@@ -364,6 +404,75 @@ const NETWORK = {
     // --- Myanmar (advisory)
     kawthaung:      { name: 'Kawthaung',                city: 'Kawthaung',     country: 'mm', lat: 9.98,   lon: 98.55,  gauge: null,
                       warn: 'Standing security advisories cover much of Myanmar, and there is no through rail to Thailand.' },
+
+    /* --- Philippines: Luzon ------------------------------------------------
+     * A separate archipelago in every sense — no scheduled passenger ship
+     * connects it to the rest of this map. Everything below is how you move
+     * around once you have flown in.
+     */
+    manila:         { name: 'Manila (Tutuban)',         city: 'Manila',        country: 'ph', lat: 14.61,  lon: 120.97, gauge: 'cape', hub: true,
+                      warn: 'PNR\'s Metro Manila commuter services have been suspended since 2024 for North–South Commuter Railway construction. Manila\'s working rail today is LRT-1, LRT-2 and MRT-3, which is a metro, not a way out of the city.' },
+    manila_pitx:    { name: 'PITX (Parañaque)',         city: 'Manila',        country: 'ph', lat: 14.51,  lon: 120.99, gauge: null,
+                      warn: 'The terminal for everything southbound out of Manila by road. Northbound buses leave from Cubao and Pasay instead — check which one your operator uses before you commit to a crossing time.' },
+    manila_pier:    { name: 'Manila North Harbor',      city: 'Manila',        country: 'ph', lat: 14.61,  lon: 120.95, gauge: null,
+                      warn: 'Pier 4 for 2GO. It is not the same place as the South Harbor cruise berths, and the taxi drivers will take you to whichever you name.' },
+    clark:          { name: 'Clark (Angeles)',          city: 'Angeles',       country: 'ph', lat: 15.19,  lon: 120.55, gauge: null, minor: true },
+    baguio:         { name: 'Baguio',                   city: 'Baguio',        country: 'ph', lat: 16.41,  lon: 120.60, gauge: null },
+    banaue:         { name: 'Banaue',                   city: 'Banaue',        country: 'ph', lat: 16.91,  lon: 121.06, gauge: null,
+                      warn: 'Reached by overnight bus and nothing else. The rice terrace viewpoints are a further jeepney or tricycle beyond the town.' },
+    vigan:          { name: 'Vigan',                    city: 'Vigan',         country: 'ph', lat: 17.57,  lon: 120.39, gauge: null },
+    sipocot:        { name: 'Sipocot',                  city: 'Sipocot',       country: 'ph', lat: 13.77,  lon: 122.98, gauge: 'cape', minor: true },
+    naga:           { name: 'Naga',                     city: 'Naga',          country: 'ph', lat: 13.62,  lon: 123.19, gauge: 'cape' },
+    legazpi:        { name: 'Legazpi',                  city: 'Legazpi',       country: 'ph', lat: 13.14,  lon: 123.74, gauge: 'cape',
+                      warn: 'The southern end of what still runs of PNR. Mayon is the view from the platform on a clear morning, which is not most mornings.' },
+    matnog:         { name: 'Matnog',                   city: 'Matnog',        country: 'ph', lat: 12.59,  lon: 124.08, gauge: null, minor: true,
+                      warn: 'The Luzon end of the Nautical Highway. Sailings stop entirely when a typhoon signal is raised over Sorsogon or Samar, and buses queue for hours behind the ramp.' },
+    batangas:       { name: 'Batangas City port',       city: 'Batangas',      country: 'ph', lat: 13.76,  lon: 121.05, gauge: null,
+                      warn: 'The busiest passenger port in the country after Manila, and the way to Mindoro, Romblon and the western Visayas without a flight.' },
+
+    // --- Philippines: Mindoro
+    calapan:        { name: 'Calapan',                  city: 'Calapan',       country: 'ph', lat: 13.41,  lon: 121.18, gauge: null },
+    puertogalera:   { name: 'Puerto Galera',            city: 'Puerto Galera', country: 'ph', lat: 13.51,  lon: 120.95, gauge: null },
+    roxas_mindoro:  { name: 'Roxas (Mindoro)',          city: 'Roxas',         country: 'ph', lat: 12.59,  lon: 121.51, gauge: null, minor: true,
+                      warn: 'Not to be confused with Roxas City on Panay, four hours the other side of the strait. Both have ports and buses go to both.' },
+
+    // --- Philippines: Panay and Negros
+    caticlan:       { name: 'Caticlan jetty port',      city: 'Caticlan',      country: 'ph', lat: 11.93,  lon: 121.95, gauge: null },
+    boracay:        { name: 'Boracay (Cagban)',         city: 'Boracay',       country: 'ph', lat: 11.95,  lon: 121.93, gauge: null },
+    kalibo:         { name: 'Kalibo',                   city: 'Kalibo',        country: 'ph', lat: 11.71,  lon: 122.37, gauge: null, minor: true },
+    iloilo:         { name: 'Iloilo',                   city: 'Iloilo',        country: 'ph', lat: 10.70,  lon: 122.57, gauge: null, hub: true },
+    bacolod:        { name: 'Bacolod',                  city: 'Bacolod',       country: 'ph', lat: 10.67,  lon: 122.95, gauge: null },
+    dumaguete:      { name: 'Dumaguete',                city: 'Dumaguete',     country: 'ph', lat: 9.31,   lon: 123.31, gauge: null },
+
+    // --- Philippines: Cebu, Bohol, Siquijor
+    cebu:           { name: 'Cebu City',                city: 'Cebu',          country: 'ph', lat: 10.30,  lon: 123.90, gauge: null, hub: true,
+                      warn: 'The hinge of the whole archipelago. Almost every Visayan ferry route touches it, which is why it is usually the shortest way between two islands that look adjacent on a map.' },
+    santander:      { name: 'Santander (Liloan pier)',  city: 'Santander',     country: 'ph', lat: 9.42,   lon: 123.31, gauge: null, minor: true },
+    tagbilaran:     { name: 'Tagbilaran',               city: 'Bohol',         country: 'ph', lat: 9.65,   lon: 123.85, gauge: null },
+    siquijor:       { name: 'Siquijor',                 city: 'Siquijor',      country: 'ph', lat: 9.21,   lon: 123.52, gauge: null },
+
+    // --- Philippines: Samar and Leyte
+    allen:          { name: 'Allen (Samar)',            city: 'Allen',         country: 'ph', lat: 12.50,  lon: 124.28, gauge: null, minor: true },
+    catbalogan:     { name: 'Catbalogan',               city: 'Catbalogan',    country: 'ph', lat: 11.78,  lon: 124.88, gauge: null, minor: true },
+    tacloban:       { name: 'Tacloban',                 city: 'Tacloban',      country: 'ph', lat: 11.24,  lon: 125.00, gauge: null },
+    ormoc:          { name: 'Ormoc',                    city: 'Ormoc',         country: 'ph', lat: 11.01,  lon: 124.61, gauge: null },
+    liloan_leyte:   { name: 'Liloan (Southern Leyte)',  city: 'Liloan',        country: 'ph', lat: 10.13,  lon: 125.13, gauge: null, minor: true,
+                      warn: 'A different Liloan from the pier in southern Cebu, and from the town north of Cebu City. Three of them, all on ferry routes.' },
+
+    // --- Philippines: Mindanao
+    surigao:        { name: 'Surigao (Lipata)',         city: 'Surigao',       country: 'ph', lat: 9.79,   lon: 125.49, gauge: null },
+    balingoan:      { name: 'Balingoan',                city: 'Balingoan',     country: 'ph', lat: 8.74,   lon: 124.79, gauge: null, minor: true },
+    camiguin:       { name: 'Camiguin (Benoni)',        city: 'Camiguin',      country: 'ph', lat: 9.17,   lon: 124.73, gauge: null },
+    cagayandeoro:   { name: 'Cagayan de Oro',           city: 'Cagayan de Oro',country: 'ph', lat: 8.48,   lon: 124.65, gauge: null },
+    davao:          { name: 'Davao',                    city: 'Davao',         country: 'ph', lat: 7.07,   lon: 125.61, gauge: null, hub: true },
+    generalsantos:  { name: 'General Santos',           city: 'General Santos',country: 'ph', lat: 6.11,   lon: 125.17, gauge: null, minor: true },
+    zamboanga:      { name: 'Zamboanga',                city: 'Zamboanga',     country: 'ph', lat: 6.91,   lon: 122.08, gauge: null,
+                      warn: 'Standing security advisories cover the Sulu archipelago, Basilan and parts of the Zamboanga peninsula. The Zamboanga–Sandakan ferry — the one sea link the Philippines ever had to the rest of Southeast Asia — has been suspended since 2017.' },
+
+    // --- Philippines: Palawan
+    puertoprincesa: { name: 'Puerto Princesa',          city: 'Puerto Princesa', country: 'ph', lat: 9.74, lon: 118.74, gauge: null },
+    elnido:         { name: 'El Nido',                  city: 'El Nido',       country: 'ph', lat: 11.20,  lon: 119.41, gauge: null },
+    coron:          { name: 'Coron (Busuanga)',         city: 'Coron',         country: 'ph', lat: 12.00,  lon: 120.20, gauge: null },
   },
 
   /* -------------------------------------------------------------------- legs
@@ -618,6 +727,106 @@ const NETWORK = {
 
     // === Sabah (isolated) ==============================================
     { from: 'kotakinabalu', to: 'tenom', mode: 'rail', op: 'ktmb', service: 'Sabah State Railway', hours: 2.5, usd: 5, scenic: true, confidence: 'reported' },
+
+    /* === Philippines ===================================================
+     * A closed subnetwork. Nothing here joins anything above, because no
+     * scheduled passenger ship does — see `disconnected` below. Within it the
+     * spine is the Strong Republic Nautical Highway: a chain of bus legs and
+     * roll-on/roll-off ferries you can ride from Luzon to Mindanao on one
+     * through ticket, which is as close as this country gets to a railway.
+     */
+
+    // --- Manila
+    { from: 'manila', to: 'manila_pier', mode: 'road', op: 'transfer', service: 'Taxi to Pier 4', hours: 0.4, usd: 4, essential: true, km: 4, confidence: 'reported',
+      note: 'Short in kilometres, unpredictable in minutes. Manila traffic is the reason to leave two hours for a four-kilometre transfer.' },
+    { from: 'manila', to: 'manila_pitx', mode: 'rail', op: 'metro', service: 'LRT-1 southbound, then the terminal walkway', hours: 0.75, usd: 1, essential: true, confidence: 'reported',
+      note: 'The one leg in the Philippines where rail genuinely beats road, and only because it is a metro. LRT-1\'s Cavite extension put PITX within a walkway of a station.' },
+
+    // --- Luzon north
+    { from: 'manila', to: 'clark', mode: 'road', op: 'coach', service: 'Airport and provincial coach', hours: 2, usd: 6, confidence: 'reported',
+      note: 'The North–South Commuter Railway will run here and is under construction the whole way. Until it opens this is a bus, and the bus is fine.' },
+    { from: 'manila', to: 'baguio', mode: 'road', op: 'victoryliner', service: 'Victory Liner deluxe', hours: 6, usd: 12, scenic: true, confidence: 'reported',
+      note: 'The last hour up Kennon Road or Marcos Highway is the scenic part, and the part that closes after heavy rain.' },
+    { from: 'baguio', to: 'vigan', mode: 'road', op: 'coach', service: 'Provincial bus via Tagudin', hours: 5, usd: 8, confidence: 'reported' },
+    { from: 'manila', to: 'vigan', mode: 'road', op: 'coach', service: 'Partas overnight coach', hours: 9, usd: 15, confidence: 'reported' },
+    { from: 'baguio', to: 'banaue', mode: 'road', op: 'coach', service: 'Cordillera bus via Bontoc', hours: 8, usd: 12, scenic: true, confidence: 'verify',
+      note: 'A mountain road, sometimes a landslide, occasionally neither bus of the day runs. The alternative is the overnight direct from Manila.' },
+    { from: 'manila', to: 'banaue', mode: 'road', op: 'coach', service: 'Ohayami / Coda overnight', hours: 9, usd: 14, confidence: 'reported' },
+
+    // --- Luzon south: the Bicol line, what is left of it
+    { from: 'manila_pitx', to: 'naga', mode: 'road', op: 'philtranco', service: 'Philtranco / Isarog to Bicol', hours: 8, usd: 16, confidence: 'reported',
+      note: 'This used to be the Bicol Express. The train is suspended, the bus is not, and the bus is faster.' },
+    { from: 'sipocot', to: 'naga', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 1.25, usd: 1, confidence: 'verify',
+      note: 'A short shuttle over what is left of the southern main line. It has suspended and resumed more than once. Confirm it is running the week you travel rather than the month.' },
+    { from: 'naga', to: 'legazpi', mode: 'rail', op: 'pnr', service: 'PNR Bicol Commuter', hours: 3.5, usd: 3, scenic: true, confidence: 'verify',
+      note: 'The only intercity passenger train still running in the Philippines, and it runs beside Mayon for the last half hour. Worth building a day around; not worth building a connection around.' },
+    { from: 'naga', to: 'legazpi', mode: 'road', op: 'ceres', service: 'Provincial bus', hours: 2.5, usd: 5, confidence: 'reported',
+      note: 'The fallback for when the train is not running, which is often.' },
+    { from: 'legazpi', to: 'matnog', mode: 'road', op: 'philtranco', service: 'Bus to the ferry ramp', hours: 3.5, usd: 6, essential: true, confidence: 'reported' },
+
+    // --- The Nautical Highway: Luzon to Mindanao
+    { from: 'matnog', to: 'allen', mode: 'ferry', op: 'roro', service: 'Matnog – Allen RORO', hours: 1.5, usd: 3, essential: true, seasonal: 'typhoon', confidence: 'reported',
+      note: 'The crossing that makes a Manila–Davao bus ticket possible. Frequent in good weather, stopped outright under a typhoon signal — and this strait sits in the path of most of them.' },
+    { from: 'allen', to: 'catbalogan', mode: 'road', op: 'philtranco', service: 'Maharlika Highway coach', hours: 3, usd: 5, confidence: 'reported' },
+    { from: 'catbalogan', to: 'tacloban', mode: 'road', op: 'philtranco', service: 'Coach over the San Juanico Bridge', hours: 3, usd: 5, scenic: true, confidence: 'reported',
+      note: 'The San Juanico Bridge from Samar to Leyte — two kilometres of it, and the only place on this route where the bus is the view.' },
+    { from: 'tacloban', to: 'ormoc', mode: 'road', op: 'ceres', service: 'Provincial bus across Leyte', hours: 2.5, usd: 4, confidence: 'reported' },
+    { from: 'tacloban', to: 'liloan_leyte', mode: 'road', op: 'philtranco', service: 'Coach down the Leyte coast', hours: 4, usd: 7, confidence: 'reported' },
+    { from: 'liloan_leyte', to: 'surigao', mode: 'ferry', op: 'roro', service: 'Liloan – Lipata RORO', hours: 3, usd: 6, essential: true, seasonal: 'typhoon', confidence: 'reported',
+      note: 'Leyte to Mindanao across the Surigao Strait. The second of the two crossings a through bus ticket covers.' },
+    { from: 'surigao', to: 'cagayandeoro', mode: 'road', op: 'ceres', service: 'Bus via Butuan', hours: 7, usd: 12, confidence: 'reported' },
+    { from: 'surigao', to: 'davao', mode: 'road', op: 'philtranco', service: 'Coach via Butuan and Tagum', hours: 9, usd: 15, confidence: 'reported' },
+    { from: 'cagayandeoro', to: 'davao', mode: 'road', op: 'ceres', service: 'Bus via Bukidnon', hours: 6, usd: 11, scenic: true, confidence: 'reported',
+      note: 'Over the Bukidnon plateau — pine, pineapple and the only cool air in Mindanao.' },
+    { from: 'davao', to: 'generalsantos', mode: 'road', op: 'ceres', service: 'Provincial bus', hours: 3, usd: 6, confidence: 'reported' },
+    { from: 'cagayandeoro', to: 'balingoan', mode: 'road', op: 'ceres', service: 'Bus to the Camiguin ferry', hours: 1.5, usd: 3, essential: true, confidence: 'reported' },
+    { from: 'balingoan', to: 'camiguin', mode: 'ferry', op: 'roro', service: 'Balingoan – Benoni RORO', hours: 1.25, usd: 3, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'cagayandeoro', to: 'zamboanga', mode: 'road', op: 'ceres', service: 'Bus via Pagadian', hours: 12, usd: 20, advisory: 'sulu', confidence: 'verify',
+      note: 'A long day and a half across western Mindanao. Check your government\'s current advice for the peninsula before treating this as routine.' },
+
+    // --- Manila by sea
+    { from: 'manila_pier', to: 'cebu', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cebu', hours: 22, usd: 35, sleeper: true, seasonal: 'typhoon', confidence: 'reported',
+      note: 'A night and most of a day. The cabin classes are cheap enough that the open tourist deck is a choice rather than a necessity.' },
+    { from: 'manila_pier', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Manila – Iloilo', hours: 22, usd: 32, sleeper: true, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'manila_pier', to: 'cagayandeoro', mode: 'ferry', op: 'twogo', service: '2GO Manila – Cagayan de Oro', hours: 30, usd: 40, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+    { from: 'manila_pier', to: 'coron', mode: 'ferry', op: 'twogo', service: '2GO Manila – Coron', hours: 14, usd: 28, sleeper: true, scenic: true, seasonal: 'typhoon', confidence: 'verify',
+      note: 'Sails a couple of times a week rather than daily, and the schedule moves. This is the leg to confirm before the rest of a Palawan itinerary is built on it.' },
+    { from: 'manila_pier', to: 'puertoprincesa', mode: 'ferry', op: 'twogo', service: '2GO Manila – Puerto Princesa', hours: 26, usd: 35, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+
+    // --- Mindoro and the western Visayas
+    { from: 'manila_pitx', to: 'batangas', mode: 'road', op: 'coach', service: 'Bus to Batangas Pier', hours: 2.5, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'batangas', to: 'calapan', mode: 'ferry', op: 'montenegro', service: 'Batangas – Calapan RORO', hours: 1.5, usd: 4, essential: true, seasonal: 'typhoon', confidence: 'reported',
+      note: 'Hourly or better through the day. The start of the western Nautical Highway.' },
+    { from: 'batangas', to: 'puertogalera', mode: 'ferry', op: 'localferry', service: 'Batangas – Puerto Galera fast craft', hours: 1.25, usd: 8, scenic: true, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'calapan', to: 'puertogalera', mode: 'road', op: 'transfer', service: 'Van along the north Mindoro coast', hours: 1, usd: 4, essential: true, confidence: 'reported' },
+    { from: 'calapan', to: 'roxas_mindoro', mode: 'road', op: 'ceres', service: 'Bus down the Mindoro east coast', hours: 3.5, usd: 6, confidence: 'reported' },
+    { from: 'roxas_mindoro', to: 'caticlan', mode: 'ferry', op: 'montenegro', service: 'Roxas – Caticlan RORO', hours: 4, usd: 10, seasonal: 'typhoon', confidence: 'verify',
+      note: 'The overland way to Boracay, and the reason people who refuse to fly still get there. One or two sailings a day, and the first is the one to aim for.' },
+    { from: 'caticlan', to: 'boracay', mode: 'ferry', op: 'roro', service: 'Caticlan – Cagban jetty boat', hours: 0.25, usd: 2, essential: true, seasonal: 'typhoon', confidence: 'structural',
+      note: 'Ten minutes across the channel, plus terminal and environmental fees collected on the Caticlan side. There is no bridge and there is not going to be one.' },
+    { from: 'caticlan', to: 'kalibo', mode: 'road', op: 'ceres', service: 'Van or bus across Aklan', hours: 2, usd: 4, confidence: 'reported' },
+    { from: 'kalibo', to: 'iloilo', mode: 'road', op: 'ceres', service: 'Bus down Panay', hours: 4, usd: 7, confidence: 'reported' },
+    { from: 'iloilo', to: 'bacolod', mode: 'ferry', op: 'oceanjet', service: 'Guimaras Strait fast craft', hours: 1.25, usd: 7, seasonal: 'typhoon', confidence: 'reported',
+      note: 'Every hour or so, and far quicker than it looks on a map. Panay and Negros function as one place because of it.' },
+    { from: 'bacolod', to: 'dumaguete', mode: 'road', op: 'ceres', service: 'Ceres bus down the Negros coast', hours: 6, usd: 9, scenic: true, confidence: 'reported' },
+
+    // --- The Cebu hub
+    { from: 'ormoc', to: 'cebu', mode: 'ferry', op: 'oceanjet', service: 'Ormoc – Cebu fast craft', hours: 2.5, usd: 13, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'cebu', to: 'tagbilaran', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Cebu – Tagbilaran', hours: 2, usd: 12, seasonal: 'typhoon', confidence: 'reported',
+      note: 'Hourly-ish and the busiest tourist crossing in the country. Weekends and holidays genuinely sell out — this is the one Philippine boat worth booking ahead.' },
+    { from: 'tagbilaran', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'OceanJet Bohol – Siquijor', hours: 1.5, usd: 11, seasonal: 'typhoon', confidence: 'verify' },
+    { from: 'dumaguete', to: 'siquijor', mode: 'ferry', op: 'oceanjet', service: 'Dumaguete – Siquijor fast craft', hours: 1, usd: 7, seasonal: 'typhoon', confidence: 'reported' },
+    { from: 'dumaguete', to: 'santander', mode: 'ferry', op: 'roro', service: 'Sibulan – Liloan crossing', hours: 0.5, usd: 2, essential: true, seasonal: 'typhoon', confidence: 'reported',
+      note: 'Twenty-five minutes between Negros and Cebu, running most of the day. The cheapest border-free crossing on this map.' },
+    { from: 'santander', to: 'cebu', mode: 'road', op: 'ceres', service: 'Ceres bus up the Cebu south coast', hours: 4, usd: 5, scenic: true, confidence: 'reported' },
+    { from: 'cebu', to: 'cagayandeoro', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Cagayan de Oro', hours: 9, usd: 20, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+    { from: 'cebu', to: 'surigao', mode: 'ferry', op: 'localferry', service: 'Cokaliong overnight', hours: 9, usd: 18, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+    { from: 'cebu', to: 'iloilo', mode: 'ferry', op: 'twogo', service: '2GO Cebu – Iloilo', hours: 12, usd: 22, sleeper: true, seasonal: 'typhoon', confidence: 'verify' },
+
+    // --- Palawan
+    { from: 'coron', to: 'elnido', mode: 'ferry', op: 'localferry', service: 'Montenegro / Jomalia fast craft', hours: 4, usd: 30, scenic: true, seasonal: 'typhoon', confidence: 'verify',
+      note: 'Weather-dependent and cancelled outright in rough months. Nothing else connects northern Palawan to the Calamianes.' },
+    { from: 'elnido', to: 'puertoprincesa', mode: 'road', op: 'coach', service: 'Van or bus down the Palawan highway', hours: 6, usd: 10, confidence: 'reported' },
   ],
 
   /* ----------------------------------------------------------------- borders
@@ -775,6 +984,25 @@ const NETWORK = {
   advisories: {
     deepsouth: 'Thailand\'s far-southern provinces (Narathiwat, Yala, Pattani) carry standing security advisories, and many governments advise against non-essential travel there. The Sungai Kolok route passes through them. Check your own government\'s current position.',
     myanmar: 'Standing security advisories cover much of Myanmar. There is no through rail to Thailand in any case.',
+    sulu: 'The Sulu archipelago, Basilan and parts of the Zamboanga peninsula carry standing security advisories, and several governments advise against all travel to some of them. The rest of Mindanao — Davao, Cagayan de Oro, the Nautical Highway corridor — is generally not covered by the same advice, so read what your own government actually says about the specific route rather than about the island.',
+  },
+
+  /* ------------------------------------------------------------ disconnected
+   * Countries on this map that no leg reaches, and the honest reason why. The
+   * planner will refuse to route into them; this is what it says instead of
+   * "no route found", which would read as a gap in the data rather than a
+   * fact about the world.
+   */
+  disconnected: {
+    ph: {
+      name: 'the Philippines',
+      why:
+        'No scheduled passenger ship connects the Philippines to anywhere else in Southeast Asia. There was one — Aleson Shipping ran Zamboanga to Sandakan in Sabah — and it has been suspended since 2017 on security grounds with no sign of returning. The BIMP-EAGA roll-on/roll-off link from Davao to Bitung in Indonesia was launched with some fanfare in 2017 and settled into carrying freight. So the country is an air arrival, and this planner will not pretend otherwise by inventing a boat.',
+      inside:
+        'Once you have landed, it is arguably the most complete bus-and-ferry country in the region. The Strong Republic Nautical Highway chains provincial coaches to roll-on/roll-off ferries from Luzon through Samar, Leyte and on to Mindanao, sold as a single through ticket — Manila to Davao is about fifty hours and two sea crossings. Around the Visayas, OceanJet\'s fast craft out of Cebu work like a suburban timetable. Plan between any two Philippine points below and the planner routes it exactly as it routes the mainland.',
+      rail:
+        'It does have railways, whatever you have been told. Manila runs LRT-1, LRT-2 and MRT-3, and PNR still works a Bicol shuttle between Sipocot, Naga and Legazpi — the last intercity passenger train in the country. What it does not have is a network: PNR\'s Manila commuter services have been shut since 2024 for the North–South Commuter Railway, and there has never been a metre of track on any island but Luzon.',
+    },
   },
 
   /* -------------------------------------------------------------- seasonality
@@ -796,6 +1024,8 @@ const NETWORK = {
       hits: ['th'], text: 'Roughest on the Gulf side. The Samui and Phangan ferries are the affected legs; cancellations cost a day.' },
     { id: 'andaman', name: 'Andaman monsoon', from: '05-01', to: '10-15', fixed: true,
       hits: ['th', 'my'], text: 'Andaman-side ferries (Lanta, Phi Phi, Langkawi) see rough crossings and occasional cancellation.' },
+    { id: 'typhoon', name: 'Philippine typhoon season', from: '06-01', to: '11-30', fixed: true,
+      hits: ['ph'], text: 'Around twenty tropical cyclones enter Philippine waters a year and most of them do it in these months. What matters for a ferry-based itinerary is not the storm but the signal: when PAGASA raises one over a sea area, the coastguard grounds every vessel in it, including the RORO ferries the Nautical Highway depends on, and they stay grounded until it is lifted. That is routinely a day, sometimes two. September and October are the worst of it.' },
   ],
 
   /* ---------------------------------------------------- booking scarcity rank
@@ -809,7 +1039,9 @@ const NETWORK = {
     { op: 'rrc', service: null, rank: 5, window: 'Limited and short', why: 'Verify the train runs at all on your date before anything else.' },
     { op: 'kai', service: null, rank: 6, window: '~45 days', why: 'Plentiful, but the Bandung and Yogyakarta services fill at weekends.' },
     { op: 'ktmb', service: null, rank: 7, window: '~30 days, extended to ~6 months around major festivals', why: 'ETS is plentiful outside festival periods.' },
-    { mode: 'ferry', rank: 8, window: 'Mostly turn-up-and-go', why: 'Langkawi and Samui routes are worth pre-booking in season, and the Mekong slow boat the day before you sail.' },
+    { op: 'twogo', service: null, rank: 7, window: '~30 days', why: 'The Manila overnight sailings to Cebu, Iloilo and Palawan fill around Holy Week, All Saints\' and Christmas. Cabins go before deck space.' },
+    { op: 'oceanjet', service: 'Cebu – Tagbilaran', rank: 8, window: '~14 days', why: 'The busiest tourist crossing in the Philippines and the one that genuinely sells out at weekends.' },
+    { mode: 'ferry', rank: 9, window: 'Mostly turn-up-and-go', why: 'Langkawi and Samui routes are worth pre-booking in season, the Mekong slow boat the day before you sail, and the Philippine RORO crossings not at all — they are grounded or they are running.' },
     { mode: 'road', rank: 9, window: 'Walk-up, except the long coaches', why: 'The Vientiane–Hanoi sleeper coach and the Sumatra runs are worth a day or two ahead.' },
   ],
 }
