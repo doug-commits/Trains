@@ -42,6 +42,47 @@ async function newPage(opts = {}) {
   return { page, context }
 }
 
+/* Put the pointer on a real place. Sweeping the canvas for a hit meant tens of
+ * thousands of synthetic moves, each running the full pick over three hundred
+ * targets — minutes, for something the map can answer directly. */
+/* Wheel in on a place, the way a reader would before picking between two
+ * things that are close together on the ground. */
+async function zoomOn(page, lon, lat, steps) {
+  for (let i = 0; i < steps; i++) {
+    const at = await page.evaluate(
+      ([lo, la]) => {
+        const p = window.OverlandMap.locate(lo, la)
+        if (!p) return null
+        const r = document.querySelector('#map').getBoundingClientRect()
+        return { x: r.left + p.x, y: r.top + p.y }
+      },
+      [lon, lat]
+    )
+    if (!at) return
+    await page.mouse.move(at.x, at.y)
+    await page.mouse.wheel(0, -240)
+    await page.waitForTimeout(90)
+  }
+  await page.waitForTimeout(250)
+}
+
+async function hover(page, lon, lat) {
+  const at = await page.evaluate(
+    ([lo, la]) => {
+      const p = window.OverlandMap.locate(lo, la)
+      if (!p) return null
+      const r = document.querySelector('#map').getBoundingClientRect()
+      return { x: r.left + p.x, y: r.top + p.y }
+    },
+    [lon, lat]
+  )
+  if (!at) return null
+  await page.mouse.move(at.x, at.y)
+  await page.waitForTimeout(90)
+  if (!(await page.locator('#tip.live').isVisible())) return null
+  return { ...at, text: (await page.locator('#tip').textContent()).replace(/\s+/g, ' ').trim() }
+}
+
 function check(label, condition, detail = '') {
   console.log(`${condition ? '  ok  ' : ' FAIL '} ${label}${detail ? ` — ${detail}` : ''}`)
   if (!condition) problems.push(`${label} ${detail}`)
@@ -384,6 +425,61 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------------------ the sights
+ * 89 landmarks sat in the data with photographs attached and none of them
+ * appeared on the map. They are drawn where they actually are, not on the
+ * railhead that serves them — Angkor is a hundred kilometres from Sisophon,
+ * and putting it on top of the station would be the lie this table exists to
+ * prevent. */
+{
+  const LANDMARKS = new Function(
+    readFileSync(join(root, 'data/landmarks.js'), 'utf8') + '; return LANDMARKS'
+  )()
+  const placed = LANDMARKS.filter(l => l.lat != null && l.lon != null)
+  check('every landmark has a position', placed.length === LANDMARKS.length,
+    `${placed.length} of ${LANDMARKS.length}`)
+
+  // Sanity on the coordinates themselves: a sight should be near the station
+  // that serves it, and inside the map's own bounds.
+  const km = (a, b) =>
+    Math.hypot((a.lat - b.lat) * 111, (a.lon - b.lon) * 111 * Math.cos((a.lat * Math.PI) / 180))
+  const strays = placed
+    .map(l => ({ name: l.name, d: Math.round(km(l, NETWORK.stations[l.station])) }))
+    .filter(x => x.d > 150)
+  check('no landmark is implausibly far from its railhead', strays.length === 0,
+    strays.map(x => `${x.name} ${x.d}km`).join(', ') || 'furthest is under 150 km')
+
+  const { page, context } = await newPage({ viewport: { width: 1440, height: 900 } })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(1100)
+
+  /* Angkor is the case this table exists for: a hundred kilometres from the
+   * nearest railhead, and the sight everybody actually asks for. It sits six
+   * kilometres from the Siem Reap terminal, which at the opening zoom is the
+   * same pixel — and stations deliberately win that tie — so zoom in first,
+   * exactly as a reader would. */
+  const angkor = LANDMARKS.find(l => l.name === 'Angkor Wat')
+  await zoomOn(page, angkor.lon, angkor.lat, 18)
+  const sightHit = await hover(page, angkor.lon, angkor.lat)
+  const sight = sightHit && sightHit.text
+  check('a sight on the map opens its own popup', !!sight, sight || 'nothing there')
+  check('and it names the railhead rather than pretending to be one',
+    !!sight && /railhead Sisophon/.test(sight), sight || '')
+  check('with the road gap stated', !!sight && /Two hours by road/.test(sight))
+
+  if (sight) {
+    await page.locator('#tip .tip-go').first().click()
+    await page.waitForTimeout(400)
+    const from = await page.locator('#from').inputValue()
+    check('routing from a sight targets its railhead', from === 'sisophon', from)
+  }
+
+  check('the legend explains the new mark',
+    (await page.locator('.legend .lmark').count()) === 1)
+  await context.close()
+}
+
 /* -------------------------------------------------- directions from a point
  * Hovering a station offers the two things anyone wants from a point on a map:
  * start here, or end here. The hard part is not the popup — it is that the
@@ -395,20 +491,8 @@ function check(label, condition, detail = '') {
   await page.waitForFunction(() => document.querySelector('#panel h1'))
   await page.waitForTimeout(1100)
 
-  const box = await page.locator('#map').boundingBox()
-  // Sweep for a station rather than hard-coding a pixel, which would rot the
-  // moment the viewport or the fitted view changes.
-  async function findStation(fromY) {
-    for (let y = fromY; y < box.y + box.height - 60; y += 9) {
-      for (let x = box.x + 60; x < box.x + box.width - 40; x += 9) {
-        await page.mouse.move(x, y)
-        if (await page.locator('#tip.live').isVisible()) return { x, y }
-      }
-    }
-    return null
-  }
-
-  const first = await findStation(box.y + 60)
+  const bangkok = NETWORK.stations.bkk_aphiwat
+  const first = await hover(page, bangkok.lon, bangkok.lat)
   check('hovering a station opens a popup', !!first, first ? `at ${first.x},${first.y}` : 'none found')
 
   const actions = await page.locator('#tip .tip-go').allTextContents()
@@ -428,7 +512,8 @@ function check(label, condition, detail = '') {
   check('"from here" sets the origin', !!from, from)
 
   // The second station should now offer to finish the route, by name.
-  const second = await findStation(box.y + 520)
+  const kl = NETWORK.stations.klsentral
+  const second = await hover(page, kl.lon, kl.lat)
   check('a second station offers to complete it', !!second)
   const labelled = await page.locator('#tip .tip-go').nth(1).textContent()
   check('and names the origin it would run from', /→ end here/.test(labelled), labelled.trim())
@@ -440,7 +525,9 @@ function check(label, condition, detail = '') {
     (await page.textContent('#panel h1')).replace(/\s+/g, ' ').trim())
 
   // An endpoint of the live route states its role rather than re-offering it.
-  await findStation(box.y + 60)
+  await page.mouse.move(10, 10)
+  await page.waitForTimeout(200)
+  await hover(page, bangkok.lon, bangkok.lat)
   const onRoute = await page.locator('#tip .tip-go.on').count()
   check('an endpoint says it is one, rather than offering again', onRoute >= 1, `${onRoute} marked`)
 

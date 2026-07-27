@@ -27,7 +27,10 @@
   const panel = $('#panel')
   const tooltip = $('#tip')
 
-  const map = MapView.create(canvas, NETWORK, BASEMAP)
+  const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS)
+  // The only handle the page offers on the live view. Used by tools/smoke.mjs
+  // to point the real pointer at a real place instead of sweeping the canvas.
+  window.OverlandMap = map
 
   const state = {
     from: null,
@@ -312,8 +315,17 @@
       return
     }
 
+    /* Inside the reach box the popup is the only thing that matters. Grazing
+       another marker on the way to its buttons used to swap the popup out from
+       under the pointer — you would set off for Bangkok's "start here" and
+       click whatever the cursor happened to brush past. */
+    if (tipReach && inTipReach(e.offsetX, e.offsetY)) return
+
     if (found.type === 'station') {
       if (tipStation !== found.id) showStationTip(e.offsetX, e.offsetY, found.id)
+      map.focusLeg(null)
+    } else if (found.type === 'landmark') {
+      if (tipStation !== found.landmark.name) showLandmarkTip(e.offsetX, e.offsetY, found.landmark)
       map.focusLeg(null)
     } else {
       const leg = found.entry.leg
@@ -369,6 +381,43 @@
     )
   }
 
+  /* A sight rather than a station. Routing to it means routing to the railhead
+   * that serves it, and the popup says which one and how far short it stops —
+   * silently sending someone to Sisophon when they asked for Angkor is exactly
+   * the trap this whole table exists to avoid. */
+  function showLandmarkTip(x, y, lm) {
+    tipStation = lm.name
+    const st = NETWORK.stations[lm.station]
+    const isFrom = state.from === lm.station
+    const isTo = state.to === lm.station
+    const originName = state.from ? NETWORK.stations[state.from].city : null
+    const targetName = state.to ? NETWORK.stations[state.to].city : null
+
+    const act = (kind, label, on) =>
+      `<button type="button" class="tip-go${on ? ' on' : ''}" data-act="${kind}" data-id="${UI.esc(
+        lm.station
+      )}" data-label="${UI.esc(lm.name)}"${on ? ' aria-current="true"' : ''}>${label}</button>`
+
+    showTip(
+      x,
+      y,
+      `<b>${UI.esc(lm.name)}</b>` +
+        `<span>${UI.esc(COUNTRY_NAME[lm.country])} · railhead ${UI.esc(st.name)}</span>` +
+        (lm.last ? `<em class="gap">${UI.esc(lm.last)}</em>` : '') +
+        `<span class="tip-acts">${
+          [
+            isFrom
+              ? act('from', 'Starting here', true)
+              : act('from', targetName ? `Start here → ${UI.esc(targetName)}` : 'Directions from here'),
+            isTo
+              ? act('to', 'Ending here', true)
+              : act('to', originName ? `${UI.esc(originName)} → end here` : 'Directions to here'),
+          ].join('')
+        }</span>`,
+      true
+    )
+  }
+
   tooltip.addEventListener('pointerenter', cancelHide)
   tooltip.addEventListener('pointerleave', hideTip)
 
@@ -376,6 +425,9 @@
     const btn = e.target.closest('.tip-go')
     if (!btn) return
     const id = btn.dataset.id
+    // A landmark answers in its own name, not the railhead's — the same rule
+    // the plain-language box already follows.
+    const named = btn.dataset.label || null
     if (btn.dataset.act === 'from') {
       // Choosing a start that is already the destination would ask for a route
       // from a place to itself; swap instead, which is what was meant.
@@ -385,7 +437,19 @@
       if (state.from === id) state.from = state.to
       state.to = id
     }
-    state.labels = null
+    /* Keep whichever end the traveller named. Picking Angkor Wat and then a
+       plain station should still headline "Angkor Wat", and picking a station
+       over a landmark should drop the old name rather than keep claiming it. */
+    const cityOf = id => (id ? NETWORK.stations[id].city : null)
+    const labels = {
+      from: state.labels?.from ?? cityOf(state.from),
+      to: state.labels?.to ?? cityOf(state.to),
+    }
+    labels[btn.dataset.act] = named || cityOf(id)
+    labels.from = labels.from ?? cityOf(state.from)
+    labels.to = labels.to ?? cityOf(state.to)
+    state.labels = labels.from && labels.to ? labels : null
+
     hideTip()
     renderControls()
     compute()

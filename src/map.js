@@ -21,6 +21,7 @@ const MapView = (() => {
       sea: get('--sea'),
       land: get('--land'),
       landEdge: get('--land-edge'),
+      landmark: get('--landmark'),
       idle: get('--idle-line'),
       idleDot: get('--idle-dot'),
       rail: get('--rail'),
@@ -36,7 +37,7 @@ const MapView = (() => {
     }
   }
 
-  function create(canvas, network, basemap) {
+  function create(canvas, network, basemap, landmarks = []) {
     const ctx = canvas.getContext('2d')
     let view = null
     let hit = { stations: [], segments: [] }
@@ -243,6 +244,35 @@ const MapView = (() => {
       }
     }
 
+    /* The sights, drawn where they actually are rather than on the railhead
+     * that serves them. Angkor is a hundred kilometres from Sisophon and Lake
+     * Toba is a hundred from Medan; putting either on top of its station would
+     * be the same lie the rest of this project spends its time refusing.
+     *
+     * A hollow diamond, so it never reads as a station — the whole point is
+     * that these are places you go, not places a train stops. */
+    function drawLandmarks(zoom) {
+      if (!landmarks.length) return
+      const r = zoom < 1.6 ? 2.6 : 3.4
+      ctx.save()
+      ctx.strokeStyle = colors.landmark
+      ctx.lineWidth = 1.3
+      ctx.globalAlpha = zoom < 1.3 ? 0.7 : 1
+      for (const lm of landmarks) {
+        if (lm.lat == null) continue
+        const p = Proj.project(view, lm.lon, lm.lat)
+        if (p.x < -20 || p.x > view.w + 20 || p.y < -20 || p.y > view.h + 20) continue
+        ctx.beginPath()
+        ctx.moveTo(p.x, p.y - r)
+        ctx.lineTo(p.x + r, p.y)
+        ctx.lineTo(p.x, p.y + r)
+        ctx.lineTo(p.x - r, p.y)
+        ctx.closePath()
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
     function drawIdleStations(routeSet) {
       const zoom = view.scale / view.baseScale
       for (const [id, s] of Object.entries(network.stations)) {
@@ -420,10 +450,15 @@ const MapView = (() => {
     }
 
     function buildHitTargets() {
-      hit = { stations: [], segments: [] }
+      hit = { stations: [], segments: [], landmarks: [] }
       for (const [id, s] of Object.entries(network.stations)) {
         const p = Proj.project(view, s.lon, s.lat)
         hit.stations.push({ id, x: p.x, y: p.y, station: s })
+      }
+      for (const lm of landmarks) {
+        if (lm.lat == null) continue
+        const p = Proj.project(view, lm.lon, lm.lat)
+        hit.landmarks.push({ x: p.x, y: p.y, landmark: lm })
       }
       if (state.route) {
         state.route.legs.forEach((entry, i) => {
@@ -440,8 +475,10 @@ const MapView = (() => {
       const used = new Set(state.route ? state.route.legs.map(e => e.leg) : [])
       const routeSet = new Set(state.route ? state.route.stationIds : [])
 
+      const zoom = view.scale / view.baseScale
       drawBasemap()
       drawIdleNetwork(used)
+      drawLandmarks(zoom)
       drawIdleStations(routeSet)
       drawRoute()
       drawRouteStations()
@@ -484,6 +521,15 @@ const MapView = (() => {
       return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy))
     }
 
+    /* Whichever is actually nearer, with a few pixels of preference for the
+     * station. An absolute station-first rule made Angkor unreachable at any
+     * sane zoom — the Siem Reap terminal sits six kilometres away, which is
+     * inside the station's own radius until you are zoomed almost to the cap,
+     * and Angkor is the single sight people most want to point at. The bias
+     * keeps the station winning when the two are genuinely on the same pixel
+     * and you cannot be aiming at either in particular. */
+    const STATION_BIAS = 5
+
     function pick(x, y) {
       let bestStation = null
       let bestD = 14
@@ -494,7 +540,21 @@ const MapView = (() => {
           bestStation = s
         }
       }
-      if (bestStation) return { type: 'station', ...bestStation }
+
+      let bestLm = null
+      let bestLmD = 12
+      for (const l of hit.landmarks) {
+        const d = Math.hypot(x - l.x, y - l.y)
+        if (d < bestLmD) {
+          bestLmD = d
+          bestLm = l
+        }
+      }
+
+      if (bestStation && (!bestLm || bestD <= bestLmD + STATION_BIAS)) {
+        return { type: 'station', ...bestStation }
+      }
+      if (bestLm) return { type: 'landmark', ...bestLm }
 
       let bestSeg = null
       let bestSegD = 10
@@ -515,6 +575,16 @@ const MapView = (() => {
       resize() {
         size()
         draw()
+      },
+      /* Where a lon/lat currently sits on screen, in CSS pixels, or null if it
+       * is off the canvas. The map is the only thing that knows the live view,
+       * so anything that needs to point at a place — a test driving the real
+       * pointer, a future "show me this on the map" link — has to ask it. */
+      locate(lon, lat) {
+        if (!view) return null
+        const p = Proj.project(view, lon, lat)
+        if (p.x < 0 || p.y < 0 || p.x > view.w || p.y > view.h) return null
+        return { x: p.x, y: p.y }
       },
       setInset(next) {
         inset = { left: 0, right: 0, ...next }

@@ -122,6 +122,24 @@ src/shell.html       Markup.
 tools/               Build and data-generation scripts.
 ```
 
+### The sights on the map
+
+The 89 landmarks are drawn where they actually are, not on the railhead that
+serves them: Angkor is a hundred kilometres from Sisophon, Lake Toba a hundred
+from Medan, and putting either on top of its station would be the exact lie
+this table exists to prevent. They render as hollow diamonds so they never read
+as stations — a sight is somewhere you go, not somewhere a train stops.
+
+Routing from one targets its railhead and the popup says which and how far
+short it stops, and the itinerary then headlines the name you actually picked
+rather than the station you were sent to.
+
+`pick` in `src/map.js` returns whichever of the two is nearer, with a few
+pixels of preference for the station. An absolute station-first rule made
+Angkor unreachable at any sane zoom — the Siem Reap terminal is six kilometres
+away, inside the station's own hit radius until you are zoomed almost to the
+cap — and Angkor is the single sight people most want to point at.
+
 ### Picking two points
 
 Point at any station on the map and a popup offers the two things anyone wants
