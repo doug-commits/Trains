@@ -27,11 +27,15 @@ const KEEP = new Map([
 // until the archipelago was added — Luzon lost its tail and Samar, Leyte,
 // Bohol and eastern Mindanao fell off the edge entirely.
 const BBOX = { west: 92, east: 127, south: -12, north: 29 }
-const TOLERANCE = 0.035 // degrees; ~4 km — plenty for a 1000px-wide map
-// Drop specks that would render as sub-pixel dust. ~0.01 sq degrees is around
-// 120 km²: small enough to keep Siquijor and Camiguin, which the ferry network
-// calls at and which look like omissions when they are missing.
-const MIN_AREA = 0.01
+// Degrees. At 50m and ~4 km this map read as a diagram; the ferry network
+// calls at islands that were being simplified into blobs or away entirely.
+// ~1.1 km is the point where Phi Phi is a shape rather than a dot and the
+// Mergui and Riau archipelagos come back, without the file getting silly.
+const TOLERANCE = 0.01
+// Drop specks that would render as sub-pixel dust. ~0.0015 sq degrees is
+// around 18 km² — an island you could walk across in an afternoon, which is
+// exactly the size of several this network calls at.
+const MIN_AREA = 0.0015
 
 // --- Sutherland-Hodgman clip against each bbox edge ------------------------
 
@@ -92,22 +96,33 @@ function perpDist(p, a, b) {
   return Math.hypot(p[0] - cx, p[1] - cy)
 }
 
+/* Iterative rather than recursive: at 10m the Sumatran coast is one ring of
+ * tens of thousands of points, and the recursive form recurses once per kept
+ * vertex — deep enough to blow the stack on exactly the coastlines this map
+ * exists to draw. */
 function simplify(points, tol) {
   if (points.length < 3) return points
-  let maxD = 0
-  let idx = 0
-  for (let i = 1; i < points.length - 1; i++) {
-    const d = perpDist(points[i], points[0], points[points.length - 1])
-    if (d > maxD) {
-      maxD = d
-      idx = i
+  const keep = new Uint8Array(points.length)
+  keep[0] = keep[points.length - 1] = 1
+  const stack = [[0, points.length - 1]]
+  while (stack.length) {
+    const [lo, hi] = stack.pop()
+    if (hi - lo < 2) continue
+    let maxD = tol
+    let idx = -1
+    for (let i = lo + 1; i < hi; i++) {
+      const d = perpDist(points[i], points[lo], points[hi])
+      if (d > maxD) {
+        maxD = d
+        idx = i
+      }
+    }
+    if (idx > 0) {
+      keep[idx] = 1
+      stack.push([lo, idx], [idx, hi])
     }
   }
-  if (maxD <= tol) return [points[0], points[points.length - 1]]
-  return [
-    ...simplify(points.slice(0, idx + 1), tol).slice(0, -1),
-    ...simplify(points.slice(idx), tol),
-  ]
+  return points.filter((_, i) => keep[i])
 }
 
 function ringArea(ring) {
