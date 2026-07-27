@@ -4,9 +4,21 @@ name: Fetch destination photos
 # sandbox blocks. GitHub's runners do not, so the fetch happens here and the
 # results are committed back.
 #
-# Run it from the Actions tab → Fetch destination photos → Run workflow.
+# It also runs on push when the fetcher, the landmark list or this file change,
+# because workflow_dispatch only registers from the repository's default branch
+# and this work lives on a feature branch. A push event runs the workflow from
+# the branch that was pushed, which is what we need.
+#
+# It cannot loop: GitHub does not raise workflow runs for pushes made with the
+# built-in GITHUB_TOKEN.
 
 on:
+  push:
+    branches: ['claude/**']
+    paths:
+      - '.github/workflows/fetch-photos.yml'
+      - 'tools/fetch-photos.mjs'
+      - 'data/landmarks.js'
   workflow_dispatch:
     inputs:
       force:
@@ -58,6 +70,19 @@ jobs:
           npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium
           node tools/smoke.mjs
+
+      # Uploaded regardless of whether the commit step can push, so a
+      # permissions problem does not throw away a successful fetch.
+      - name: Upload photographs as an artifact
+        if: inputs.dry_run != true
+        uses: actions/upload-artifact@v4
+        with:
+          name: destination-photos
+          path: |
+            data/photos/
+            data/photos.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Report
         if: always()
