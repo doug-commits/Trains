@@ -31,6 +31,13 @@
   --idle-line: #3a6674;
   --idle-dot: #4c7d8b;
 
+  /* Chart ground. A single flat sea fill over two thirds of the viewport is
+     the least interesting thing a map can do; these give it depth without
+     touching the palette it already had. */
+  --sea-deep: #061217;
+  --grid: #16323d;
+  --coast: #2d5a6b;
+
   --panel-w: 29.5rem;
   --topbar-h: 3.5rem;
 
@@ -80,6 +87,10 @@
     --idle-line: #aab5b2;
     --idle-dot: #93a09e;
 
+    --sea-deep: #c3d4d7;
+    --grid: #c2d2d4;
+    --coast: #b7c8ca;
+
     --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
     --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
     --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
@@ -96,6 +107,7 @@
   --ink: #e7efea; --ink-soft: #c4d6d5; --muted: #7d9ba2;
   --rail: #e9a63e; --ferry: #57b6c8; --road: #978d7f; --alert: #e2615a;
   --idle-line: #3a6674; --idle-dot: #4c7d8b;
+  --sea-deep: #061217; --grid: #16323d; --coast: #2d5a6b;
 }
 
 :root[data-theme='light'] {
@@ -105,6 +117,7 @@
   --ink: #13212a; --ink-soft: #2c3d45; --muted: #5b7178;
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;
   --idle-line: #aab5b2; --idle-dot: #93a09e;
+  --sea-deep: #c3d4d7; --grid: #c2d2d4; --coast: #b7c8ca;
   --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
   --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
   --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
@@ -565,7 +578,7 @@ body {
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   border-left: 1px solid var(--panel-edge);
-  box-shadow: -20px 0 50px -30px rgb(0 0 0 / 0.6);
+  box-shadow: -28px 0 60px -30px rgb(0 0 0 / 0.55);
 }
 
 /* --------------------------------------------------------------- heading */
@@ -1543,6 +1556,23 @@ table { width: 100%; border-collapse: collapse; }
   position: relative;
 }
 .corridor-art canvas { display: block; width: 100%; height: 100%; }
+/* Photographs of skylines and coastlines are mostly sky, and a blown-out sky is
+   the brightest thing on a dark page — it butts against the chrome and glares.
+   A scrim at the top settles it in, the way the bottom fade already does. */
+.corridor-art::before,
+.banner::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  background: linear-gradient(
+    color-mix(in srgb, var(--panel-solid) 55%, transparent),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Fade the plate into the card so it sits in the layout rather than on it. */
 .corridor-art::after {
   content: '';
@@ -1611,17 +1641,23 @@ table { width: 100%; border-collapse: collapse; }
    stops competing. */
 .photo-credit {
   position: absolute;
-  right: 0.6rem;
-  bottom: 0.45rem;
-  z-index: 1;
-  max-width: 75%;
+  right: 0;
+  bottom: 0.5rem;
+  z-index: 2;
+  max-width: 80%;
+  padding: 0.12rem 0.6rem 0.12rem 1.6rem;
   font-family: var(--sans);
   font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.03em;
-  line-height: 1.3;
-  color: rgb(255 255 255 / 0.72);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.85);
+  line-height: 1.4;
+  /* Always light on a dark fade, whatever the theme and whatever is in the
+     photograph. A blown-out sky in light mode made a white credit vanish
+     entirely, and this text is a licence condition, not decoration — it has to
+     be readable on every image the fetcher might bring back. */
+  color: rgb(255 255 255 / 0.88);
+  background: linear-gradient(to left, rgb(6 14 18 / 0.62), rgb(6 14 18 / 0));
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

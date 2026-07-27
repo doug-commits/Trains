@@ -181,6 +181,13 @@
   --idle-line: #3a6674;
   --idle-dot: #4c7d8b;
 
+  /* Chart ground. A single flat sea fill over two thirds of the viewport is
+     the least interesting thing a map can do; these give it depth without
+     touching the palette it already had. */
+  --sea-deep: #061217;
+  --grid: #16323d;
+  --coast: #2d5a6b;
+
   --panel-w: 29.5rem;
   --topbar-h: 3.5rem;
 
@@ -230,6 +237,10 @@
     --idle-line: #aab5b2;
     --idle-dot: #93a09e;
 
+    --sea-deep: #c3d4d7;
+    --grid: #c2d2d4;
+    --coast: #b7c8ca;
+
     --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
     --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
     --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
@@ -246,6 +257,7 @@
   --ink: #e7efea; --ink-soft: #c4d6d5; --muted: #7d9ba2;
   --rail: #e9a63e; --ferry: #57b6c8; --road: #978d7f; --alert: #e2615a;
   --idle-line: #3a6674; --idle-dot: #4c7d8b;
+  --sea-deep: #061217; --grid: #16323d; --coast: #2d5a6b;
 }
 
 :root[data-theme='light'] {
@@ -255,6 +267,7 @@
   --ink: #13212a; --ink-soft: #2c3d45; --muted: #5b7178;
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;
   --idle-line: #aab5b2; --idle-dot: #93a09e;
+  --sea-deep: #c3d4d7; --grid: #c2d2d4; --coast: #b7c8ca;
   --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
   --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
   --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
@@ -715,7 +728,7 @@ body {
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   border-left: 1px solid var(--panel-edge);
-  box-shadow: -20px 0 50px -30px rgb(0 0 0 / 0.6);
+  box-shadow: -28px 0 60px -30px rgb(0 0 0 / 0.55);
 }
 
 /* --------------------------------------------------------------- heading */
@@ -1693,6 +1706,23 @@ table { width: 100%; border-collapse: collapse; }
   position: relative;
 }
 .corridor-art canvas { display: block; width: 100%; height: 100%; }
+/* Photographs of skylines and coastlines are mostly sky, and a blown-out sky is
+   the brightest thing on a dark page — it butts against the chrome and glares.
+   A scrim at the top settles it in, the way the bottom fade already does. */
+.corridor-art::before,
+.banner::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  background: linear-gradient(
+    color-mix(in srgb, var(--panel-solid) 55%, transparent),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Fade the plate into the card so it sits in the layout rather than on it. */
 .corridor-art::after {
   content: '';
@@ -1761,17 +1791,23 @@ table { width: 100%; border-collapse: collapse; }
    stops competing. */
 .photo-credit {
   position: absolute;
-  right: 0.6rem;
-  bottom: 0.45rem;
-  z-index: 1;
-  max-width: 75%;
+  right: 0;
+  bottom: 0.5rem;
+  z-index: 2;
+  max-width: 80%;
+  padding: 0.12rem 0.6rem 0.12rem 1.6rem;
   font-family: var(--sans);
   font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.03em;
-  line-height: 1.3;
-  color: rgb(255 255 255 / 0.72);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.85);
+  line-height: 1.4;
+  /* Always light on a dark fade, whatever the theme and whatever is in the
+     photograph. A blown-out sky in light mode made a white credit vanish
+     entirely, and this text is a licence condition, not decoration — it has to
+     be readable on every image the fetcher might bring back. */
+  color: rgb(255 255 255 / 0.88);
+  background: linear-gradient(to left, rgb(6 14 18 / 0.62), rgb(6 14 18 / 0));
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5199,6 +5235,9 @@ const MapView = (() => {
       ink: get('--ink'),
       muted: get('--muted'),
       panel: get('--panel'),
+      seaDeep: get('--sea-deep'),
+      grid: get('--grid'),
+      coast: get('--coast'),
     }
   }
 
@@ -5275,27 +5314,101 @@ const MapView = (() => {
 
     /* ------------------------------------------------------------ drawing */
 
+    /* Meridians and parallels every five degrees. The cheapest thing that makes
+     * a chart look like a chart rather than a diagram — it gives the empty sea
+     * a scale, and it moves under a pan, which is what tells you the map is a
+     * real projection and not a picture. */
+    function drawGraticule() {
+      const nw = Proj.unproject(view, 0, 0)
+      const se = Proj.unproject(view, view.w, view.h)
+      // Coarser lines as you zoom out, so the grid never turns into a screen.
+      const span = Math.abs(se.lon - nw.lon)
+      const step = span > 60 ? 10 : span > 25 ? 5 : span > 10 ? 2 : 1
+
+      ctx.save()
+      ctx.strokeStyle = colors.grid
+      ctx.lineWidth = 0.6
+      ctx.globalAlpha = 0.55
+      ctx.beginPath()
+      const first = n => Math.ceil(n / step) * step
+      for (let lon = first(nw.lon); lon <= se.lon; lon += step) {
+        const a = Proj.project(view, lon, nw.lat)
+        const b = Proj.project(view, lon, se.lat)
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+      }
+      for (let lat = first(se.lat); lat <= nw.lat; lat += step) {
+        const a = Proj.project(view, nw.lon, lat)
+        const b = Proj.project(view, se.lon, lat)
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    /* Darkens the corners so the eye settles in the middle where the route is.
+     * Drawn on the ground rather than over everything, so it never dims a leg. */
+    function drawVignette() {
+      const g = ctx.createRadialGradient(
+        view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.32,
+        view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.78
+      )
+      g.addColorStop(0, 'rgba(0,0,0,0)')
+      g.addColorStop(1, colors.seaDeep)
+      ctx.save()
+      ctx.globalAlpha = 0.5
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, view.w, view.h)
+      ctx.restore()
+    }
+
     function drawBasemap() {
-      ctx.fillStyle = colors.sea
+      // A sea that deepens toward the bottom of the frame. One flat fill across
+      // two thirds of the viewport is the least interesting thing a map can do.
+      const sky = ctx.createLinearGradient(0, 0, 0, view.h)
+      sky.addColorStop(0, colors.sea)
+      sky.addColorStop(1, colors.seaDeep)
+      ctx.fillStyle = sky
       ctx.fillRect(0, 0, view.w, view.h)
 
+      drawGraticule()
+      drawVignette()
+
       ctx.lineJoin = 'round'
+
+      /* All the land as one path, filled once with a soft shadow so the glow
+       * lands in the water and not along every internal frontier. The country
+       * outlines are stroked separately afterwards. */
+      const all = new Path2D()
+      const paths = []
       for (const country of basemap.countries) {
-        ctx.beginPath()
+        const path = new Path2D()
         for (const ring of country.rings) {
           for (let i = 0; i < ring.length; i++) {
             const p = Proj.project(view, ring[i][0], ring[i][1])
-            if (i === 0) ctx.moveTo(p.x, p.y)
-            else ctx.lineTo(p.x, p.y)
+            if (i === 0) path.moveTo(p.x, p.y)
+            else path.lineTo(p.x, p.y)
           }
-          ctx.closePath()
+          path.closePath()
         }
-        ctx.fillStyle = colors.land
-        ctx.fill()
-        ctx.strokeStyle = colors.landEdge
-        ctx.lineWidth = 0.8
-        ctx.stroke()
+        paths.push(path)
+        all.addPath(path)
       }
+
+      ctx.save()
+      ctx.shadowColor = colors.coast
+      ctx.shadowBlur = 16
+      ctx.fillStyle = colors.land
+      ctx.fill(all)
+      ctx.restore()
+      // Again without the shadow, so the interior is the flat land colour.
+      ctx.fillStyle = colors.land
+      ctx.fill(all)
+
+      ctx.strokeStyle = colors.landEdge
+      ctx.lineWidth = 0.8
+      for (const path of paths) ctx.stroke(path)
     }
 
     /** Ferries arc; land legs run straight between stations. */

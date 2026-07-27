@@ -75,6 +75,22 @@ function check(label, condition, detail = '') {
   })
   check('map paints multiple colours', painted > 3, `${painted} distinct samples`)
 
+  /* The sea used to be one flat fill across two thirds of the viewport. It now
+   * carries a gradient, a graticule and a vignette, so open water sampled at
+   * different heights must not come back identical. */
+  const water = await page.evaluate(() => {
+    const c = document.querySelector('#map')
+    const ctx = c.getContext('2d')
+    const at = (fx, fy) => {
+      const d = ctx.getImageData(Math.round(c.width * fx), Math.round(c.height * fy), 1, 1).data
+      return `${d[0]},${d[1]},${d[2]}`
+    }
+    // Down the left edge, which is open ocean at every zoom this opens at.
+    return [at(0.02, 0.1), at(0.02, 0.5), at(0.02, 0.92)]
+  })
+  check('the sea has depth rather than one flat fill',
+    new Set(water).size > 1, water.join('  '))
+
   await page.screenshot({ path: join(outDir, '01-idle-dark.png') })
   await context.close()
 }

@@ -113,7 +113,7 @@ src/ask.js           Plain-language questions to a pair of stations, typos
                      included. See "Reading the question" below.
 src/scene.js         Drawn destination illustrations, the photo fallback.
 src/photos.js        Real photographs and their attribution.
-src/map.js           Canvas rendering.
+src/map.js           Canvas rendering: chart ground, network, route, labels.
 src/ui.js            The itinerary document.
 src/app.js           Controls, map interaction, URL state, theme.
 src/app.css          Styles.

@@ -30,6 +30,9 @@ const MapView = (() => {
       ink: get('--ink'),
       muted: get('--muted'),
       panel: get('--panel'),
+      seaDeep: get('--sea-deep'),
+      grid: get('--grid'),
+      coast: get('--coast'),
     }
   }
 
@@ -106,27 +109,101 @@ const MapView = (() => {
 
     /* ------------------------------------------------------------ drawing */
 
+    /* Meridians and parallels every five degrees. The cheapest thing that makes
+     * a chart look like a chart rather than a diagram — it gives the empty sea
+     * a scale, and it moves under a pan, which is what tells you the map is a
+     * real projection and not a picture. */
+    function drawGraticule() {
+      const nw = Proj.unproject(view, 0, 0)
+      const se = Proj.unproject(view, view.w, view.h)
+      // Coarser lines as you zoom out, so the grid never turns into a screen.
+      const span = Math.abs(se.lon - nw.lon)
+      const step = span > 60 ? 10 : span > 25 ? 5 : span > 10 ? 2 : 1
+
+      ctx.save()
+      ctx.strokeStyle = colors.grid
+      ctx.lineWidth = 0.6
+      ctx.globalAlpha = 0.55
+      ctx.beginPath()
+      const first = n => Math.ceil(n / step) * step
+      for (let lon = first(nw.lon); lon <= se.lon; lon += step) {
+        const a = Proj.project(view, lon, nw.lat)
+        const b = Proj.project(view, lon, se.lat)
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+      }
+      for (let lat = first(se.lat); lat <= nw.lat; lat += step) {
+        const a = Proj.project(view, nw.lon, lat)
+        const b = Proj.project(view, se.lon, lat)
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    /* Darkens the corners so the eye settles in the middle where the route is.
+     * Drawn on the ground rather than over everything, so it never dims a leg. */
+    function drawVignette() {
+      const g = ctx.createRadialGradient(
+        view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.32,
+        view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.78
+      )
+      g.addColorStop(0, 'rgba(0,0,0,0)')
+      g.addColorStop(1, colors.seaDeep)
+      ctx.save()
+      ctx.globalAlpha = 0.5
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, view.w, view.h)
+      ctx.restore()
+    }
+
     function drawBasemap() {
-      ctx.fillStyle = colors.sea
+      // A sea that deepens toward the bottom of the frame. One flat fill across
+      // two thirds of the viewport is the least interesting thing a map can do.
+      const sky = ctx.createLinearGradient(0, 0, 0, view.h)
+      sky.addColorStop(0, colors.sea)
+      sky.addColorStop(1, colors.seaDeep)
+      ctx.fillStyle = sky
       ctx.fillRect(0, 0, view.w, view.h)
 
+      drawGraticule()
+      drawVignette()
+
       ctx.lineJoin = 'round'
+
+      /* All the land as one path, filled once with a soft shadow so the glow
+       * lands in the water and not along every internal frontier. The country
+       * outlines are stroked separately afterwards. */
+      const all = new Path2D()
+      const paths = []
       for (const country of basemap.countries) {
-        ctx.beginPath()
+        const path = new Path2D()
         for (const ring of country.rings) {
           for (let i = 0; i < ring.length; i++) {
             const p = Proj.project(view, ring[i][0], ring[i][1])
-            if (i === 0) ctx.moveTo(p.x, p.y)
-            else ctx.lineTo(p.x, p.y)
+            if (i === 0) path.moveTo(p.x, p.y)
+            else path.lineTo(p.x, p.y)
           }
-          ctx.closePath()
+          path.closePath()
         }
-        ctx.fillStyle = colors.land
-        ctx.fill()
-        ctx.strokeStyle = colors.landEdge
-        ctx.lineWidth = 0.8
-        ctx.stroke()
+        paths.push(path)
+        all.addPath(path)
       }
+
+      ctx.save()
+      ctx.shadowColor = colors.coast
+      ctx.shadowBlur = 16
+      ctx.fillStyle = colors.land
+      ctx.fill(all)
+      ctx.restore()
+      // Again without the shadow, so the interior is the flat land colour.
+      ctx.fillStyle = colors.land
+      ctx.fill(all)
+
+      ctx.strokeStyle = colors.landEdge
+      ctx.lineWidth = 0.8
+      for (const path of paths) ctx.stroke(path)
     }
 
     /** Ferries arc; land legs run straight between stations. */
