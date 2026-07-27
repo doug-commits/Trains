@@ -12,10 +12,14 @@
  * and the API returns the author and licence alongside the file, so the
  * attribution the licence requires can be generated rather than hand-kept.
  *
- * NOTE: this could not be executed in the environment it was written in —
- * outbound access to Wikimedia is blocked there. The request shape follows the
- * documented MediaWiki API, but treat the first real run as the thing that
- * proves it. It is deliberately verbose about what it accepted and rejected.
+ *   node tools/fetch-photos.mjs --dry-run  # show what it would take, fetch nothing
+ *
+ * NOTE: this has never completed a real run. The environment it was written in
+ * blocks outbound access to Wikimedia — the attempt returns 403 at the network
+ * edge, with or without the proxy. The request shape follows the documented
+ * MediaWiki API, but treat your first run as the thing that proves it. It
+ * preflights the connection and reports what it accepted and rejected per
+ * landmark so that run is readable rather than a wall of failures.
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs'
@@ -44,6 +48,7 @@ const WIDTH = 1200 // Commons resizes server-side, so nothing is processed here.
 
 const args = process.argv.slice(2)
 const force = args.includes('--force')
+const dryRun = args.includes('--dry-run')
 const onlyArg = args.indexOf('--only')
 const only = onlyArg >= 0 ? (args[onlyArg + 1] || '').split(',').filter(Boolean) : null
 
@@ -76,12 +81,43 @@ function licenceOk(name) {
   return ALLOWED.some(rx => rx.test(String(name || '').trim()))
 }
 
+class NetworkError extends Error {}
+
 async function api(params) {
   const url = new URL('https://commons.wikimedia.org/w/api.php')
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
+  let res
+  try {
+    res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
+  } catch (err) {
+    throw new NetworkError(`cannot reach commons.wikimedia.org (${err.message})`)
+  }
+  // 403 here is almost always an egress filter or a blocked User-Agent, not a
+  // problem with the landmark — worth distinguishing so it is not chased as one.
+  if (res.status === 403 || res.status === 429 || res.status >= 500) {
+    throw new NetworkError(`Commons API ${res.status} ${res.statusText}`)
+  }
   if (!res.ok) throw new Error(`Commons API ${res.status} ${res.statusText}`)
   return res.json()
+}
+
+/** One request before the loop, so a blocked network fails in two seconds. */
+async function preflight() {
+  try {
+    await api({ action: 'query', format: 'json', formatversion: '2', meta: 'siteinfo' })
+    return true
+  } catch (err) {
+    console.error(`\nCannot reach Wikimedia Commons: ${err.message}\n`)
+    console.error('This is a network problem, not a data problem. Usually one of:')
+    console.error('  · the machine sits behind an egress filter or corporate proxy')
+    console.error('  · commons.wikimedia.org is not on an allowlist')
+    console.error('  · the User-Agent was rejected — Wikimedia requires a descriptive one')
+    console.error('\nCheck with:')
+    console.error('  curl -A "OverlandSEA/1.0 (contact@example.com)" \\')
+    console.error('    "https://commons.wikimedia.org/w/api.php?action=query&format=json&meta=siteinfo"')
+    console.error('\nNothing was written. Destinations keep their drawn illustrations.')
+    return false
+  }
 }
 
 /** Search Commons for a usable photograph of one landmark. */
@@ -151,6 +187,8 @@ async function download(url) {
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 async function main() {
+  if (!(await preflight())) process.exit(2)
+
   mkdirSync(OUT_DIR, { recursive: true })
   const landmarks = loadLandmarks()
   const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8')) : {}
@@ -180,6 +218,12 @@ async function main() {
         for (const r of found.rejected.slice(0, 3)) console.log(`      rejected ${r}`)
         continue
       }
+      if (dryRun) {
+        console.log(`  · ${lm.name} — would take ${found.title} (${found.licence}, ${found.credit})`)
+        skipped++
+        await sleep(350)
+        continue
+      }
       const bytes = await download(found.thumburl)
       writeFileSync(join(OUT_DIR, file), bytes)
       manifest[id] = {
@@ -199,6 +243,12 @@ async function main() {
     } catch (err) {
       failed++
       console.log(`  ✗ ${lm.name}: ${err.message}`)
+      // A network failure mid-run will repeat for every remaining landmark.
+      if (err instanceof NetworkError) {
+        console.error('\nStopping — the connection dropped rather than the search failing.')
+        console.error('Anything already fetched is kept; re-run to continue where it left off.')
+        break
+      }
     }
     await sleep(350) // be a good citizen of a free API
   }
@@ -208,6 +258,10 @@ async function main() {
     if (!existsSync(join(OUT_DIR, entry.file))) delete manifest[id]
   }
 
+  if (dryRun) {
+    console.log('\nDry run — nothing written.')
+    return
+  }
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n')
 
   const total = Object.keys(manifest).length
