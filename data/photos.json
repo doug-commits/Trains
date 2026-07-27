@@ -973,5 +973,31 @@
     "height": 600,
     "req": 800,
     "bytes": 174831
+  },
+  "ubud": {
+    "file": "ubud.jpg",
+    "station": "denpasar",
+    "landmark": "Ubud",
+    "credit": "chensiyuan",
+    "licence": "CC BY-SA 4.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:1_Tegalalang_rice_terrace_ubud_bali.jpg",
+    "width": 800,
+    "height": 373,
+    "req": 800,
+    "bytes": 155615
+  },
+  "kawasan-falls": {
+    "file": "kawasan-falls.jpg",
+    "station": "cebu",
+    "landmark": "Kawasan Falls",
+    "credit": "Magalhães",
+    "licence": "Public domain",
+    "licenceUrl": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Kawasan_Falls_Cebu_Island.jpg",
+    "width": 800,
+    "height": 530,
+    "req": 800,
+    "bytes": 133864
   }
 }
