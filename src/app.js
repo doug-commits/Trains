@@ -46,31 +46,54 @@
   /* Real numbers on the corridor cards, so the choice is informed before the
      click. One Dijkstra run per corridor over ~200 edges — cheap at boot. */
   function withStats(presets) {
-    // Several corridors end in the same kind of place, and three identical
-    // skylines in a row reads as a rendering bug. Where the terminus repeats,
-    // take the illustration from somewhere else the route actually calls at.
-    const used = new Set()
+    /* Several corridors end in the same place — three of these finish in
+     * Singapore — so taking the art from the terminus put the identical
+     * photograph on adjacent cards, which reads as a broken page rather than a
+     * coincidence. Each card claims its picture, and a card whose first choice
+     * is taken walks back down its own route until it finds one nobody else has
+     * used. Photographs first, drawings as the fallback, both deduplicated. */
+    const usedPhotos = new Set()
+    const usedScenes = new Set()
+    const havePhotos = typeof Photos !== 'undefined'
+
     return presets.map(p => {
       const routed = Router.route(NETWORK, p.from, p.to, {})
       if (!routed) return p
       const plan = Plan.build(NETWORK, routed, {})
       const t = plan.totals
 
+      // Walk from the destination backwards: the terminus is the best answer,
+      // and the places just short of it are the next best.
+      const candidates = [...plan.stationIds].reverse()
+
+      let photoId = null
+      if (havePhotos) {
+        for (const id of candidates) {
+          const photo = Photos.forStation(id)
+          if (photo && !usedPhotos.has(photo.id)) {
+            photoId = photo.id
+            usedPhotos.add(photo.id)
+            break
+          }
+        }
+      }
+
       let scene = Scene.kindFor(NETWORK, LANDMARKS, p.to)
       let seed = p.to
-      if (used.has(scene)) {
-        const along = plan.stationIds
+      if (!photoId && usedScenes.has(scene)) {
+        const along = candidates
           .map(id => ({ id, kind: Scene.kindFor(NETWORK, LANDMARKS, id) }))
-          .find(x => !used.has(x.kind))
+          .find(x => !usedScenes.has(x.kind))
         if (along) {
           scene = along.kind
           seed = along.id
         }
       }
-      used.add(scene)
+      if (!photoId) usedScenes.add(scene)
 
       return {
         ...p,
+        photoId,
         scene,
         sceneSeed: `${seed}-${p.from}`,
         stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd },
@@ -133,7 +156,7 @@
       map.setRoute(null, false)
       app.dataset.active = 'false'
       panel.innerHTML = UI.idle(NETWORK, CORRIDORS)
-      resetScroll()
+      resetScroll(false)
       paintScenes()
       return
     }
@@ -154,7 +177,7 @@
       const reach = Router.reachable(NETWORK, state.from, opts)
       app.dataset.active = 'true'
       panel.innerHTML = UI.unreachable(NETWORK, state.from, state.to, reach, opts)
-      resetScroll()
+      resetScroll(true)
       paintScenes()
       return
     }
@@ -164,16 +187,23 @@
     app.dataset.active = 'true'
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
     panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
-    resetScroll()
+    resetScroll(true)
     paintScenes()
     bindPanel()
     writeHash()
   }
 
   /* On wide screens the panel scrolls independently; stacked, the window does,
-     and a new route rendered below the fold is a route nobody reads. */
-  function resetScroll() {
+     and a new route rendered below the fold is a route nobody reads.
+     But only once there is a route: doing this on the idle state scrolled the
+     search box off the top of a phone before anyone had typed in it, which is
+     the first thing you want to see and the last thing to hide. */
+  function resetScroll(toResult) {
     panel.scrollTop = 0
+    if (!toResult) {
+      window.scrollTo({ top: 0 })
+      return
+    }
     if (!window.matchMedia('(min-width: 60.0625rem)').matches) {
       const wrap = document.querySelector('.mapwrap')
       if (wrap) window.scrollTo({ top: wrap.offsetTop, behavior: 'smooth' })

@@ -319,6 +319,55 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------------- art, and where it starts
+ * Three corridors finish in Singapore, so taking the picture from each card's
+ * terminus put the same photograph on adjacent cards. Adjacent identical images
+ * read as a broken page, which is a cheap way to lose the reader's trust in
+ * everything else. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('.corridor'))
+  await page.waitForTimeout(1000)
+
+  const art = await page.evaluate(() =>
+    [...document.querySelectorAll('.corridor')].map(c => {
+      const img = c.querySelector('img.photo')
+      if (img) return 'photo:' + img.getAttribute('src').slice(-48)
+      const cv = c.querySelector('canvas.scene')
+      return 'drawn:' + (cv ? cv.dataset.scene + '/' + cv.dataset.seed : 'none')
+    })
+  )
+  const repeated = art.filter((a, i) => art.indexOf(a) !== i)
+  check('no two corridor cards share a picture', repeated.length === 0,
+    repeated.length ? repeated.join(', ') : `${art.length} distinct`)
+}
+
+/* On a phone the search box is the first thing anyone needs, and the idle state
+ * used to scroll it off the top of the screen before they had typed in it. */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(900)
+
+  const box = await page.locator('#askbox').boundingBox()
+  check('the search box is on screen when the page opens',
+    !!box && box.y >= 0 && box.y < 844, box ? `y=${Math.round(box.y)}` : 'not found')
+
+  // Picking a route should still carry you down to the answer.
+  await page.locator('.corridor').first().click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1400)
+  check('choosing a route still scrolls to it',
+    (await page.evaluate(() => window.scrollY)) > 200)
+  await context.close()
+}
+
 /* ------------------------------------------------------------- what beds cost
  * The whole point of pricing per place rather than per region: a flat average
  * hides that one night on this route costs more than the other four together. */

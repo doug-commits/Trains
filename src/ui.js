@@ -738,7 +738,10 @@ const UI = (() => {
                <span><b>${esc(money(st.usd))}</b>all in</span>
              </span>`
           : ''
-        const photo = typeof Photos !== 'undefined' ? Photos.forStation(p.to) : null
+        // The card was assigned its own photograph in app.js, deduplicated
+        // against the others; falling back to the terminus here would undo that.
+        const photo =
+          typeof Photos !== 'undefined' && p.photoId ? Photos.forId(p.photoId) : null
         const inner = photo
           ? Photos.figure(photo, p.label, p.scene ? { kind: p.scene, seed: p.sceneSeed || p.to } : null)
           : p.scene

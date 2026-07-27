@@ -31,9 +31,26 @@
   --idle-line: #3a6674;
   --idle-dot: #4c7d8b;
 
-  --panel-w: 28.5rem;
+  --panel-w: 29.5rem;
   --topbar-h: 3.5rem;
-  --radius: 3px;
+
+  /* Shape. The old single 3px value made every surface read as the same kind
+     of thing — a technical box. A scale lets a card feel like a card, a chip
+     like a chip, and the console frame stay crisp. */
+  --r-xs: 4px;
+  --r-sm: 7px;
+  --r: 11px;
+  --r-lg: 16px;
+  --radius: var(--r-sm);
+
+  /* Depth. Layered rather than one big drop shadow, so raised surfaces read as
+     lifted off the chart instead of floating in front of it. */
+  --lift-1: 0 1px 2px rgb(0 0 0 / 0.24);
+  --lift-2: 0 4px 10px -4px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.2);
+  --lift-3: 0 18px 40px -20px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.25);
+  /* A hairline of light along the top edge — the cheapest convincing depth cue
+     on a dark ground, and it disappears correctly in light mode. */
+  --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.045);
 
   --sans: BarlowCond, ui-sans-serif, system-ui, sans-serif;
   --serif: Spectral, Georgia, serif;
@@ -62,6 +79,11 @@
 
     --idle-line: #aab5b2;
     --idle-dot: #93a09e;
+
+    --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
+    --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
+    --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
+    --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
   }
 }
 
@@ -83,6 +105,10 @@
   --ink: #13212a; --ink-soft: #2c3d45; --muted: #5b7178;
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;
   --idle-line: #aab5b2; --idle-dot: #93a09e;
+  --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
+  --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
+  --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
+  --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
 }
 
 * { box-sizing: border-box; }
@@ -134,7 +160,7 @@ body {
   margin-left: -0.3rem;
   background: none;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r-sm);
   font-family: var(--sans);
   cursor: pointer;
   transition: background 0.15s ease;
@@ -186,11 +212,15 @@ body {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r-sm);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.btn-ghost:hover { color: var(--ink); border-color: var(--muted); }
+.btn-ghost:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+  box-shadow: var(--lift-1);
+}
 
 /* ---------------------------------------------------------------- stage */
 
@@ -218,16 +248,16 @@ body {
   left: 1.1rem;
   width: 24rem;
   max-width: calc(100vw - 2.2rem);
-  padding: 1rem 1.1rem;
+  padding: 1.15rem 1.2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.85rem;
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(16px) saturate(1.3);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
-  box-shadow: 0 20px 48px -24px rgb(0 0 0 / 0.6);
+  border-radius: var(--r);
+  box-shadow: var(--lift-3), var(--sheen);
   z-index: 3;
 }
 
@@ -244,12 +274,14 @@ body {
 
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 
+/* These were uppercase and letterspaced like the section headings, which put
+   nine shouted labels on one panel and left nothing leading. Sentence case
+   demotes them to what they are: captions on an input. */
 .field > span {
   font-family: var(--sans);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -257,20 +289,23 @@ body {
 .field input {
   width: 100%;
   min-width: 0;
-  padding: 0.5rem 0.55rem;
+  padding: 0.58rem 0.62rem;
   font-family: var(--sans);
   font-size: 1rem;
   font-weight: 500;
   color: var(--ink);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
-  transition: border-color 0.15s ease;
+  border-radius: var(--r-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .field select:hover,
 .field input:hover { border-color: var(--muted); }
 .field select:focus,
-.field input:focus { border-color: var(--rail); }
+.field input:focus {
+  border-color: var(--rail);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rail) 16%, transparent);
+}
 
 .swap {
   flex: none;
@@ -281,8 +316,9 @@ body {
   color: var(--muted);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 .swap:hover { color: var(--rail); border-color: var(--rail); }
 
@@ -302,10 +338,9 @@ body {
 }
 .details > summary::-webkit-details-marker { display: none; }
 .details > summary > span {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--ink-soft);
 }
 .details > summary > span::after {
@@ -402,7 +437,7 @@ body {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r);
   font-family: var(--sans);
   font-size: 0.8rem;
   font-weight: 500;
@@ -431,7 +466,7 @@ body {
   pointer-events: none;
   background: var(--panel-solid);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r);
   box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.6);
   font-family: var(--sans);
   line-height: 1.35;
@@ -458,7 +493,7 @@ body {
   width: var(--panel-w);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 1.9rem 1.9rem 4rem;
+  padding: 2.2rem 2.1rem 5rem;
   z-index: 2;
   background: color-mix(in srgb, var(--panel) 93%, transparent);
   backdrop-filter: blur(18px) saturate(1.2);
@@ -511,26 +546,30 @@ body {
 
 /* ----------------------------------------------------------------- stats */
 
+/* A grid rather than a wrapping flex row. Seven stats in a flex row broke into
+   ragged lines at a different point on every route; a fixed track count means
+   the numbers line up under each other whatever the itinerary is. */
 .stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1.35rem;
-  margin: 0 0 1.1rem;
-  padding: 0.75rem 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem 1rem;
+  margin: 0 0 1.2rem;
+  padding: 0.95rem 0;
   border-top: 1px solid var(--panel-edge);
   border-bottom: 1px solid var(--panel-edge);
 }
-.stat { display: flex; align-items: baseline; gap: 0.32rem; }
+.stat { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .stat b {
   font-family: var(--mono);
-  font-size: 1.02rem;
+  font-size: 1.12rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 .stat span {
   font-family: var(--sans);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 500;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -539,7 +578,7 @@ body {
 
 /* --------------------------------------------------------------- blocks */
 
-.block { margin-top: 2.2rem; }
+.block { margin-top: 2.7rem; }
 
 .panel h2 {
   margin: 0;
@@ -572,7 +611,7 @@ body {
   padding: 0.85rem 1rem;
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r);
 }
 .callout.alert {
   border-color: color-mix(in srgb, var(--alert) 55%, var(--panel-edge));
@@ -606,12 +645,15 @@ table { width: 100%; border-collapse: collapse; }
 
 .route tr.leg { cursor: default; }
 .route tr.leg > td {
-  padding: 0.62rem 0.4rem;
+  padding: 0.8rem 0.45rem;
   vertical-align: top;
   border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 60%, transparent);
+  transition: background 0.14s ease;
 }
 .route tr.leg:hover > td,
-.route tr.leg:focus-visible > td { background: var(--raise); }
+.route tr.leg:focus-visible > td {
+  background: color-mix(in srgb, var(--raise) 70%, transparent);
+}
 
 .route .num {
   width: 2.2rem;
@@ -673,7 +715,7 @@ table { width: 100%; border-collapse: collapse; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
   border: 1px solid currentColor;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   color: var(--muted);
 }
 .tag.warn { color: var(--alert); }
@@ -702,7 +744,7 @@ table { width: 100%; border-collapse: collapse; }
   color: var(--ink);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 .j-rule { display: block; margin-top: 0.15rem; color: var(--muted); }
 .route tr.junction.warn .j-buffer {
@@ -762,7 +804,7 @@ table { width: 100%; border-collapse: collapse; }
   font-size: 0.93rem;
   line-height: 1.55;
   background: var(--raise);
-  border-radius: var(--radius);
+  border-radius: var(--r);
 }
 .trap b {
   font-family: var(--sans);
@@ -791,7 +833,7 @@ table { width: 100%; border-collapse: collapse; }
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 /* Severity reads through fill weight as well as hue. */
 .risk.critical .sev { color: var(--sea); background: var(--alert); }
@@ -871,7 +913,7 @@ table { width: 100%; border-collapse: collapse; }
   padding: 0.9rem 1rem;
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r);
 }
 .compare h3 { font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .compare p { font-size: 0.94rem; color: var(--ink-soft); }
@@ -900,40 +942,41 @@ table { width: 100%; border-collapse: collapse; }
   position: relative;
   display: block;
   width: 100%;
-  padding: 0.8rem 0.9rem;
+  padding: 0.95rem 1.05rem 1.05rem;
   text-align: left;
   font-family: var(--sans);
   color: var(--ink);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  box-shadow: var(--lift-1), var(--sheen);
   cursor: pointer;
   overflow: hidden;
-  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
-.corridor::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--rail);
-  opacity: 0;
-  transition: opacity 0.16s ease;
-}
+/* Lifting reads as "this is a thing you can take" far better than the sideways
+   nudge did, and it does not shift the text under the cursor mid-click. */
 .corridor:hover {
-  border-color: color-mix(in srgb, var(--rail) 55%, var(--panel-edge));
-  transform: translateX(2px);
-  box-shadow: 0 8px 20px -14px rgb(0 0 0 / 0.5);
+  border-color: color-mix(in srgb, var(--rail) 45%, var(--panel-edge));
+  transform: translateY(-2px);
+  box-shadow: var(--lift-3), var(--sheen);
 }
-.corridor:hover::before { opacity: 1; }
+.corridor:active { transform: translateY(0); box-shadow: var(--lift-1), var(--sheen); }
+/* The photograph creeps outward as the card lifts — a small thing, and the
+   difference between a card that responds and one that just changes colour. */
+.corridor .photo,
+.corridor canvas.scene { transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.corridor:hover .photo,
+.corridor:hover canvas.scene { transform: scale(1.035); }
 
 .corridor-name {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
-  font-size: 1.02rem;
+  font-size: 1.12rem;
   font-weight: 600;
+  letter-spacing: -0.005em;
 }
 .corridor-name em {
   font-style: normal;
@@ -942,19 +985,19 @@ table { width: 100%; border-collapse: collapse; }
 }
 .corridor-note {
   display: block;
-  margin-top: 0.15rem;
-  font-size: 0.86rem;
-  line-height: 1.4;
+  margin-top: 0.22rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
   color: var(--muted);
 }
 .corridor-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 0 0.85rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--panel-edge);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1101,7 +1144,7 @@ table { width: 100%; border-collapse: collapse; }
   padding: 0.06rem 0.3rem;
   background: var(--livery);
   color: var(--plate-ink);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   font-family: var(--sans);
   font-size: 0.68rem;
   font-weight: 600;
@@ -1126,24 +1169,31 @@ table { width: 100%; border-collapse: collapse; }
 }
 .opline .tag { margin-top: 0; }
 
+/* This repeated on every leg at near-body size over two lines, so on an
+   eight-leg route it was the loudest recurring element after the station
+   names. It is a utility link and should read as one. */
 .book-leg {
-  display: block;
-  margin-top: 0.35rem;
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.4rem;
+  margin-top: 0.45rem;
   font-family: var(--sans);
-  font-size: 0.82rem;
+  font-size: 0.79rem;
   font-weight: 600;
   color: var(--rail);
   text-decoration: none;
 }
-.book-leg:hover { text-decoration: underline; text-underline-offset: 2px; }
+.book-leg:hover { text-decoration: underline; text-underline-offset: 3px; }
 .book-leg .host {
-  display: block;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 400;
   letter-spacing: 0.01em;
   color: var(--muted);
+  opacity: 0.8;
 }
+.book-leg .host::before { content: '· '; }
 /* No direct site, or nothing to book — say so rather than showing a dead link. */
 .book-leg.none,
 .book-leg.via {
@@ -1180,7 +1230,7 @@ table { width: 100%; border-collapse: collapse; }
   padding: 0.75rem 0.9rem;
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
+  border-radius: var(--r);
   font-size: 0.86rem;
 }
 .disclosure b { font-family: var(--sans); color: var(--ink-soft); }
@@ -1194,20 +1244,29 @@ table { width: 100%; border-collapse: collapse; }
 
 .ask-go {
   flex: none;
-  padding: 0 0.9rem;
+  padding: 0 1.15rem;
   font-family: var(--sans);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--sea);
-  background: var(--rail);
-  border: 1px solid var(--rail);
-  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rail) 92%, #fff) 0%,
+    var(--rail) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--rail) 80%, #000);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-2);
   cursor: pointer;
-  transition: filter 0.15s ease;
+  transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
 }
-.ask-go:hover { filter: brightness(1.1); }
+.ask-go:hover {
+  filter: brightness(1.06);
+  box-shadow: var(--lift-2), 0 0 0 4px color-mix(in srgb, var(--rail) 18%, transparent);
+}
+.ask-go:active { transform: translateY(1px); box-shadow: var(--lift-1); }
 
 /* How often the thing runs. Sits under the service name, quieter than the
    service but louder than a note, because on a once-a-day boat it is the most
@@ -1231,10 +1290,11 @@ table { width: 100%; border-collapse: collapse; }
 /* Day by day. A shape for the journey, not a timetable. */
 .days { display: grid; gap: 0.5rem; }
 .day {
-  padding: 0.6rem 0.7rem;
+  padding: 0.75rem 0.85rem;
   background: var(--raise);
-  border-left: 2px solid var(--panel-edge);
-  border-radius: 2px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r);
+  box-shadow: var(--lift-1), var(--sheen);
 }
 .day-head {
   display: flex;
@@ -1294,10 +1354,11 @@ table { width: 100%; border-collapse: collapse; }
 /* Where you sleep, and what it costs there rather than on average. */
 .stays { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
 .stays > li {
-  padding: 0.6rem 0.7rem;
+  padding: 0.75rem 0.85rem;
   background: var(--raise);
-  border-left: 2px solid var(--panel-edge);
-  border-radius: 2px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r);
+  box-shadow: var(--lift-1), var(--sheen);
 }
 .stay-head {
   display: flex;
@@ -1335,7 +1396,7 @@ table { width: 100%; border-collapse: collapse; }
   font-size: 0.76rem;
   color: var(--muted);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 .band b { font-family: var(--mono); font-weight: 600; color: var(--ink-soft); }
 .band.on { border-color: var(--rail); color: var(--ink-soft); }
@@ -1351,13 +1412,13 @@ table { width: 100%; border-collapse: collapse; }
    cannot cover, which is the part that would otherwise be a nasty surprise. */
 .ask-note {
   margin: 0;
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.7rem;
   font-family: var(--sans);
   font-size: 0.84rem;
   line-height: 1.45;
   background: var(--raise);
   border-left: 2px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r);
   color: var(--muted);
 }
 .ask-note b { color: var(--ink); font-weight: 600; }
@@ -1375,7 +1436,7 @@ table { width: 100%; border-collapse: collapse; }
   color: var(--ink);
   background: var(--panel);
   border: 1px solid var(--panel-edge);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s;
 }
@@ -1385,14 +1446,14 @@ table { width: 100%; border-collapse: collapse; }
 .or {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.7rem;
   margin: 0;
   font-family: var(--sans);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--muted);
+  opacity: 0.85;
 }
 .or::before,
 .or::after {
@@ -1405,10 +1466,13 @@ table { width: 100%; border-collapse: collapse; }
 /* ------------------------------------------------------------ destinations */
 
 /* Original illustrations rather than photographs — see src/scene.js for why. */
+/* Was a 4.6rem letterbox through the middle of every image, which beheaded
+   skylines and mountains alike and left cards looking like they were showing
+   the wrong part of the picture. */
 .corridor-art {
   display: block;
-  margin: -0.8rem -0.9rem 0.7rem;
-  height: 4.6rem;
+  margin: -0.95rem -1.05rem 0.85rem;
+  height: 7.5rem;
   overflow: hidden;
   position: relative;
 }
@@ -1418,15 +1482,15 @@ table { width: 100%; border-collapse: collapse; }
   content: '';
   position: absolute;
   inset: auto 0 0 0;
-  height: 32%;
-  background: linear-gradient(transparent, var(--raise));
+  height: 55%;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--raise) 92%, transparent) 55%, var(--raise));
   pointer-events: none;
 }
 
 .banner {
   position: relative;
-  margin: -1.9rem -1.9rem 1.4rem;
-  height: 9rem;
+  margin: -2.2rem -2.1rem 1.6rem;
+  height: 13rem;
   overflow: hidden;
 }
 .banner canvas { display: block; width: 100%; height: 100%; }
@@ -1434,8 +1498,8 @@ table { width: 100%; border-collapse: collapse; }
   content: '';
   position: absolute;
   inset: auto 0 0 0;
-  height: 42%;
-  background: linear-gradient(transparent, var(--panel-solid));
+  height: 58%;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--panel-solid) 88%, transparent) 50%, var(--panel-solid));
   pointer-events: none;
 }
 .banner-cap {
@@ -1453,7 +1517,7 @@ table { width: 100%; border-collapse: collapse; }
 }
 
 @media (max-width: 60rem) {
-  .banner { margin: -1.5rem -1.25rem 1.2rem; height: 7.5rem; }
+  .banner { margin: -1.5rem -1.25rem 1.2rem; height: 10rem; }
   .banner-cap { left: 1.25rem; }
 }
 
@@ -1464,27 +1528,34 @@ table { width: 100%; border-collapse: collapse; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Above centre. Almost every photograph here is a landscape or a building,
+     and the subject sits in the upper half — dead-centre cropping cut the tops
+     off skylines and left a card full of foreground. */
+  object-position: center 38%;
   /* Settle the image into the page's palette so photographs and drawn
      illustrations can sit side by side without one looking pasted in. */
-  filter: saturate(0.88) contrast(1.04);
+  filter: saturate(0.9) contrast(1.03);
 }
 
 /* The credit the licence requires, kept on the image rather than only in a
-   list at the bottom where nobody connects it to the picture. */
+   list at the bottom where nobody connects it to the picture.
+   It used to be a hard black chip in the top-right corner of every photograph,
+   which fought the title for attention and was the first thing the eye landed
+   on. Bottom-right, over the fade that is already there, it stays legible and
+   stops competing. */
 .photo-credit {
   position: absolute;
-  right: 0.5rem;
-  top: 0.4rem;
+  right: 0.6rem;
+  bottom: 0.45rem;
   z-index: 1;
-  max-width: 70%;
-  padding: 0.1rem 0.35rem;
+  max-width: 75%;
   font-family: var(--sans);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
   line-height: 1.3;
-  color: #eef2f0;
-  background: rgb(0 0 0 / 0.45);
-  border-radius: 2px;
+  color: rgb(255 255 255 / 0.72);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.85);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

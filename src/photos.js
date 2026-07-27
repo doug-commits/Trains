@@ -32,6 +32,11 @@ const Photos = (() => {
     return byStation[stationId] || null
   }
 
+  /** A specific photograph by manifest id, for callers that pick their own. */
+  function forId(id) {
+    return have[id] ? { id, ...have[id] } : null
+  }
+
   function count() {
     return Object.keys(have).length
   }
@@ -90,5 +95,5 @@ const Photos = (() => {
     return `<div class="credits"><h3>Photography</h3><ul>${items}</ul></div>`
   }
 
-  return { forStation, figure, creditBlock, creditsFor, count }
+  return { forStation, forId, figure, creditBlock, creditsFor, count }
 })()
