@@ -1155,5 +1155,57 @@
     "height": 600,
     "req": 800,
     "bytes": 226442
+  },
+  "maeklong-railway-market": {
+    "file": "maeklong-railway-market.jpg",
+    "station": "maeklong",
+    "landmark": "Maeklong Railway Market",
+    "credit": "Codas",
+    "licence": "CC BY-SA 4.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Maeklong_Railway_Market_01.jpg",
+    "width": 800,
+    "height": 600,
+    "req": 800,
+    "bytes": 276138
+  },
+  "amphawa-floating-market": {
+    "file": "amphawa-floating-market.jpg",
+    "station": "maeklong",
+    "landmark": "Amphawa floating market",
+    "credit": "Rangan Datta Wiki",
+    "licence": "CC BY-SA 4.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Amphawa_Floating_Market_8.jpg",
+    "width": 800,
+    "height": 530,
+    "req": 800,
+    "bytes": 199681
+  },
+  "rong-kluea-market": {
+    "file": "rong-kluea-market.jpg",
+    "station": "aranyaprathet",
+    "landmark": "Rong Kluea Market",
+    "credit": "Patiparn.Nice2002bkk",
+    "licence": "CC BY-SA 4.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Intercity_buses_in_Chachoengsao_(2).jpg",
+    "width": 800,
+    "height": 601,
+    "req": 800,
+    "bytes": 155185
+  },
+  "hanoi-train-street": {
+    "file": "hanoi-train-street.jpg",
+    "station": "hanoi",
+    "landmark": "Hanoi Train Street",
+    "credit": "Kris Martyn",
+    "licence": "CC BY-SA 4.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Train_street_in_Hanoi.jpg",
+    "width": 800,
+    "height": 1200,
+    "req": 800,
+    "bytes": 452748
   }
 }
