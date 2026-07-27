@@ -46,6 +46,7 @@
   const canvas = $('#map')
   const panel = $('#panel')
   const tooltip = $('#tip')
+  const hint = $('#maphint')
 
   const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS)
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
@@ -306,12 +307,54 @@
   let tipReach = null
   let hideTimer = null
 
+  // Touch pointers currently down. One finger is the page's — it scrolls past
+  // the map. Two are the map's: they pan, and their separation pinches.
+  const touches = new Map()
+  let pinch = null
+
+  const midpoint = () => {
+    const pts = [...touches.values()]
+    return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+  }
+  const spread = () => {
+    const pts = [...touches.values()]
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1
+  }
+
   canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
+      if (touches.size === 2) {
+        // The second finger says "I mean the map". Take the gesture now.
+        drag = { ...midpoint(), moved: 0 }
+        pinch = spread()
+        hideTip()
+      }
+      return
+    }
     canvas.setPointerCapture(e.pointerId)
     drag = { x: e.offsetX, y: e.offsetY, moved: 0 }
   })
 
   canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
+      if (touches.size < 2 || !drag) return
+      // Two fingers down means the browser has already yielded the gesture,
+      // so panning and pinching here costs the page nothing.
+      e.preventDefault()
+      const mid = midpoint()
+      map.panBy(mid.x - drag.x, mid.y - drag.y)
+      drag.moved += Math.abs(mid.x - drag.x) + Math.abs(mid.y - drag.y)
+      drag.x = mid.x
+      drag.y = mid.y
+      const now = spread()
+      if (pinch) map.zoomAt(mid.x, mid.y, now / pinch)
+      pinch = now
+      hideTip()
+      return
+    }
+
     if (drag) {
       const dx = e.offsetX - drag.x
       const dy = e.offsetY - drag.y
@@ -485,10 +528,16 @@
   })
 
   canvas.addEventListener('pointerup', e => {
+    const wasPinch = e.pointerType === 'touch' && touches.size > 1
+    if (e.pointerType === 'touch') {
+      touches.delete(e.pointerId)
+      if (touches.size < 2) pinch = null
+    }
     const wasDrag = drag && drag.moved > 6
     drag = null
     canvas.style.cursor = 'grab'
-    if (wasDrag) return
+    // Lifting one finger out of a two-finger gesture is not a tap.
+    if (wasDrag || wasPinch) return
 
     const found = map.pick(e.offsetX, e.offsetY)
     if (!found || found.type !== 'station') return hideTip()
@@ -515,20 +564,59 @@
   })
 
   canvas.addEventListener('pointerleave', e => {
+    touches.delete(e.pointerId)
+    if (touches.size < 2) pinch = null
     drag = null
     // Leaving the canvas for the popup is not leaving the map.
     if (!inTipReach(e.offsetX, e.offsetY)) hideTip()
   })
 
+  canvas.addEventListener('pointercancel', e => {
+    touches.delete(e.pointerId)
+    if (touches.size < 2) pinch = null
+    drag = null
+  })
+
+  const ZOOM_KEY = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl'
+  let hintTimer = null
+
+  function flashHint(text) {
+    hint.textContent = text
+    hint.hidden = false
+    // Two frames, so the element is laid out before the class that fades it in.
+    requestAnimationFrame(() => requestAnimationFrame(() => hint.classList.add('show')))
+    clearTimeout(hintTimer)
+    hintTimer = setTimeout(() => {
+      hint.classList.remove('show')
+      setTimeout(() => { hint.hidden = true }, 300)
+    }, 1600)
+  }
+
   canvas.addEventListener(
     'wheel',
     e => {
+      // Scrolling the page over the map is still scrolling the page. Zooming is
+      // something you ask for: ctrl/⌘ and the wheel, which is also exactly what
+      // a trackpad pinch reports. Anything else falls through to the document.
+      if (!e.ctrlKey && !e.metaKey) {
+        flashHint(`Hold ${ZOOM_KEY} and scroll to zoom the map`)
+        return
+      }
       e.preventDefault()
-      map.zoomAt(e.offsetX, e.offsetY, e.deltaY < 0 ? 1.12 : 1 / 1.12)
+      // A pinch arrives as many small deltas; the wheel as few large ones.
+      const step = Math.min(Math.abs(e.deltaY) / 100, 1) * 0.12
+      map.zoomAt(e.offsetX, e.offsetY, e.deltaY < 0 ? 1 + step : 1 / (1 + step))
       hideTip()
     },
     { passive: false }
   )
+
+  const zoomStep = factor => () => {
+    map.zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, factor)
+    hideTip()
+  }
+  $('#zoomin').addEventListener('click', zoomStep(1.3))
+  $('#zoomout').addEventListener('click', zoomStep(1 / 1.3))
 
   function showTip(x, y, html, interactive = false) {
     cancelHide()

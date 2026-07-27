@@ -586,6 +586,13 @@ const MapView = (() => {
         if (p.x < 0 || p.y < 0 || p.x > view.w || p.y > view.h) return null
         return { x: p.x, y: p.y }
       },
+      /* A short string that changes whenever the view pans or zooms. Cheaper to
+       * compare than the view itself, and it is what tells a test whether a
+       * scroll moved the map when it should have moved the page. */
+      viewSignature() {
+        if (!view) return 'none'
+        return [view.scale, view.dx, view.dy].map(n => Math.round(n * 100) / 100).join(',')
+      },
       setInset(next) {
         inset = { left: 0, right: 0, ...next }
       },
