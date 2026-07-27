@@ -201,6 +201,9 @@
     $('#nationality').value = state.nationality
     $('#pace').value = state.pace
     $('#stay').value = state.stay
+    // The search boxes show whatever the selects now hold, so a pick made on
+    // the map or by a corridor card reads back in the fields too.
+    syncCombos()
     renderDetailSummary()
   }
 
@@ -702,6 +705,197 @@
     tooltip.classList.remove('live')
     tipStation = null
     tipReach = null
+  }
+
+  /* ------------------------------------------------------------- combobox */
+
+  /* A native select over two hundred stations means scrolling past nine
+   * countries to reach Surabaya, and its own type-ahead only jumps to the
+   * first letter of the option text — which here is the city, so "surabaya"
+   * works and "gubeng" never will. This filters on everything: station name,
+   * city, and country.
+   *
+   * The select is still the model. It holds the answer, the rest of the app
+   * reads it, and this is only a nicer way to reach it. */
+
+  /* Fold accents, so "Đà Nẵng" is reachable from a keyboard that has no Đ and
+   * "Huế" from one with no ế. NFD splits a letter from its marks and the range
+   * strips the marks — but it leaves đ alone, because a stroked d is its own
+   * letter rather than a d wearing an accent. That one is spelled out. */
+  const fold = s =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd')
+
+  const CHOICES = Object.entries(NETWORK.stations).map(([id, s]) => ({
+    id,
+    city: s.city,
+    name: s.name,
+    where: COUNTRY_NAME[s.country],
+    // Where a city has several stations, the one people mean comes first:
+    // "sing" should offer HarbourFront before Woodlands CIQ, which is a
+    // border post you pass through rather than a place you set out from.
+    weight: s.hub ? 0 : s.minor ? 2 : 1,
+    hay: fold(`${s.city} ${s.name} ${COUNTRY_NAME[s.country]}`),
+  }))
+
+  const MAX_ROWS = 60
+
+  /* Ranked, so typing "sing" puts Singapore above Sungai Petani. A match at
+   * the start of a word beats one buried mid-string, and the city beats the
+   * station name — people think in cities. */
+  function search(q) {
+    if (!q) return CHOICES.slice().sort((a, b) => a.city.localeCompare(b.city))
+    const n = fold(q)
+    const scored = []
+    for (const c of CHOICES) {
+      const at = c.hay.indexOf(n)
+      if (at < 0) continue
+      const wordStart = at === 0 || c.hay[at - 1] === ' ' || c.hay[at - 1] === '('
+      const inCity = at < c.city.length
+      scored.push({ c, rank: (at === 0 ? 0 : wordStart ? 1 : 2) + (inCity ? 0 : 0.5), at })
+    }
+    scored.sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        a.c.weight - b.c.weight ||
+        a.c.city.localeCompare(b.c.city) ||
+        a.c.name.localeCompare(b.c.name)
+    )
+    return scored.map(s => s.c)
+  }
+
+  const mark = (text, q) => {
+    if (!q) return UI.esc(text)
+    const folded = fold(text)
+    // Folding can shorten a string, and then an index into the folded copy
+    // points at the wrong letters of the original. Where that happens, show
+    // the row unmarked rather than emphasising the wrong half of a word.
+    if (folded.length !== text.length) return UI.esc(text)
+    const at = folded.indexOf(fold(q))
+    if (at < 0) return UI.esc(text)
+    return (
+      UI.esc(text.slice(0, at)) +
+      `<b>${UI.esc(text.slice(at, at + q.length))}</b>` +
+      UI.esc(text.slice(at + q.length))
+    )
+  }
+
+  function setupCombo(which) {
+    const select = $(`#${which}`)
+    const input = $(`#${which}-q`)
+    const list = $(`#${which}-list`)
+    let rows = []
+    let active = -1
+    let open = false
+
+    const labelFor = id => {
+      const s = NETWORK.stations[id]
+      return s ? (s.city === s.name ? s.name : `${s.city} — ${s.name}`) : ''
+    }
+
+    function close() {
+      open = false
+      active = -1
+      list.hidden = true
+      input.setAttribute('aria-expanded', 'false')
+      input.removeAttribute('aria-activedescendant')
+    }
+
+    function paint(q) {
+      rows = search(q).slice(0, MAX_ROWS)
+      if (!rows.length) {
+        list.innerHTML = `<li class="combo-empty">Nothing matches “${UI.esc(q)}”</li>`
+      } else {
+        list.innerHTML = rows
+          .map(
+            (c, i) =>
+              `<li id="${which}-opt-${i}" role="option" aria-selected="${i === active}" data-i="${i}">` +
+              `<span>${mark(c.city === c.name ? c.name : `${c.city} — ${c.name}`, q)}</span>` +
+              `<span class="where">${UI.esc(c.where)}</span></li>`
+          )
+          .join('')
+      }
+      open = true
+      list.hidden = false
+      input.setAttribute('aria-expanded', 'true')
+    }
+
+    function highlight(i) {
+      const prev = list.querySelector('[aria-selected="true"]')
+      if (prev) prev.setAttribute('aria-selected', 'false')
+      active = i
+      if (i < 0) return input.removeAttribute('aria-activedescendant')
+      const el = list.children[i]
+      if (!el) return
+      el.setAttribute('aria-selected', 'true')
+      el.scrollIntoView({ block: 'nearest' })
+      input.setAttribute('aria-activedescendant', el.id)
+    }
+
+    function choose(i) {
+      const c = rows[i]
+      if (!c) return
+      select.value = c.id
+      select.dispatchEvent(new Event('change'))
+      input.value = labelFor(c.id)
+      close()
+    }
+
+    input.addEventListener('input', () => paint(input.value.trim()))
+    input.addEventListener('focus', () => {
+      input.select()
+      paint('')
+    })
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (!open) return paint(input.value.trim())
+        if (!rows.length) return
+        const step = e.key === 'ArrowDown' ? 1 : -1
+        highlight((active + step + rows.length) % rows.length)
+        return
+      }
+      if (e.key === 'Enter') {
+        if (!open || !rows.length) return
+        e.preventDefault()
+        // Enter with nothing highlighted takes the best match, which is what
+        // typing three letters and pressing Enter is asking for.
+        choose(active < 0 ? 0 : active)
+        return
+      }
+      if (e.key === 'Escape' && open) {
+        e.preventDefault()
+        close()
+        input.value = labelFor(select.value)
+        return
+      }
+      if (e.key === 'Tab') close()
+    })
+
+    // pointerdown, not click: blur would close the list before click landed.
+    list.addEventListener('pointerdown', e => {
+      const li = e.target.closest('li[data-i]')
+      if (!li) return
+      e.preventDefault()
+      choose(Number(li.dataset.i))
+    })
+
+    input.addEventListener('blur', () => {
+      // Leaving with half a word typed should not look like a choice.
+      setTimeout(() => {
+        if (!open) return
+        close()
+        input.value = labelFor(select.value)
+      }, 0)
+    })
+
+    return { sync: () => { input.value = labelFor(select.value) } }
+  }
+
+  const COMBOS = { from: setupCombo('from'), to: setupCombo('to') }
+  const syncCombos = () => {
+    COMBOS.from.sync()
+    COMBOS.to.sync()
   }
 
   /* ------------------------------------------------------------- listeners */

@@ -872,6 +872,76 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------- finding a station by typing */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+
+  const rows = () => page.locator('#from-list li').allTextContents()
+
+  await page.click('#from-q')
+  await page.waitForTimeout(150)
+  check('focusing the box offers the whole list', (await rows()).length > 20,
+    `${(await rows()).length} shown`)
+
+  // The case a native select cannot do: the platform name, not the city.
+  await page.fill('#from-q', 'gubeng')
+  await page.waitForTimeout(150)
+  const gubeng = await rows()
+  check('typing a station name finds it, not just the city',
+    gubeng.length === 1 && /Surabaya/.test(gubeng[0]), gubeng.join(' | '))
+
+  // Accents folded, because the keyboard in front of you may not have them.
+  await page.fill('#from-q', 'da nang')
+  await page.waitForTimeout(150)
+  const danang = await rows()
+  check('accents fold, so "da nang" reaches Đà Nẵng',
+    danang.length === 1 && /Nẵng/.test(danang[0]), danang.join(' | '))
+
+  // Where a city has several stations, the one people mean leads.
+  await page.fill('#from-q', 'sing')
+  await page.waitForTimeout(150)
+  check('the main terminal outranks the border post',
+    /HarbourFront/.test((await rows())[0]), (await rows())[0])
+
+  // Three letters and Enter, with nothing highlighted, takes the best match.
+  await page.fill('#from-q', 'suraba')
+  await page.waitForTimeout(150)
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(400)
+  check('Enter takes the top match', (await page.inputValue('#from')) === 'surabaya',
+    await page.inputValue('#from'))
+
+  // Arrow keys move, and the box reads back what was chosen.
+  await page.fill('#to-q', 'jakar')
+  await page.waitForTimeout(150)
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  check('arrow keys pick too', (await page.inputValue('#to')) === 'jakarta',
+    await page.inputValue('#to'))
+  check('and the box shows the station it chose',
+    /Jakarta/.test(await page.inputValue('#to-q')), await page.inputValue('#to-q'))
+
+  check('a miss says so rather than showing nothing',
+    /Nothing matches/.test((await page.fill('#from-q', 'zzzz'), await page.waitForTimeout(150),
+      (await rows()).join(''))))
+
+  // A choice made anywhere else has to read back into the box, or the two
+  // disagree about where you are going.
+  await page.click('#startover')
+  await page.waitForFunction(() => document.querySelector('.corridor'))
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(600)
+  const shown = await page.inputValue('#from-q')
+  check('a corridor card fills the boxes too', /Bangkok|Krung Thep/.test(shown), shown)
+
+  await page.screenshot({ path: join(outDir, '21-station-search.png') })
+  await context.close()
+}
+
 /* --------------------------------------------- the track is the real track */
 {
   const railPairs = new Set(

@@ -389,6 +389,74 @@ body {
 
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 
+/* ------------------------------------------------------------- combobox */
+
+/* Two hundred stations in a native select means scrolling past nine countries
+   to reach Surabaya. Typing three letters should get you there instead. */
+.combo { position: relative; }
+
+.combo-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0.3rem 0 0;
+  padding: 0.25rem;
+  max-height: 17rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-3), var(--sheen);
+}
+
+.combo-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: var(--r-xs);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.combo-list li[aria-selected='true'],
+.combo-list li:hover { background: var(--raise); }
+
+/* The line that says which of the three Padang Besars this is. */
+.combo-list .where {
+  margin-left: auto;
+  padding-left: 0.5rem;
+  flex: none;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.combo-list b { font-weight: 600; color: var(--rail); }
+
+.combo-empty {
+  padding: 0.55rem;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: default;
+}
+.combo-empty:hover { background: none; }
+
+/* Same caption treatment the wrapping-label fields get. */
+.field > .cap {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
 /* These were uppercase and letterspaced like the section headings, which put
    nine shouted labels on one panel and left nothing leading. Sentence case
    demotes them to what they are: captions on an input. */

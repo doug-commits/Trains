@@ -56,15 +56,26 @@
       <p class="or"><span>or choose stations</span></p>
 
       <div class="search">
-        <label class="field">
-          <span>From</span>
-          <select id="from"></select>
-        </label>
+        <div class="field combo">
+          <label class="cap" for="from-q">From</label>
+          <input type="text" id="from-q" class="combo-input" role="combobox" aria-expanded="false"
+                 aria-controls="from-list" aria-autocomplete="list" aria-describedby="combo-help"
+                 placeholder="Type a city or station" autocomplete="off" spellcheck="false">
+          <ul id="from-list" class="combo-list" role="listbox" aria-label="Stations" hidden></ul>
+        </div>
         <button type="button" id="swap" class="swap" title="Swap origin and destination" aria-label="Swap origin and destination">⇅</button>
-        <label class="field">
-          <span>To</span>
-          <select id="to"></select>
-        </label>
+        <div class="field combo">
+          <label class="cap" for="to-q">To</label>
+          <input type="text" id="to-q" class="combo-input" role="combobox" aria-expanded="false"
+                 aria-controls="to-list" aria-autocomplete="list" aria-describedby="combo-help"
+                 placeholder="Type a city or station" autocomplete="off" spellcheck="false">
+          <ul id="to-list" class="combo-list" role="listbox" aria-label="Stations" hidden></ul>
+        </div>
+        <p id="combo-help" class="sr">Type to filter, arrow keys to move, Enter to choose.</p>
+        <!-- The chosen station lives here. The boxes above are how you find it;
+             this is what the rest of the app reads, and what a form would post. -->
+        <select id="from" class="sr" tabindex="-1" aria-hidden="true"></select>
+        <select id="to" class="sr" tabindex="-1" aria-hidden="true"></select>
       </div>
 
       <details class="details">
