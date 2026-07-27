@@ -1,0 +1,94 @@
+name: Fetch destination photos
+
+# The fetcher needs to reach commons.wikimedia.org, which the development
+# sandbox blocks. GitHub's runners do not, so the fetch happens here and the
+# results are committed back.
+#
+# Run it from the Actions tab → Fetch destination photos → Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refetch images that already exist
+        type: boolean
+        default: false
+      dry_run:
+        description: Show what would be taken without writing anything
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-photos
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch photographs from Wikimedia Commons
+        id: fetch
+        run: |
+          set -o pipefail
+          ARGS=""
+          [ "${{ inputs.force }}" = "true" ] && ARGS="$ARGS --force"
+          [ "${{ inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
+          node tools/fetch-photos.mjs $ARGS 2>&1 | tee fetch.log
+
+      - name: Build
+        if: inputs.dry_run != true
+        run: node tools/build.mjs | tee -a fetch.log
+
+      # A broken page must not be committed, so the browser test gates the
+      # commit rather than following it.
+      - name: Verify in a real browser
+        if: inputs.dry_run != true
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node tools/smoke.mjs
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo '## Fetch destination photos'
+            echo
+            echo '```'
+            tail -n 80 fetch.log 2>/dev/null || echo 'no log'
+            echo '```'
+            if [ -f data/photos.json ]; then
+              echo
+              echo "Manifest holds $(node -e "console.log(Object.keys(require('./data/photos.json')).length)") photographs."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        if: inputs.dry_run != true
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/photos data/photos.json index.html 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo 'Nothing changed — no photographs were added or updated.'
+            exit 0
+          fi
+          COUNT=$(node -e "console.log(Object.keys(require('./data/photos.json')).length)")
+          git commit -m "Add ${COUNT} destination photographs from Wikimedia Commons
+
+          Fetched by .github/workflows/fetch-photos.yml. Every image is CC0,
+          public domain, CC BY or CC BY-SA; author, licence and source travel
+          with each file in data/photos.json and render as attribution in the
+          itinerary."
+          git push
