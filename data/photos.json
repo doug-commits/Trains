@@ -986,5 +986,18 @@
     "height": 530,
     "req": 800,
     "bytes": 133864
+  },
+  "kraton-and-solo-batik": {
+    "file": "kraton-and-solo-batik.jpg",
+    "station": "solo",
+    "landmark": "Kraton and Solo batik",
+    "credit": "Crisco 1492",
+    "licence": "CC BY-SA 3.0",
+    "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Great_Mosque_of_Solo.jpg",
+    "width": 800,
+    "height": 389,
+    "req": 800,
+    "bytes": 134209
   }
 }
