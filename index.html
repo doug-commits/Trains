@@ -6965,13 +6965,46 @@ const UI = (() => {
    * helps: where exactly is this place, and how do I cover the last mile the
    * railway does not.
    *
-   * Coordinates rather than names, deliberately — there are three Liloans on
-   * this map and a name search would find the wrong one. */
+   * By name, not by coordinate. Every station here is stored to two decimal
+   * places, which is ample for drawing a map of ten countries and hopeless for
+   * dropping a pin: it is about a kilometre of slop, so the marker lands in a
+   * field near the station and Google labels it nothing at all. A name Google
+   * can geocode puts you on the actual place, with its actual card.
+   *
+   * The name alone is not enough — there are three Liloans on this map — so
+   * every query carries its city and country. That is what makes it exact. */
+  const placeQuery = (...parts) => {
+    const seen = []
+    for (const p of parts) if (p && !seen.includes(p)) seen.push(p)
+    return encodeURIComponent(seen.join(', '))
+  }
+
+  /* "Maeklong" is a river, a district and a market before it is a platform, so
+   * a rail station says that it is one — unless its name already does. Ferry
+   * piers and bus stands keep their names as written; they are what Google has
+   * them filed under. */
+  const SAYS_WHAT_IT_IS = /station|junction|terminal|sentral|central|halt|pier|port|airport/i
+  const stationQuery = s =>
+    placeQuery(
+      s.gauge && !SAYS_WHAT_IT_IS.test(s.name) ? `${s.name} railway station` : s.name,
+      s.city,
+      COUNTRY_NAME[s.country]
+    )
+
+  /* A sight is named in its own right, so it leads. Its railhead's town only
+   * qualifies it when the two are the same place — where there is a gap the
+   * railhead is somewhere else entirely, and "Angkor Wat, Sisophon" would send
+   * Google looking two hours down the road from Angkor Wat. */
+  const landmarkQuery = lm => {
+    const st = NETWORK.stations[lm.station]
+    return placeQuery(lm.name, !lm.last && st ? st.city : null, COUNTRY_NAME[lm.country])
+  }
+
   const MAPS = {
-    at: (lat, lon) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
-    between: (a, b) =>
-      `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}` +
-      `&destination=${b.lat},${b.lon}&travelmode=driving`,
+    at: query => `https://www.google.com/maps/search/?api=1&query=${query}`,
+    between: (from, to) =>
+      `https://www.google.com/maps/dir/?api=1&origin=${from}` +
+      `&destination=${to}&travelmode=driving`,
   }
   const mapsLink = (href, text) =>
     `<a class="tip-map" href="${UI.esc(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`
@@ -7397,7 +7430,7 @@ const UI = (() => {
         s.gauge ? ` · ${UI.esc(s.gauge)} gauge` : ''
       }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}` +
         `<span class="tip-acts">${actions}</span>` +
-        `<span class="tip-links">${mapsLink(MAPS.at(s.lat, s.lon), 'Show on Google Maps')}</span>`,
+        `<span class="tip-links">${mapsLink(MAPS.at(stationQuery(s)), 'Show on Google Maps')}</span>`,
       true
     )
   }
@@ -7437,9 +7470,12 @@ const UI = (() => {
         }</span>` +
         /* The gap is the whole reason this table exists, and until now it was
            only ever described. Now it is a route you can follow. */
-        `<span class="tip-links">${mapsLink(MAPS.at(lm.lat, lm.lon), 'Show on Google Maps')}${
-          lm.last && st.lat != null
-            ? mapsLink(MAPS.between(st, lm), `Directions from ${UI.esc(st.city)}`)
+        `<span class="tip-links">${mapsLink(MAPS.at(landmarkQuery(lm)), 'Show on Google Maps')}${
+          lm.last
+            ? mapsLink(
+                MAPS.between(stationQuery(st), landmarkQuery(lm)),
+                `Directions from ${UI.esc(st.city)}`
+              )
             : ''
         }</span>`,
       true
@@ -7704,8 +7740,8 @@ const UI = (() => {
       // describing it.
       const lm = side.landmark
       const st = lm && NETWORK.stations[lm.station]
-      return lm && lm.last && lm.lat != null && st
-        ? `${parts} ${mapsLink(MAPS.between(st, lm), 'Directions')}`
+      return lm && lm.last && st
+        ? `${parts} ${mapsLink(MAPS.between(stationQuery(st), landmarkQuery(lm)), 'Directions')}`
         : parts
     }
     showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')

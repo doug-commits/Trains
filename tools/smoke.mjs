@@ -480,15 +480,25 @@ function check(label, condition, detail = '') {
   }
 
   /* Out to the real map for the last mile, which is the one thing the chart
-   * cannot show. Coordinates rather than names on purpose — there are three
-   * Liloans in this network and a name search would find the wrong one. */
+   * cannot show. By name, because the stored coordinates are only good to about
+   * a kilometre — but never qualified by the railhead's town, because across a
+   * road gap the railhead is two hours from the sight. */
   await hover(page, angkor.lon, angkor.lat)
-  const links = await page.locator('#tip .tip-map').evaluateAll(a => a.map(x => x.href))
+  const links = (
+    await page.locator('#tip .tip-map').evaluateAll(a => a.map(x => x.href))
+  ).map(decodeURIComponent)
   check('a sight links out to the real map', links.some(h => /maps\/search/.test(h)), links.length + ' links')
+
+  const search = links.find(h => /maps\/search/.test(h))
+  check('a sight is searched by its own name', /query=Angkor Wat, Cambodia/.test(search), search)
+  check('and is not mislabelled with a railhead two hours away',
+    !/Sisophon/.test(search), search)
+
   const dir = links.find(h => /maps\/dir/.test(h))
-  const rail = NETWORK.stations[angkor.station]
   check('and offers directions across the road gap, starting at the railhead',
-    !!dir && dir.includes(`origin=${rail.lat},${rail.lon}`) && dir.includes(`destination=${angkor.lat},${angkor.lon}`),
+    !!dir &&
+      /origin=Sisophon railway station, Sisophon, Cambodia/.test(dir) &&
+      /destination=Angkor Wat, Cambodia/.test(dir),
     dir || 'no directions link')
 
   check('the legend explains the new mark',
@@ -511,9 +521,17 @@ function check(label, condition, detail = '') {
   const first = await hover(page, bangkok.lon, bangkok.lat)
   check('hovering a station opens a popup', !!first, first ? `at ${first.x},${first.y}` : 'none found')
 
-  const stationLink = await page.locator('#tip .tip-map').first().getAttribute('href')
-  check('a station links out to the real map at its own coordinates',
-    !!stationLink && stationLink.includes(`query=${bangkok.lat},${bangkok.lon}`), stationLink || 'none')
+  /* By name, not by coordinate. Station coordinates are stored to two decimal
+   * places — about a kilometre — so a dropped pin lands near the station and
+   * labelled nothing, which is exactly the bug this replaced. */
+  const stationLink = decodeURIComponent(
+    await page.locator('#tip .tip-map').first().getAttribute('href')
+  )
+  check('a station links out by name, not by a kilometre-wide coordinate',
+    /query=Krung Thep Aphiwat railway station, Bangkok, Thailand/.test(stationLink),
+    stationLink)
+  check('and no maps link ships a bare lat,lon',
+    !/query=-?\d+\.\d+,-?\d+\.\d+/.test(stationLink), stationLink)
 
   const actions = await page.locator('#tip .tip-go').allTextContents()
   check('it offers both directions', actions.length === 2 && /from here/i.test(actions[0]) && /to here/i.test(actions[1]),
