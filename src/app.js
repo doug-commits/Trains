@@ -21,6 +21,26 @@
     { label: 'Manila → Boracay', from: 'manila', to: 'boracay', note: 'Everyone flies. You do not have to, and this is what the alternative costs' },
   ]
 
+  /* Links out to Google Maps, rather than loading it.
+   *
+   * The built page fetches nothing at runtime, which is what lets it work at
+   * Padang Besar with no signal and inside a strict-CSP artifact. Embedding a
+   * map would cost all of that, plus a client-side API key and metered billing.
+   * A link costs nothing and shows up at the two moments the real map actually
+   * helps: where exactly is this place, and how do I cover the last mile the
+   * railway does not.
+   *
+   * Coordinates rather than names, deliberately — there are three Liloans on
+   * this map and a name search would find the wrong one. */
+  const MAPS = {
+    at: (lat, lon) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
+    between: (a, b) =>
+      `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}` +
+      `&destination=${b.lat},${b.lon}&travelmode=driving`,
+  }
+  const mapsLink = (href, text) =>
+    `<a class="tip-map" href="${UI.esc(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`
+
   const $ = sel => document.querySelector(sel)
   const app = document.querySelector('.app')
   const canvas = $('#map')
@@ -376,7 +396,9 @@
       y,
       `<b>${UI.esc(s.name)}</b><span>${UI.esc(s.city)}, ${UI.esc(COUNTRY_NAME[s.country])}${
         s.gauge ? ` · ${UI.esc(s.gauge)} gauge` : ''
-      }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}<span class="tip-acts">${actions}</span>`,
+      }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}` +
+        `<span class="tip-acts">${actions}</span>` +
+        `<span class="tip-links">${mapsLink(MAPS.at(s.lat, s.lon), 'Show on Google Maps')}</span>`,
       true
     )
   }
@@ -413,6 +435,13 @@
               ? act('to', 'Ending here', true)
               : act('to', originName ? `${UI.esc(originName)} → end here` : 'Directions to here'),
           ].join('')
+        }</span>` +
+        /* The gap is the whole reason this table exists, and until now it was
+           only ever described. Now it is a route you can follow. */
+        `<span class="tip-links">${mapsLink(MAPS.at(lm.lat, lm.lon), 'Show on Google Maps')}${
+          lm.last && st.lat != null
+            ? mapsLink(MAPS.between(st, lm), `Directions from ${UI.esc(st.city)}`)
+            : ''
         }</span>`,
       true
     )
@@ -622,10 +651,18 @@
     compute()
 
     // Say what it decided, including any gap it cannot cover by rail.
-    const line = side =>
-      Ask.explain(NETWORK, side)
+    const line = side => {
+      const parts = Ask.explain(NETWORK, side)
         .map((b, i) => (i === 0 ? `<b>${UI.esc(b)}</b>` : `<span>${UI.esc(b)}</span>`))
         .join(' — ')
+      // Where the answer is a sight with a road gap, offer the drive as well as
+      // describing it.
+      const lm = side.landmark
+      const st = lm && NETWORK.stations[lm.station]
+      return lm && lm.last && lm.lat != null && st
+        ? `${parts} ${mapsLink(MAPS.between(st, lm), 'Directions')}`
+        : parts
+    }
     showAskNote(`${line(result.from)}<br>${line(result.to)}`, 'ok')
   }
 

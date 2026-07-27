@@ -475,6 +475,18 @@ function check(label, condition, detail = '') {
     check('routing from a sight targets its railhead', from === 'sisophon', from)
   }
 
+  /* Out to the real map for the last mile, which is the one thing the chart
+   * cannot show. Coordinates rather than names on purpose — there are three
+   * Liloans in this network and a name search would find the wrong one. */
+  await hover(page, angkor.lon, angkor.lat)
+  const links = await page.locator('#tip .tip-map').evaluateAll(a => a.map(x => x.href))
+  check('a sight links out to the real map', links.some(h => /maps\/search/.test(h)), links.length + ' links')
+  const dir = links.find(h => /maps\/dir/.test(h))
+  const rail = NETWORK.stations[angkor.station]
+  check('and offers directions across the road gap, starting at the railhead',
+    !!dir && dir.includes(`origin=${rail.lat},${rail.lon}`) && dir.includes(`destination=${angkor.lat},${angkor.lon}`),
+    dir || 'no directions link')
+
   check('the legend explains the new mark',
     (await page.locator('.legend .lmark').count()) === 1)
   await context.close()
@@ -494,6 +506,10 @@ function check(label, condition, detail = '') {
   const bangkok = NETWORK.stations.bkk_aphiwat
   const first = await hover(page, bangkok.lon, bangkok.lat)
   check('hovering a station opens a popup', !!first, first ? `at ${first.x},${first.y}` : 'none found')
+
+  const stationLink = await page.locator('#tip .tip-map').first().getAttribute('href')
+  check('a station links out to the real map at its own coordinates',
+    !!stationLink && stationLink.includes(`query=${bangkok.lat},${bangkok.lon}`), stationLink || 'none')
 
   const actions = await page.locator('#tip .tip-go').allTextContents()
   check('it offers both directions', actions.length === 2 && /from here/i.test(actions[0]) && /to here/i.test(actions[1]),
@@ -592,6 +608,33 @@ function check(label, condition, detail = '') {
     `$${sgRate} vs $${jbRate} in Johor Bahru`)
 
   await page.screenshot({ path: join(outDir, '26-lodging.png') })
+  await context.close()
+}
+
+/* --------------------------------------------- nothing is fetched at runtime
+ * The premise the whole thing rests on: it works at a border post with no
+ * signal, and inside a strict-CSP artifact. Linking out to Google Maps is fine;
+ * loading it would end both. This is the guard on that decision. */
+{
+  const { page, context } = await newPage()
+  const external = []
+  page.on('request', r => {
+    const u = r.url()
+    if (!u.startsWith('file:') && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u)
+  })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor').first().click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1000)
+  check('the page fetches nothing from the network', external.length === 0,
+    external.slice(0, 3).join(', ') || 'zero requests')
+
+  // Every external host in the page must be a link, never a loaded resource.
+  const linked = await page.evaluate(() =>
+    [...new Set([...document.querySelectorAll('a[href^="http"]')].map(a => new URL(a.href).host))]
+  )
+  check('external hosts appear only as links', linked.length > 0, `${linked.length} linked hosts`)
   await context.close()
 }
 

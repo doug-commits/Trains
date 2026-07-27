@@ -565,6 +565,25 @@ body {
 }
 .tip.live { pointer-events: auto; }
 
+/* Out to the real map, at the two moments it helps: where exactly is this, and
+   how do I cover the last mile the railway does not. */
+.tip-links {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  margin-top: 0.45rem;
+}
+.tip-map {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--rail);
+  text-decoration: none;
+}
+.tip-map:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.ask-note .tip-map { margin-left: 0.3rem; white-space: nowrap; }
+
 /* Start here / end here. The two things anyone wants from a point on a map. */
 .tip-acts {
   display: flex !important;
