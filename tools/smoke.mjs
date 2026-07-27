@@ -542,6 +542,61 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------------- the theme control
+ * Three states, because the stylesheet already honours prefers-color-scheme
+ * and a two-way switch would throw that away. The map is a canvas, so it does
+ * not inherit the palette — it has to actually repaint. */
+{
+  const { page, context } = await newPage({ colorScheme: 'dark' })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(700)
+
+  const readTheme = () =>
+    page.evaluate(() => ({
+      mode: document.querySelector('#theme').dataset.mode,
+      attr: document.documentElement.getAttribute('data-theme'),
+      sea: getComputedStyle(document.documentElement).getPropertyValue('--sea').trim(),
+      label: document.querySelector('#theme').getAttribute('aria-label'),
+      // Top-left of the canvas is open sea on every view.
+      pixel: (() => {
+        const c = document.querySelector('#map')
+        const d = c.getContext('2d').getImageData(4, 4, 1, 1).data
+        return `${d[0]},${d[1]},${d[2]}`
+      })(),
+    }))
+
+  const start = await readTheme()
+  check('opens following the system', start.mode === 'auto' && start.attr === null, start.mode)
+
+  const seen = [start]
+  for (let i = 0; i < 3; i++) {
+    await page.click('#theme')
+    await page.waitForTimeout(450)
+    seen.push(await readTheme())
+  }
+  check('the button cycles auto → light → dark → auto',
+    seen.map(x => x.mode).join(' → ') === 'auto → light → dark → auto',
+    seen.map(x => x.mode).join(' → '))
+  check('light actually changes the palette', seen[1].sea !== seen[0].sea,
+    `${seen[0].sea} → ${seen[1].sea}`)
+  check('and the map canvas repaints with it', seen[1].pixel !== seen[0].pixel,
+    `${seen[0].pixel} → ${seen[1].pixel}`)
+  check('the button says what it will do next', /switch to/i.test(seen[0].label), seen[0].label)
+
+  // A choice has to survive a reload, or it is not a preference.
+  await page.click('#theme')
+  await page.waitForTimeout(300)
+  await page.reload()
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(700)
+  const after = await readTheme()
+  check('the choice survives a reload', after.mode === 'light' && after.attr === 'light', after.mode)
+
+  await page.screenshot({ path: join(outDir, '27-theme-light.png') })
+  await context.close()
+}
+
 /* -------------------------------------------------------------- mobile */
 {
   const { page, context } = await newPage({

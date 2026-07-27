@@ -11,6 +11,13 @@ Open `index.html` in a browser. There is no server, no build step needed to run
 it, and no network request at runtime — the map geometry, the network data and
 the typefaces all travel inside the page.
 
+It follows your system's light or dark setting by default. The control in the
+top bar cycles **auto → light → dark → auto** and remembers an explicit choice
+in `localStorage`; a stored preference is stamped onto the document during
+parse, ahead of the stylesheet, so it never shows as a flash of the other
+theme. The map is a canvas and does not inherit the palette, so it is told to
+repaint.
+
 ---
 
 ## What it actually does
@@ -108,7 +115,7 @@ src/scene.js         Drawn destination illustrations, the photo fallback.
 src/photos.js        Real photographs and their attribution.
 src/map.js           Canvas rendering.
 src/ui.js            The itinerary document.
-src/app.js           Controls, map interaction, URL state.
+src/app.js           Controls, map interaction, URL state, theme.
 src/app.css          Styles.
 src/fonts.css        Subset typefaces as data URIs, generated.
 src/shell.html       Markup.

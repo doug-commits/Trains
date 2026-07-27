@@ -511,14 +511,70 @@
     compute()
   })
 
-  /* ---------------------------------------------------------------- theme */
+  /* ---------------------------------------------------------------- theme
+   * Three states rather than two. A plain light/dark switch is simpler, but it
+   * throws away the ability to follow the machine — and the stylesheet already
+   * honours prefers-color-scheme, so discarding that would be giving something
+   * up for nothing. The button cycles auto → light → dark → auto, and says
+   * which it is on.
+   */
+  const THEME_KEY = 'overlandsea:theme'
+  const THEME_ORDER = ['auto', 'light', 'dark']
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)')
 
+  const THEME_TEXT = {
+    auto: 'Theme: matching your system. Switch to light.',
+    light: 'Theme: light. Switch to dark.',
+    dark: 'Theme: dark. Follow your system instead.',
+  }
+
+  function readTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_KEY)
+      return THEME_ORDER.includes(stored) ? stored : 'auto'
+    } catch {
+      // Private browsing, or storage blocked. Following the system is a fine
+      // answer and not worth an error over.
+      return 'auto'
+    }
+  }
+
+  function applyTheme(mode) {
+    const root = document.documentElement
+    if (mode === 'auto') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', mode)
+
+    const btn = $('#theme')
+    btn.dataset.mode = mode
+    btn.title = THEME_TEXT[mode]
+    // The visible label is an icon, so the accessible name has to carry both
+    // the current state and what pressing it will do.
+    btn.setAttribute('aria-label', THEME_TEXT[mode])
+    $('#theme-label').textContent = THEME_TEXT[mode]
+    try {
+      if (mode === 'auto') localStorage.removeItem(THEME_KEY)
+      else localStorage.setItem(THEME_KEY, mode)
+    } catch {
+      /* nothing to persist to; the choice still holds for this visit */
+    }
+  }
+
+  let themeMode = readTheme()
+  applyTheme(themeMode)
+
+  $('#theme').addEventListener('click', () => {
+    themeMode = THEME_ORDER[(THEME_ORDER.indexOf(themeMode) + 1) % THEME_ORDER.length]
+    applyTheme(themeMode)
+  })
+
+  /* The map is drawn on a canvas, so it does not inherit a palette the way the
+     document does — it has to be told to repaint. */
   const redraw = () => map.redraw()
   new MutationObserver(redraw).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['data-theme', 'class', 'style'],
   })
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw)
+  systemDark.addEventListener('change', redraw)
 
   function updateInset() {
     // Below the breakpoint the panes stack, so nothing overlays the map.

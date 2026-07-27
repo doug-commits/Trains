@@ -7,6 +7,17 @@
 <meta name="description" content="Plan a Southeast Asian journey that stays on rails as far as the rails go, bridges the gaps by sea, and tells you what happens at every border.">
 </head>
 <body>
+<script>
+  /* Runs during parse, ahead of the stylesheet below, so a stored preference
+     never shows as a flash of the other theme. The full control lives in
+     src/app.js; this is only the part that has to happen first. */
+  try {
+    var m = localStorage.getItem('overlandsea:theme')
+    if (m === 'light' || m === 'dark') document.documentElement.setAttribute('data-theme', m)
+  } catch (e) {
+    /* private mode, or storage disabled — fall through to the system setting */
+  }
+</script>
 <div class="app" data-active="false">
   <header class="topbar">
     <button type="button" id="home" class="brand" title="Back to the start">
@@ -17,6 +28,23 @@
     <p class="tagline">Rail-first journey planning across Southeast Asia</p>
 
     <div class="topbar-actions">
+      <button type="button" id="theme" class="btn-icon" aria-live="polite">
+        <svg class="ic ic-auto" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/>
+        </svg>
+        <svg class="ic ic-light" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="10" cy="10" r="3.8" fill="currentColor"/>
+          <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M10 1.6v2.1M10 16.3v2.1M18.4 10h-2.1M3.7 10H1.6"/>
+            <path d="M15.9 4.1l-1.5 1.5M5.6 14.4l-1.5 1.5M15.9 15.9l-1.5-1.5M5.6 5.6L4.1 4.1"/>
+          </g>
+        </svg>
+        <svg class="ic ic-dark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M16.3 12.6A7.2 7.2 0 0 1 7.4 3.7a7.2 7.2 0 1 0 8.9 8.9z" fill="currentColor"/>
+        </svg>
+        <span class="sr" id="theme-label">Theme</span>
+      </button>
       <button type="button" id="startover" class="btn-ghost">Start over</button>
     </div>
   </header>
@@ -342,6 +370,72 @@ body {
   color: var(--ink);
   border-color: var(--muted);
   box-shadow: var(--lift-1);
+}
+
+/* A square icon button, and the only place in the chrome where an icon carries
+   the meaning on its own — so it also carries a screen-reader label that names
+   the current mode and what the next click does. */
+.btn-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-icon:hover {
+  color: var(--rail);
+  border-color: var(--muted);
+  box-shadow: var(--lift-1);
+}
+.btn-icon .ic {
+  grid-area: 1 / 1;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: none;
+}
+/* One icon at a time, chosen by the mode stamped on the button. Auto shows a
+   half-filled disc because it is neither one thing nor the other. */
+.btn-icon[data-mode='auto'] .ic-auto,
+.btn-icon[data-mode='light'] .ic-light,
+.btn-icon[data-mode='dark'] .ic-dark { display: block; }
+
+/* Visible to assistive tech, invisible on screen. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Nothing on the page should snap between two palettes; the surfaces cross-fade
+   while the map redraws. Respects a reduced-motion preference. */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  .topbar,
+  .panel,
+  .controls,
+  .corridor,
+  .day,
+  .stays > li,
+  .callout,
+  .compare,
+  .route tr.leg > td {
+    transition: background-color 0.28s ease, border-color 0.28s ease, color 0.28s ease;
+  }
 }
 
 /* ---------------------------------------------------------------- stage */
@@ -6873,14 +6967,70 @@ const UI = (() => {
     compute()
   })
 
-  /* ---------------------------------------------------------------- theme */
+  /* ---------------------------------------------------------------- theme
+   * Three states rather than two. A plain light/dark switch is simpler, but it
+   * throws away the ability to follow the machine — and the stylesheet already
+   * honours prefers-color-scheme, so discarding that would be giving something
+   * up for nothing. The button cycles auto → light → dark → auto, and says
+   * which it is on.
+   */
+  const THEME_KEY = 'overlandsea:theme'
+  const THEME_ORDER = ['auto', 'light', 'dark']
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)')
 
+  const THEME_TEXT = {
+    auto: 'Theme: matching your system. Switch to light.',
+    light: 'Theme: light. Switch to dark.',
+    dark: 'Theme: dark. Follow your system instead.',
+  }
+
+  function readTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_KEY)
+      return THEME_ORDER.includes(stored) ? stored : 'auto'
+    } catch {
+      // Private browsing, or storage blocked. Following the system is a fine
+      // answer and not worth an error over.
+      return 'auto'
+    }
+  }
+
+  function applyTheme(mode) {
+    const root = document.documentElement
+    if (mode === 'auto') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', mode)
+
+    const btn = $('#theme')
+    btn.dataset.mode = mode
+    btn.title = THEME_TEXT[mode]
+    // The visible label is an icon, so the accessible name has to carry both
+    // the current state and what pressing it will do.
+    btn.setAttribute('aria-label', THEME_TEXT[mode])
+    $('#theme-label').textContent = THEME_TEXT[mode]
+    try {
+      if (mode === 'auto') localStorage.removeItem(THEME_KEY)
+      else localStorage.setItem(THEME_KEY, mode)
+    } catch {
+      /* nothing to persist to; the choice still holds for this visit */
+    }
+  }
+
+  let themeMode = readTheme()
+  applyTheme(themeMode)
+
+  $('#theme').addEventListener('click', () => {
+    themeMode = THEME_ORDER[(THEME_ORDER.indexOf(themeMode) + 1) % THEME_ORDER.length]
+    applyTheme(themeMode)
+  })
+
+  /* The map is drawn on a canvas, so it does not inherit a palette the way the
+     document does — it has to be told to repaint. */
   const redraw = () => map.redraw()
   new MutationObserver(redraw).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['data-theme', 'class', 'style'],
   })
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw)
+  systemDark.addEventListener('change', redraw)
 
   function updateInset() {
     // Below the breakpoint the panes stack, so nothing overlays the map.
