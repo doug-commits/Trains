@@ -60,7 +60,11 @@ async function zoomOn(page, lon, lat, steps) {
     )
     if (!at) return
     await page.mouse.move(at.x, at.y)
+    // Ctrl is how a human asks the map to zoom rather than the page to scroll,
+    // so the test has to ask the same way.
+    await page.keyboard.down('Control')
     await page.mouse.wheel(0, -240)
+    await page.keyboard.up('Control')
     await page.waitForTimeout(90)
   }
   await page.waitForTimeout(250)
@@ -850,6 +854,51 @@ function check(label, condition, detail = '') {
   check('page body does not scroll sideways on mobile', bodyOverflow <= 1, `${bodyOverflow}px`)
 
   await page.screenshot({ path: join(outDir, '06-mobile.png'), fullPage: false })
+  await context.close()
+}
+
+/* --------------------------------------- the map does not eat page scroll */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1100)
+
+  // Park the pointer over the middle of the map and scroll as if reading on.
+  const box = await page.locator('#map').boundingBox()
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  await page.mouse.move(cx, cy)
+
+  const before = await page.evaluate(() => window.OverlandMap.viewSignature())
+  await page.mouse.wheel(0, 400)
+  await page.waitForTimeout(300)
+  const after = await page.evaluate(() => window.OverlandMap.viewSignature())
+
+  check('a plain scroll over the map leaves the map alone', before === after, after)
+  check('and says why nothing zoomed',
+    await page.locator('#maphint').isVisible())
+
+  // Ctrl held is the ask, and it must still work.
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -200)
+  await page.keyboard.up('Control')
+  await page.waitForTimeout(300)
+  const zoomed = await page.evaluate(() => window.OverlandMap.viewSignature())
+  check('ctrl and scroll still zooms', zoomed !== after, `${after} → ${zoomed}`)
+
+  // And the buttons work without any gesture at all.
+  await page.click('#zoomout')
+  await page.waitForTimeout(300)
+  const buttoned = await page.evaluate(() => window.OverlandMap.viewSignature())
+  check('the zoom buttons work on their own', buttoned !== zoomed)
+
+  check('one finger is the page\'s, not the map\'s',
+    await page.evaluate(() => getComputedStyle(document.querySelector('#map')).touchAction) === 'pan-y')
+
+  await page.screenshot({ path: join(outDir, '20-scroll-guard.png') })
   await context.close()
 }
 
