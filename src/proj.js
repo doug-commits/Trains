@@ -76,6 +76,39 @@ const Proj = (() => {
     return { ...view, dx: view.dx + dx, dy: view.dy + dy }
   }
 
+  /* Keep the region on screen. Without this the map can be dragged into empty
+   * ocean until nothing is left to navigate by, and the only way back is Reset
+   * view. The rule: the projected bbox must always cover the middle of the
+   * canvas, so there is never a drag that loses the map. */
+  function clamp(view, bbox) {
+    const left = bbox.west * view.scale + view.dx
+    const right = bbox.east * view.scale + view.dx
+    const top = screenY(bbox.north) * view.scale + view.dy
+    const bottom = screenY(bbox.south) * view.scale + view.dy
+
+    // Once the region is smaller than the canvas it may sit anywhere inside it;
+    // beyond that it must not be dragged clear of the centre.
+    const cx = view.w / 2
+    const cy = view.h / 2
+    let dx = view.dx
+    let dy = view.dy
+    if (right - left <= view.w) {
+      if (left < 0) dx += -left
+      if (right > view.w) dx -= right - view.w
+    } else {
+      if (left > cx) dx -= left - cx
+      if (right < cx) dx += cx - right
+    }
+    if (bottom - top <= view.h) {
+      if (top < 0) dy += -top
+      if (bottom > view.h) dy -= bottom - view.h
+    } else {
+      if (top > cy) dy -= top - cy
+      if (bottom < cy) dy += cy - bottom
+    }
+    return dx === view.dx && dy === view.dy ? view : { ...view, dx, dy }
+  }
+
   /** Fit a set of {lon,lat} points into the box, respecting a zoom ceiling. */
   function fitPoints(view, points, padding, maxZoom = 9) {
     if (!points.length) return view
@@ -125,5 +158,5 @@ const Proj = (() => {
     return 2 * R * Math.asin(Math.sqrt(s))
   }
 
-  return { create, project, unproject, zoomAt, pan, fitPoints, haversine, screenY }
+  return { create, project, unproject, zoomAt, pan, clamp, fitPoints, haversine, screenY }
 })()

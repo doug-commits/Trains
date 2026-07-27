@@ -902,6 +902,74 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------ the map holds still unless you mean it */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1100)
+
+  const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
+  const box = await page.locator('#map').boundingBox()
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+
+  // A click with a shaky hand. The wobble covers ground without going
+  // anywhere, which is exactly what a path-length threshold would misread.
+  const steady = await sig()
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  for (const [dx, dy] of [[2, 1], [3, -1], [1, 2], [4, 0], [2, 3], [5, 1]]) {
+    await page.mouse.move(cx + dx, cy + dy)
+  }
+  await page.mouse.up()
+  await page.waitForTimeout(200)
+  check('a wobbly click does not nudge the map', (await sig()) === steady, steady)
+
+  // A deliberate drag still pans.
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  for (let i = 1; i <= 10; i++) await page.mouse.move(cx + i * 12, cy + i * 6)
+  await page.mouse.up()
+  await page.waitForTimeout(200)
+  check('a deliberate drag still pans', (await sig()) !== steady)
+
+  // And no drag can throw the network off the screen.
+  for (let r = 0; r < 8; r++) {
+    await page.mouse.move(cx, cy)
+    await page.mouse.down()
+    for (let i = 1; i <= 12; i++) await page.mouse.move(cx + i * 70, cy + i * 45)
+    await page.mouse.up()
+  }
+  await page.waitForTimeout(300)
+  const reachable = await page.evaluate(() =>
+    [[100.54, 13.8], [103.85, 1.29], [105.84, 21.02], [120.98, 14.6], [101.69, 3.14]]
+      .filter(c => window.OverlandMap.locate(c[0], c[1])).length
+  )
+  check('the map cannot be dragged away and lost', reachable > 0, `${reachable}/5 cities on screen`)
+
+  // The whole point of the threshold: picking a station must still work.
+  await page.click('#reset')
+  await page.waitForTimeout(700)
+  const was = await page.inputValue('#from')
+  const at = await page.evaluate(() => {
+    const q = window.OverlandMap.locate(100.54, 13.8)
+    const r = document.querySelector('#map').getBoundingClientRect()
+    return q && { x: r.left + q.x, y: r.top + q.y }
+  })
+  await page.mouse.move(at.x, at.y)
+  await page.mouse.down()
+  await page.mouse.move(at.x + 3, at.y + 2)
+  await page.mouse.up()
+  await page.waitForTimeout(500)
+  check('and a station still picks under a shaky click',
+    (await page.inputValue('#from')) !== was)
+
+  await context.close()
+}
+
 await browser.close()
 
 console.log('')

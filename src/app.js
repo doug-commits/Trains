@@ -307,6 +307,10 @@
   let tipReach = null
   let hideTimer = null
 
+  // How far the pointer must travel before a press counts as a drag rather
+  // than a click that wobbled. Also the click/drag cutoff on release.
+  const PAN_THRESHOLD = 10
+
   // Touch pointers currently down. One finger is the page's — it scrolls past
   // the map. Two are the map's: they pan, and their separation pinches.
   const touches = new Map()
@@ -325,15 +329,15 @@
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
       if (touches.size === 2) {
-        // The second finger says "I mean the map". Take the gesture now.
-        drag = { ...midpoint(), moved: 0 }
+        // The second finger says "I mean the map" — no threshold needed.
+        drag = { ...midpoint(), panning: true }
         pinch = spread()
         hideTip()
       }
       return
     }
     canvas.setPointerCapture(e.pointerId)
-    drag = { x: e.offsetX, y: e.offsetY, moved: 0 }
+    drag = { x: e.offsetX, y: e.offsetY, originX: e.offsetX, originY: e.offsetY, panning: false }
   })
 
   canvas.addEventListener('pointermove', e => {
@@ -345,7 +349,6 @@
       e.preventDefault()
       const mid = midpoint()
       map.panBy(mid.x - drag.x, mid.y - drag.y)
-      drag.moved += Math.abs(mid.x - drag.x) + Math.abs(mid.y - drag.y)
       drag.x = mid.x
       drag.y = mid.y
       const now = spread()
@@ -358,9 +361,27 @@
     if (drag) {
       const dx = e.offsetX - drag.x
       const dy = e.offsetY - drag.y
-      drag.moved += Math.abs(dx) + Math.abs(dy)
       drag.x = e.offsetX
       drag.y = e.offsetY
+
+      /* A click is a press with a bit of hand-shake in it. Panning from the
+       * first pixel means every station you pick nudges the map somewhere new,
+       * and it drifts all session. So the map holds still until the pointer is
+       * unmistakably somewhere else — and then panning starts from there, so
+       * nothing jumps to catch up.
+       *
+       * Distance from where the press landed, not distance travelled: a slow
+       * tremor covers plenty of ground without ever going anywhere, and
+       * measuring the path would call that a drag. */
+      if (!drag.panning) {
+        const off = Math.hypot(e.offsetX - drag.originX, e.offsetY - drag.originY)
+        if (off < PAN_THRESHOLD) return
+        drag.panning = true
+        canvas.style.cursor = 'grabbing'
+        hideTip()
+        return
+      }
+
       map.panBy(dx, dy)
       hideTip()
       return
@@ -533,7 +554,8 @@
       touches.delete(e.pointerId)
       if (touches.size < 2) pinch = null
     }
-    const wasDrag = drag && drag.moved > 6
+    // Only a press that actually panned suppresses the click.
+    const wasDrag = drag && drag.panning
     drag = null
     canvas.style.cursor = 'grab'
     // Lifting one finger out of a two-finger gesture is not a tap.

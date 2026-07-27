@@ -53,6 +53,22 @@ const MapView = (() => {
     // a route fitted to the full canvas ends up half-hidden behind them.
     let inset = { left: 0, right: 0 }
 
+    /* What a drag is not allowed to lose. The basemap box runs well past the
+     * network on every side, so clamping to it still lets the map be dragged
+     * until only empty sea is left. The stations are what people navigate by,
+     * so they are what has to stay reachable. */
+    const reach = (() => {
+      const pts = Object.values(network.stations)
+      const lons = pts.map(s => s.lon)
+      const lats = pts.map(s => s.lat)
+      return {
+        west: Math.min(...lons) - 1,
+        east: Math.max(...lons) + 1,
+        south: Math.min(...lats) - 1,
+        north: Math.max(...lats) + 1,
+      }
+    })()
+
     /** Fit into the strip the overlays leave visible, then shift it into place. */
     function fitVisible(rect, fit) {
       const strip = Math.max(240, rect.width - inset.left - inset.right)
@@ -619,11 +635,11 @@ const MapView = (() => {
         draw()
       },
       panBy(dx, dy) {
-        view = Proj.pan(view, dx, dy)
+        view = Proj.clamp(Proj.pan(view, dx, dy), reach)
         draw()
       },
       zoomAt(x, y, factor) {
-        view = Proj.zoomAt(view, x, y, factor)
+        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach)
         draw()
       },
       resetView() {
