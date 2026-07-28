@@ -110,6 +110,17 @@ const SCRIPTS = [
  *   dist/planner.html   inlined only. It is published as one file with nothing
  *                       beside it, and a link that cannot resolve would mean a
  *                       failed request for every photograph over the budget. */
+/* How much photography travels inside dist/planner.html, and only that.
+ *
+ * The website links every photograph instead. Inlining them there was costing
+ * 3970 KB of a 4914 KB document — base64 in the HTML is the worst delivery
+ * there is: it blocks the parser, it cannot be cached separately from the page
+ * or from each other, it is re-downloaded on every visit, and base64 adds a
+ * third to the bytes on top. A linked file is fetched only if it is actually
+ * shown, cached on its own, and never blocks first paint.
+ *
+ * The fragment is different because it is published as a single file with
+ * nothing beside it, so a link there has nothing to resolve against. */
 const PHOTO_BUDGET_KB = Number(process.env.PHOTO_BUDGET_KB || 3000)
 
 function loadPhotos() {
@@ -163,11 +174,10 @@ function loadPhotos() {
       licenceUrl: entry.licenceUrl,
       source: entry.source,
     }
+    linked[id] = { href: `data/photos/${entry.file}`, ...meta }
     if (fits) {
       bytes += buf.length
       embedded[id] = { src: `data:${mime};base64,${buf.toString('base64')}`, ...meta }
-    } else {
-      linked[id] = { href: `data/photos/${entry.file}`, ...meta }
     }
   }
   return { embedded, linked, skipped, kb: bytes / 1024 }
@@ -251,11 +261,9 @@ if (APP) {
     `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${bodyWith(photos.embedded)}\n`
   )
 
-  // Standalone document for opening off disk.
-  writeFileSync(
-    join(root, 'index.html'),
-    htmlDoc({ ...photos.embedded, ...photos.linked }, false)
-  )
+  /* Standalone document for opening off disk, and what the site deploys.
+   * Every photograph linked, none inlined. */
+  writeFileSync(join(root, 'index.html'), htmlDoc(photos.linked, false))
 }
 
 const kb = p => (readFileSync(join(root, p)).length / 1024).toFixed(0)

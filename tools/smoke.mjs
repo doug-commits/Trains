@@ -1635,6 +1635,57 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------- what the page weighs */
+
+/* The landing page is the whole audience's first impression and most of them
+ * are on a phone on a Southeast Asian mobile network. It went out at 5276 KB:
+ * 3970 KB of photographs base64'd into the HTML, and nine more fetched at 960
+ * pixels wide to be displayed at 402. Both are the sort of thing that comes
+ * back quietly, so both are measured here. */
+{
+  const html = readFileSync(join(root, 'index.html'), 'utf8')
+  const inlined = [...html.matchAll(/data:image\/[a-z+]+;base64,/g)].length
+  check('no photographs are base64d into the page', inlined === 0,
+    `${inlined} found`)
+
+  const kb = Math.round(statSync(join(root, 'index.html')).size / 1024)
+  check('and the document stays under a megabyte', kb < 1024, `${kb} KB`)
+
+  const { page, context } = await newPage({ viewport: { width: 412, height: 915 } })
+  let bytes = 0
+  let images = 0
+  page.on('response', async r => {
+    try {
+      bytes += (await r.body()).length
+      if (/\.(jpe?g|png|webp)(\?|$)/i.test(r.url())) images++
+    } catch {
+      /* a response with no retrievable body is not part of the weight */
+    }
+  })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(2000)
+
+  /* Nine corridor cards, drawn rather than photographed. They are the first
+     thing on the page, before the reader has asked for anything. */
+  check('nothing is fetched to decorate the landing page', images === 0,
+    `${images} images`)
+  check('the cards are drawn instead',
+    (await page.locator('.corridor canvas').count()) === 9)
+  check('so the first visit costs well under what it did',
+    bytes / 1024 < 1200, `${Math.round(bytes / 1024)} KB, was 5276`)
+
+  /* The photography is not gone — it arrives on a route you asked for. */
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1800)
+  check('a route you planned still gets its photograph',
+    (await page.locator('#panel img.photo').count()) > 0 && images === 1,
+    `${images} image fetched`)
+
+  await context.close()
+}
+
 /* --------------------------------------------------- the Android build */
 
 /* A second artefact that can drift from the site without anyone noticing,

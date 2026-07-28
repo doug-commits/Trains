@@ -104,13 +104,23 @@
   function withStats(presets) {
     /* Several corridors end in the same place — three of these finish in
      * Singapore — so taking the art from the terminus put the identical
-     * photograph on adjacent cards, which reads as a broken page rather than a
-     * coincidence. Each card claims its picture, and a card whose first choice
-     * is taken walks back down its own route until it finds one nobody else has
-     * used. Photographs first, drawings as the fallback, both deduplicated. */
-    const usedPhotos = new Set()
+     * picture on adjacent cards, which reads as a broken page rather than a
+     * coincidence. Each card claims its art, and a card whose first choice is
+     * taken walks back down its own route until it finds one nobody else has
+     * used.
+     *
+     * Drawn, not photographed. These nine cards are the first thing on the
+     * page, before the reader has asked for anything, and photographs made
+     * them two megabytes of it — nine images fetched at 960 pixels wide to be
+     * shown at 402, on a landing page whose whole audience is on a phone in
+     * Southeast Asia. The illustrations cost nothing: they are drawn on a
+     * canvas at the size they are displayed.
+     *
+     * The photography is not gone. It appears on the destination banner of a
+     * route you have actually planned — one image, after an act, where it is
+     * telling you something about where you are going rather than decorating
+     * a page you have not read yet. */
     const usedScenes = new Set()
-    const havePhotos = typeof Photos !== 'undefined'
 
     return presets.map(p => {
       const routed = Router.route(NETWORK, p.from, p.to, {})
@@ -122,21 +132,9 @@
       // and the places just short of it are the next best.
       const candidates = [...plan.stationIds].reverse()
 
-      let photoId = null
-      if (havePhotos) {
-        for (const id of candidates) {
-          const photo = Photos.forStation(id)
-          if (photo && !usedPhotos.has(photo.id)) {
-            photoId = photo.id
-            usedPhotos.add(photo.id)
-            break
-          }
-        }
-      }
-
       let scene = Scene.kindFor(NETWORK, LANDMARKS, p.to)
       let seed = p.to
-      if (!photoId && usedScenes.has(scene)) {
+      if (usedScenes.has(scene)) {
         const along = candidates
           .map(id => ({ id, kind: Scene.kindFor(NETWORK, LANDMARKS, id) }))
           .find(x => !usedScenes.has(x.kind))
@@ -145,11 +143,11 @@
           seed = along.id
         }
       }
-      if (!photoId) usedScenes.add(scene)
+      usedScenes.add(scene)
 
       return {
         ...p,
-        photoId,
+        photoId: null,
         scene,
         sceneSeed: `${seed}-${p.from}`,
         stats: { days: t.days, legs: t.legs, borders: t.borders, usd: t.totalUsd },
