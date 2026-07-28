@@ -1239,14 +1239,22 @@
     dark: 'Theme: dark. Follow your system instead.',
   }
 
+  /* Nothing chosen yet: the website follows the system, the app opens light.
+   *
+   * A website is arrived at inside a browser already set the way its reader
+   * likes it, so following along is the polite default. An app is opened on
+   * its own, and a chart is read in daylight more often than not. Either way
+   * this is only the starting point — the toggle still offers all three, and
+   * the moment one is picked it is remembered and this stops applying. */
+  const firstTheme = () => (document.documentElement.dataset.app ? 'light' : 'auto')
+
   function readTheme() {
     try {
       const stored = localStorage.getItem(THEME_KEY)
-      return THEME_ORDER.includes(stored) ? stored : 'auto'
+      return THEME_ORDER.includes(stored) ? stored : firstTheme()
     } catch {
-      // Private browsing, or storage blocked. Following the system is a fine
-      // answer and not worth an error over.
-      return 'auto'
+      // Private browsing, or storage blocked. Not worth an error over.
+      return firstTheme()
     }
   }
 
@@ -1518,8 +1526,15 @@
     grip.setPointerCapture(e.pointerId)
   })
 
+  /* Only from the very top of the contents, and only downwards.
+   *
+   * Arming this at any other scroll position is what made the itinerary
+   * unreadable: the sheet took the press, refused to move because the pull was
+   * upward, and the list never got its scroll either — so a finger on the
+   * directions did nothing at all. Below the top, the contents are simply
+   * scrolling and this stays out of it. */
   sheetScroll.addEventListener('pointerdown', e => {
-    if (snap === 'full' && sheetScroll.scrollTop > 0) return
+    if (sheetScroll.scrollTop > 0) return
     startSheetDrag(e, true)
   })
 
@@ -1528,20 +1543,30 @@
     const dy = e.clientY - sheetDrag.y
     sheetDrag.moved = Math.max(sheetDrag.moved, Math.abs(dy))
 
-    /* A drag that began on the contents only takes over once it is clearly a
-     * downward pull, so a flick meant for the list is still a scroll. */
+    // Upwards from the top of the list is a scroll, not a sheet gesture. Let
+    // it through untouched — the browser is better at scrolling than we are.
     if (sheetDrag.fromContent && dy < 12) return
     if (e.cancelable) e.preventDefault()
 
+    sheetDrag.took = true
     const pts = snapPoints()
     placeSheet(Math.max(pts.full, Math.min(pts.peek, sheetDrag.from + dy)), false)
   }
+
+  /* Reading on is a request for more room. Scrolling the itinerary while the
+   * sheet is only part way up opens it the rest of the way, rather than making
+   * the reader put the list down, find the handle, and come back to it. */
+  sheetScroll.addEventListener('scroll', () => {
+    if (onPhone() && snap !== 'full' && sheetScroll.scrollTop > 4) setSnap('full')
+  })
 
   const endSheetDrag = e => {
     if (!sheetDrag) return
     const held = sheetDrag
     sheetDrag = null
-    if (held.moved < 4) return setSnap(snap) // a tap, not a drag
+    // A tap, or a drag that turned out to be the list scrolling: leave both
+    // the sheet and the scroll exactly where they are.
+    if (held.moved < 4 || !held.took) return
 
     /* A flick should land where it was thrown, not where it stopped. The bias
      * is the distance the sheet would keep travelling at the speed it left. */

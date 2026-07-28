@@ -50,10 +50,10 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # Builds its own page: dist/app.html, with no photographs and none of the
+      # website-only sections. It does not use the site's index.html.
       - name: Build the page and stage it into the app
-        run: |
-          node tools/build.mjs
-          node tools/build-android.mjs
+        run: node tools/build-android.mjs
 
       - name: Decode the upload keystore
         if: env.KEYSTORE_B64 != ''

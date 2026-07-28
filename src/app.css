@@ -1551,6 +1551,11 @@ table { width: 100%; border-collapse: collapse; }
 .sheet-scroll { display: contents; }
 .sheet-grip { display: none; }
 
+/* Website-only. These link to the written-up route pages, which are separate
+   documents on the site and are not inside the app — the app is one file, so
+   every one of those links would be a dead end. */
+[data-app='true'] .block-web { display: none; }
+
 /* ------------------------------------------------------------ on a phone */
 
 /* The map is the page, and the itinerary is a sheet drawn over it.
@@ -1658,9 +1663,9 @@ table { width: 100%; border-collapse: collapse; }
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
-  /* Only the tallest position scrolls. Below it a drag anywhere in the sheet
-     moves the sheet, which is what a hand reaching for it expects. */
-  .sheet:not([data-snap='full']) .sheet-scroll { overflow-y: hidden; }
+  /* Scrollable at every height, not only the tallest. Locking it below full
+     meant an itinerary at half was a picture of an itinerary: the sheet had
+     the press and would not move, and the list could not scroll either. */
 
   /* The sheet already does this, with three positions instead of two and a
      handle you can drag. Two collapse controls in the same corner is one too

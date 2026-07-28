@@ -7,7 +7,7 @@
  */
 
 import { chromium } from 'playwright'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -1633,6 +1633,94 @@ function check(label, condition, detail = '') {
 
   await page.screenshot({ path: join(outDir, '22-sheet.png') })
   await context.close()
+}
+
+/* --------------------------------------------------- the Android build */
+
+/* A second artefact that can drift from the site without anyone noticing,
+ * because nobody opens it in a browser. Built by tools/build-android.mjs from
+ * the same sources with APP=1; what follows is the whole of what should
+ * differ. */
+{
+  const appFile = join(root, 'dist/app.html')
+  if (!existsSync(appFile)) {
+    check('the app build exists', false, 'run tools/build-android.mjs')
+  } else {
+    const { page, context } = await newPage({
+      viewport: { width: 412, height: 915 },
+      deviceScaleFactor: 3,
+      isMobile: true,
+      hasTouch: true,
+      colorScheme: 'dark', // the system says dark; the app should not care
+    })
+    await page.goto('file://' + appFile)
+    await page.waitForFunction(() => document.querySelector('#panel h1'))
+    await page.waitForTimeout(700)
+
+    /* Opens light whatever the system says. The website still follows it —
+       checked by every other block in this file, which runs in dark. */
+    check('the app opens in day mode',
+      (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light')
+
+    /* The written-up routes are separate pages on the site. Inside one file
+       every one of those links is a dead end, so they are not offered. */
+    const deadEnds = await page.evaluate(() =>
+      [...document.querySelectorAll('.block-web')]
+        .filter(e => getComputedStyle(e).display !== 'none').length)
+    check('and leaves out the links to pages it does not carry', deadEnds === 0)
+
+    // 22 MB of photographs, against a page that is 0.9 MB without them.
+    const size = Math.round(statSync(appFile).size / 1024)
+    check('the app page is a fraction of the website\'s', size < 1600, `${size} KB`)
+    check('because it carries no photographs',
+      (await page.evaluate(() => document.querySelectorAll('#panel img').length)) === 0)
+
+    // And still answers, with the drawn art the page already falls back to.
+    await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+    await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+    await page.waitForTimeout(1200)
+    const legs = await page.locator('.route tbody tr').count()
+    check('and routes exactly as the website does', legs > 0, `${legs} rows`)
+    check('with drawn art where a photograph would have been',
+      (await page.locator('#panel canvas').count()) > 0)
+
+    /* The itinerary has to scroll at every sheet height. Locking it below full
+       made a route at half a picture of a route: the sheet held the press and
+       would not move, and the list could not scroll either. */
+    const gestures = await page.evaluate(() => {
+      const el = document.querySelector('#sheet-scroll')
+      const r = el.getBoundingClientRect()
+      const x = r.left + r.width / 2
+      const y0 = r.top + 120
+      const fire = (t, y, target) => {
+        const ev = new PointerEvent(t, {
+          pointerId: 1, pointerType: 'touch', bubbles: true,
+          cancelable: true, clientX: x, clientY: y,
+        })
+        target.dispatchEvent(ev)
+        return ev.defaultPrevented
+      }
+      fire('pointerdown', y0, el)
+      const up = [1, 2, 3, 4, 5, 6].map(i => fire('pointermove', y0 - i * 20, window))
+      fire('pointerup', y0 - 120, window)
+      fire('pointerdown', y0, el)
+      const down = [1, 2, 3, 4, 5, 6].map(i => fire('pointermove', y0 + i * 20, window))
+      fire('pointerup', y0 + 120, window)
+      return {
+        snap: document.querySelector('#sheet').dataset.snap,
+        overflow: getComputedStyle(el).overflowY,
+        upSwallowed: up.some(Boolean),
+        downTaken: down.some(Boolean),
+      }
+    })
+    check('the itinerary scrolls at half height', gestures.overflow === 'auto',
+      `snap=${gestures.snap}`)
+    check('and reading up it is not swallowed by the sheet', !gestures.upSwallowed)
+    check('while pulling down from the top still lowers it', gestures.downTaken)
+
+    await page.screenshot({ path: join(outDir, '23-app.png') })
+    await context.close()
+  }
 }
 
 await browser.close()

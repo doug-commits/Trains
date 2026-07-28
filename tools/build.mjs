@@ -175,7 +175,20 @@ function loadPhotos() {
 
 const photoJs = set => `const PHOTOS = ${JSON.stringify(set)};`
 
-const photos = loadPhotos()
+/* The Android build.
+ *
+ * Same program, different package. It drops the photographs — 93 of them, and
+ * about 22 of the app's 46 MB — because a phone that has already installed a
+ * journey planner does not need it to carry a picture library it cannot use
+ * offline anyway once the budget cuts in. The drawn scene art is already the
+ * fallback for a station with no photograph, so this is a path the page
+ * takes every day rather than an untested branch.
+ *
+ * It also marks the document, which is how the page knows to leave out the
+ * parts that only make sense on a website. */
+const APP = process.env.APP === '1'
+
+const photos = APP ? { embedded: {}, linked: {}, skipped: 0, kb: 0 } : loadPhotos()
 
 const basemap = readFileSync(join(root, 'data/basemap.json'), 'utf8').trim()
 const rails = readFileSync(join(root, 'data/rails.json'), 'utf8').trim()
@@ -211,30 +224,39 @@ ${sources}
 
 mkdirSync(join(root, 'dist'), { recursive: true })
 
-// Fragment for publishing: the host supplies doctype, html, head and body.
-writeFileSync(
-  join(root, 'dist/planner.html'),
-  `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${bodyWith(photos.embedded)}\n`
-)
-
-// Standalone document for opening off disk.
-writeFileSync(
-  join(root, 'index.html'),
-  `<!doctype html>
-<html lang="en">
+const htmlDoc = (photoSet, app) => `<!doctype html>
+<html lang="en"${app ? ' data-app="true"' : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${TITLE}</title>
 <meta name="description" content="${DESCRIPTION}">
-${headMeta()}
+${app ? '' : headMeta()}
 </head>
 <body>
-${bodyWith({ ...photos.embedded, ...photos.linked })}
+${bodyWith(photoSet)}
 </body>
 </html>
 `
-)
+
+if (APP) {
+  /* Written on its own, and nothing else is. Sharing the index.html output
+   * would mean an Android build silently leaves a photograph-less page behind
+   * for the website to deploy. */
+  writeFileSync(join(root, 'dist/app.html'), htmlDoc({}, true))
+} else {
+  // Fragment for publishing: the host supplies doctype, html, head and body.
+  writeFileSync(
+    join(root, 'dist/planner.html'),
+    `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${bodyWith(photos.embedded)}\n`
+  )
+
+  // Standalone document for opening off disk.
+  writeFileSync(
+    join(root, 'index.html'),
+    htmlDoc({ ...photos.embedded, ...photos.linked }, false)
+  )
+}
 
 const kb = p => (readFileSync(join(root, p)).length / 1024).toFixed(0)
 const embeddedCount = Object.keys(photos.embedded).length
@@ -246,5 +268,9 @@ console.log(
       (photos.skipped ? `, ${photos.skipped} missing from disk` : '')
     : 'photos             none — destinations fall back to drawn illustrations'
 )
-console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
-console.log(`index.html         ${kb('index.html')} KB`)
+if (APP) {
+  console.log(`dist/app.html      ${kb('dist/app.html')} KB`)
+} else {
+  console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
+  console.log(`index.html         ${kb('index.html')} KB`)
+}

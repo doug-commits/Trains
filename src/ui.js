@@ -836,7 +836,7 @@ const UI = (() => {
       </section>
       ${
         typeof GUIDES !== 'undefined' && GUIDES.length
-          ? `<section class="block">
+          ? `<section class="block block-web">
         <h2>Routes written up in full</h2>
         <p class="sub">The planner answers any pair on the network. These are the ones asked
         about most often, written out as pages you can read, link to and come back to.</p>

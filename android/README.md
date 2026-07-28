@@ -1,14 +1,31 @@
 # Overland SEA for Android
 
-A WebView over the same page the website serves — with one difference that is
-the whole reason the app exists.
+A WebView over the same program the website serves — built for the app rather
+than copied from the site, and with one difference that is the whole reason it
+exists.
 
 **It works with no signal.** The planner already fetches nothing at runtime:
-the network data, the coastline, the rail alignments, the itinerary logic, the
-fonts and 93 photographs are all inside the page. Bundling it means the app
-answers "does the Padang Besar connection hold?" on a platform in southern
-Thailand with the phone in flight mode, which is exactly when you need it and
-exactly when a website is useless.
+the network data, the coastline, the rail alignments, the itinerary logic and
+the fonts are all inside the page. Bundling it means the app answers "does the
+Padang Besar connection hold?" on a platform in southern Thailand with the
+phone in flight mode, which is exactly when you need it and exactly when a
+website is useless.
+
+## What the app leaves out
+
+Built with `APP=1`, which changes three things and nothing else:
+
+**No photographs.** The library is 22 MB of what was a 46 MB app. Stations
+without one already fall back to drawn scene art, so this is a path the page
+takes every day rather than an untested branch. 4.9 MB of page becomes 0.9 MB.
+
+**No links to the written-up route pages.** Those are separate documents on the
+site. Inside a single bundled file every one of them is a dead end.
+
+**Opens in day mode.** A website is arrived at inside a browser already set the
+way its reader likes it, so following the system is the polite default there.
+An app is opened on its own, and a chart is read in daylight more often than
+not. The toggle still offers all three and remembers what it is told.
 
 That is also why this is not the wrapper-around-a-website that Play rejects
 under its minimum-functionality policy. There is no website being wrapped;
@@ -36,12 +53,12 @@ That produces `overland-sea-android` containing an `.aab` for Play and an
 `.apk` you can sideload. To build locally you need Android Studio or the SDK,
 then:
 
-    node tools/build.mjs && node tools/build-android.mjs
+    node tools/build-android.mjs
     cd android && ./gradlew bundleRelease
 
-`tools/build-android.mjs` stages `index.html` and `data/photos/` into
-`app/src/main/assets/` (about 22 MB) and writes `version.properties`. The
-version code is ten-minute ticks since 2026-01-01 rather than a number someone
+`tools/build-android.mjs` runs the app build itself and stages `dist/app.html`
+into `app/src/main/assets/index.html` (about 0.9 MB), then writes
+`version.properties`. The version code is ten-minute ticks since 2026-01-01 rather than a number someone
 has to remember to increment, because Play rejects a repeat and a manual
 counter is a counter you will eventually forget.
 

@@ -8,32 +8,36 @@
  * post, which is exactly where you need it and exactly where a website is
  * useless.
  *
- * index.html rather than dist/planner.html: the fragment inlines only the
- * photographs that fit a 3 MB budget, and an app has no such budget. Copying
- * the linked set alongside gets all 93 offline too.
+ * It builds its own page rather than staging the website's. dist/app.html
+ * carries no photographs at all: the library is 22 MB of a 46 MB app, and the
+ * drawn scene art it falls back to is the same art the page already uses for
+ * every station without a photograph. It also leaves out the parts that only
+ * make sense on a website — the links to the written-up route pages, which are
+ * separate documents on the site and would be dead ends inside one file.
  *
- *   node tools/build.mjs && node tools/build-android.mjs
+ *   node tools/build-android.mjs
  */
 
 import { cpSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const assets = join(root, 'android/app/src/main/assets')
 
-if (!existsSync(join(root, 'index.html'))) {
-  console.error('android            index.html missing — run tools/build.mjs first')
-  process.exit(1)
-}
+/* Built here rather than expected to be lying around, so there is no way to
+ * ship an app made from whatever the last build happened to leave behind. */
+execFileSync(process.execPath, [join(root, 'tools/build.mjs')], {
+  cwd: root,
+  env: { ...process.env, APP: '1' },
+  stdio: 'inherit',
+})
 
 rmSync(assets, { recursive: true, force: true })
-mkdirSync(join(assets, 'data'), { recursive: true })
+mkdirSync(assets, { recursive: true })
 
-cpSync(join(root, 'index.html'), join(assets, 'index.html'))
-if (existsSync(join(root, 'data/photos'))) {
-  cpSync(join(root, 'data/photos'), join(assets, 'data/photos'), { recursive: true })
-}
+cpSync(join(root, 'dist/app.html'), join(assets, 'index.html'))
 
 /* The version code has to rise on every upload and Play rejects a repeat, so
  * it is derived rather than remembered: time since the project's epoch, which

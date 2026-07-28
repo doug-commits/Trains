@@ -3,8 +3,15 @@
      never shows as a flash of the other theme. The full control lives in
      src/app.js; this is only the part that has to happen first. */
   try {
+    var root = document.documentElement
     var m = localStorage.getItem('overlandsea:theme')
-    if (m === 'light' || m === 'dark') document.documentElement.setAttribute('data-theme', m)
+    if (m === 'light' || m === 'dark') root.setAttribute('data-theme', m)
+    /* The app opens light unless told otherwise. The website follows the
+       system, which is right for something you arrive at inside a browser
+       already set the way you like it; an app is opened on its own and a chart
+       is read in daylight more often than not. The toggle still wins, and once
+       used it is remembered — this is only the starting point. */
+    else if (root.dataset.app) root.setAttribute('data-theme', 'light')
   } catch (e) {
     /* private mode, or storage disabled — fall through to the system setting */
   }
