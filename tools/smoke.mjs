@@ -872,6 +872,37 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------------- the islands are drawn */
+{
+  const bm = JSON.parse(readFileSync(join(root, 'data/basemap.json'), 'utf8'))
+  check('the small islands are in the basemap', (bm.islands || []).length > 300,
+    `${(bm.islands || []).length} islands`)
+
+  // A ferry terminal drawn in open water reads as a bug. Most of these are on
+  // land now; the count is the guard against a rebuild quietly losing them.
+  const rings = [...bm.countries.flatMap(c => c.rings), ...(bm.islands || [])]
+  const inRing = (p, r) => {
+    let c = false
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i]
+      const [xj, yj] = r[j]
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c
+    }
+    return c
+  }
+  const onLand = Object.values(NETWORK.stations).filter(s =>
+    rings.some(r => inRing([s.lon, s.lat], r))
+  ).length
+  check('stations sit on drawn land', onLand >= 183,
+    `${onLand} of ${Object.keys(NETWORK.stations).length}`)
+
+  // Islands Natural Earth's country polygons do not have at any resolution.
+  const near = (lon, lat) =>
+    rings.some(r => r.some(v => Math.abs(v[0] - lon) < 0.2 && Math.abs(v[1] - lat) < 0.2))
+  check('Koh Tao is on the map at last', near(99.84, 10.1))
+  check('and so are the Gilis and Boracay', near(116.04, -8.35) && near(121.93, 11.95))
+}
+
 /* ------------------------------------------- getting the panel out of the way */
 {
   /* Narrower than the suite's default on purpose. Whether the panel covers

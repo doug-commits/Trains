@@ -9,9 +9,11 @@
 
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const [, , inPath, outPath] = process.argv
+const [, , inPath, outPath, islandsPath] = process.argv
 if (!inPath || !outPath) {
-  console.error('usage: build-basemap.mjs <ne_50m_countries.geojson> <out.json>')
+  console.error(
+    'usage: build-basemap.mjs <ne_10m_countries.geojson> <out.json> [ne_10m_minor_islands.geojson]'
+  )
   process.exit(1)
 }
 
@@ -36,6 +38,18 @@ const TOLERANCE = 0.01
 // around 18 km² — an island you could walk across in an afternoon, which is
 // exactly the size of several this network calls at.
 const MIN_AREA = 0.0015
+
+/* Minor islands come from their own dataset and need their own numbers.
+ *
+ * Several places this network calls at are not in the country polygons at any
+ * resolution: Koh Tao, Koh Phi Phi, Koh Samet, the Gilis and Boracay are all
+ * missing, which left ferry termini sitting in open water — Koh Tao was 37 km
+ * from the nearest drawn land. They are also small enough that the country
+ * tolerance would flatten them to triangles, so they get a finer one. */
+const ISLAND_TOLERANCE = 0.002 // ~220 m
+// Gili Trawangan is about 3.4 km2. Below roughly a square kilometre an island
+// is a dot at any zoom this map opens at, and 500 of them is noise.
+const ISLAND_MIN_AREA = 0.00008
 
 // --- Sutherland-Hodgman clip against each bbox edge ------------------------
 
@@ -168,7 +182,27 @@ for (const feature of world.features) {
 
 countries.sort((a, b) => a.id.localeCompare(b.id))
 
-const out = { bbox: BBOX, countries }
+/* Islands, unattributed. They are drawn as land and nothing else asks which
+ * country they belong to, so inventing an answer would be work with no reader. */
+const islands = []
+if (islandsPath) {
+  const minor = JSON.parse(readFileSync(islandsPath, 'utf8'))
+  for (const feature of minor.features) {
+    const g = feature.geometry
+    if (!g) continue
+    const polygons = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : []
+    for (const poly of polygons) {
+      const clipped = clip(poly[0])
+      if (clipped.length < 3) continue
+      const simplified = simplify(clipped, ISLAND_TOLERANCE)
+      if (simplified.length < 3) continue
+      if (ringArea(simplified) < ISLAND_MIN_AREA) continue
+      islands.push(simplified.map(([x, y]) => [+x.toFixed(4), +y.toFixed(4)]))
+    }
+  }
+}
+
+const out = { bbox: BBOX, countries, islands }
 writeFileSync(outPath, JSON.stringify(out))
 
 const points = countries.reduce(
@@ -176,6 +210,6 @@ const points = countries.reduce(
   0
 )
 console.log(
-  `${countries.length} countries, ${points} points, ` +
+  `${countries.length} countries, ${islands.length} islands, ${points} points, ` +
     `${(JSON.stringify(out).length / 1024).toFixed(1)} KB -> ${outPath}`
 )

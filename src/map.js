@@ -208,6 +208,23 @@ const MapView = (() => {
         all.addPath(path)
       }
 
+      /* The small islands, which are land without being any country's outline.
+       * They come from their own dataset because several places this network
+       * calls at — Koh Tao, Phi Phi, Samet, the Gilis, Boracay — are absent
+       * from the country polygons at every resolution, which left ferry
+       * terminals floating in open water. */
+      const isles = new Path2D()
+      for (const ring of basemap.islands || []) {
+        for (let i = 0; i < ring.length; i++) {
+          const p = Proj.project(view, ring[i][0], ring[i][1])
+          if (i === 0) isles.moveTo(p.x, p.y)
+          else isles.lineTo(p.x, p.y)
+        }
+        isles.closePath()
+      }
+      paths.push(isles)
+      all.addPath(isles)
+
       ctx.save()
       ctx.shadowColor = colors.coast
       ctx.shadowBlur = 16
