@@ -1724,6 +1724,15 @@ function check(label, condition, detail = '') {
     await page.waitForFunction(() => document.querySelector('#panel h1'))
     await page.waitForTimeout(700)
 
+    /* The program is a separate file here too, and a missing subresource is
+       the app's quietest possible failure: WebView reports nothing for one, so
+       it would open, draw the shell and sit there. */
+    check('the app loads its program as a deferred file',
+      existsSync(join(root, 'dist/app.js')) &&
+        statSync(join(root, 'dist/app.js')).size > 500_000 &&
+        /<script defer src="app\.js"><\/script>/.test(readFileSync(appFile, 'utf8')))
+    check('and it actually ran', (await page.evaluate(() => !!window.OverlandMap)))
+
     /* Opens light whatever the system says. The website still follows it —
        checked by every other block in this file, which runs in dark. */
     check('the app opens in day mode',

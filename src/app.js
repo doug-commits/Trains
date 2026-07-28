@@ -157,8 +157,13 @@
   const CORRIDORS = withStats(PRESETS)
 
   /* The written-up routes get their headline numbers from the same router that
-   * produced the page, so the link and the page it points at cannot disagree. */
-  for (const g of GUIDES) {
+   * produced the page, so the link and the page it points at cannot disagree.
+   *
+   * Not in the app, which does not show this list at all — those pages are
+   * separate documents on the site and are not in the package. Sixteen route
+   * searches and sixteen plans, at boot, on a phone, for a section nobody will
+   * see. */
+  for (const g of document.documentElement.dataset.app ? [] : GUIDES) {
     const routed = Router.route(NETWORK, g.from, g.to, {})
     if (!routed) continue
     const t = Plan.build(NETWORK, routed, {}).totals
@@ -1631,6 +1636,24 @@
     map.resize()
     compute()
   }
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(start)
-  else start()
+  /* Draw now, correct the lettering when it arrives.
+   *
+   * This used to wait on document.fonts.ready before drawing anything, because
+   * the canvas measures text and laying labels out against fallback metrics
+   * puts them a few pixels from where they belong. The cost of that caution was
+   * the entire first impression: five faces to decode, and on a mid-range phone
+   * the app opened on a blank screen for most of three seconds while it
+   * happened. Nobody is reading station labels during those three seconds,
+   * because there is nothing on the screen to read.
+   *
+   * So the map goes up immediately with whatever the system can letter it in,
+   * and redraws once the real faces are ready. The difference between the two
+   * frames is a few pixels of label placement, and by then there is a map. */
+  start()
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      map.redraw()
+      paintScenes()
+    })
+  }
 })()

@@ -183,7 +183,7 @@ function loadPhotos() {
   return { embedded, linked, skipped, kb: bytes / 1024 }
 }
 
-const photoJs = set => `const PHOTOS = ${JSON.stringify(set)};`
+const photoJs = set => `const PHOTOS = JSON.parse(${JSON.stringify(JSON.stringify(set))});`
 
 /* The Android build.
  *
@@ -200,8 +200,18 @@ const APP = process.env.APP === '1'
 
 const photos = APP ? { embedded: {}, linked: {}, skipped: 0, kb: 0 } : loadPhotos()
 
-const basemap = readFileSync(join(root, 'data/basemap.json'), 'utf8').trim()
-const rails = readFileSync(join(root, 'data/rails.json'), 'utf8').trim()
+/* Handed to JSON.parse as a string rather than written as an object literal.
+ *
+ * An engine parsing `{"countries":[...]}` in source has to run the full
+ * JavaScript grammar over all 325 KB of it, in case any of it turns out to be
+ * an expression. JSON.parse knows in advance that none of it can be, and reads
+ * it several times faster. On the phone this is the single largest thing the
+ * app does before it can draw anything. */
+const asJson = file =>
+  `JSON.parse(${JSON.stringify(readFileSync(join(root, file), 'utf8').trim())})`
+
+const basemap = asJson('data/basemap.json')
+const rails = asJson('data/rails.json')
 const fonts = read('src/fonts.css')
 const css = read('src/app.css')
 const shell = read('src/shell.html')
@@ -273,8 +283,16 @@ ${body ?? bodyWith(photoSet)}
 if (APP) {
   /* Written on its own, and nothing else is. Sharing the index.html output
    * would mean an Android build silently leaves a photograph-less page behind
-   * for the website to deploy. */
-  writeFileSync(join(root, 'dist/app.html'), htmlDoc({}, true))
+   * for the website to deploy.
+   *
+   * Split and deferred like the website, and for a sharper reason. Inline, the
+   * app opened on a blank screen while 915 KB of script parsed — 2.7 seconds
+   * of nothing on a mid-range phone, which is the whole of a reader's first
+   * impression. Deferred, the interface is drawn while the program is still
+   * loading. Both files are inside the package, so this costs the app nothing:
+   * there is no network involved either way. */
+  writeFileSync(join(root, 'dist/app.js'), programFor({}) + '\n')
+  writeFileSync(join(root, 'dist/app.html'), htmlDoc(null, true, bodyLinking({}, 'app.js')))
 } else {
   // Fragment for publishing: the host supplies doctype, html, head and body.
   writeFileSync(
@@ -302,7 +320,7 @@ console.log(
     : 'photos             none — destinations fall back to drawn illustrations'
 )
 if (APP) {
-  console.log(`dist/app.html      ${kb('dist/app.html')} KB`)
+  console.log(`dist/app.html      ${kb('dist/app.html')} KB + app.js ${kb('dist/app.js')} KB`)
 } else {
   console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
   console.log(`index.html         ${kb('index.html')} KB + app.js ${kb('app.js')} KB`)

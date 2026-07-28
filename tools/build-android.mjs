@@ -38,6 +38,22 @@ rmSync(assets, { recursive: true, force: true })
 mkdirSync(assets, { recursive: true })
 
 cpSync(join(root, 'dist/app.html'), join(assets, 'index.html'))
+cpSync(join(root, 'dist/app.js'), join(assets, 'app.js'))
+
+/* Both, or neither is worth shipping.
+ *
+ * The page loads the program as a subresource, and a missing subresource does
+ * not reach MainActivity.onReceivedError — that only fires for the main frame.
+ * So an app staged without app.js does not report anything: it opens, draws the
+ * empty shell, and sits there. Checked here, where it can still be a build
+ * failure instead of a review. */
+for (const [name, min] of [['index.html', 50_000], ['app.js', 500_000]]) {
+  const at = join(assets, name)
+  if (!existsSync(at) || statSync(at).size < min) {
+    console.error(`android            ${name} missing or truncated in assets — refusing to stage`)
+    process.exit(1)
+  }
+}
 
 /* The version code has to rise on every upload and Play rejects a repeat, so
  * it is derived rather than remembered: time since the project's epoch, which
