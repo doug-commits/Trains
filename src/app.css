@@ -376,6 +376,23 @@ body {
   z-index: 3;
 }
 
+/* A paid link. Deliberately quieter than the operator booking links above it —
+   the thing you came for outranks the thing that pays. */
+.stay-book {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.stay-book:hover { color: var(--ink); border-bottom-color: var(--rail); }
+
+.disclosure b { color: var(--ink-soft); }
+
 /* ------------------------------------------------- describing a place */
 
 .describe { margin-top: 0.15rem; }

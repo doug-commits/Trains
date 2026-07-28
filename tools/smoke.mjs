@@ -168,7 +168,32 @@ function check(label, condition, detail = '') {
   )
   check('every leg has a way to book it', bookless === 0, `${bookless} without`)
   check('operator plates render', (await page.locator('tr.leg .plate').count()) === legs)
-  check('no affiliate links claimed', /No affiliate links/.test(await page.textContent('#panel')))
+  /* The promise narrowed when hotels and insurance started paying, and the
+   * narrower version has to stay exactly true: transport links earn nothing,
+   * and the operator-first ordering is not for sale. */
+  const panelText = await page.textContent('#panel')
+  check('transport links are still declared unpaid',
+    /No affiliate links on transport/.test(panelText))
+  check('and where it does earn is stated plainly',
+    /Where it does earn/.test(panelText) && /pay a commission/.test(panelText))
+
+  // A paid link that is not marked is a link-scheme violation, and would cost
+  // far more in rankings than it earns.
+  const paid = await page.locator('a.stay-book').evaluateAll(a =>
+    a.map(x => ({ rel: x.rel, host: new URL(x.href).host }))
+  )
+  check('paid links exist on a route with hotel nights', paid.length > 0, `${paid.length} links`)
+  check('every paid link is marked sponsored',
+    paid.every(l => /sponsored/.test(l.rel) && /nofollow/.test(l.rel)),
+    paid.filter(l => !/sponsored/.test(l.rel)).map(l => l.host).join(' ') || 'all marked')
+
+  // The reverse: nothing on a transport leg may be a paid link.
+  const legLinks = await page.locator('tr.leg a').evaluateAll(a =>
+    a.map(x => ({ rel: x.rel, cls: x.className }))
+  )
+  check('no booking link on a leg is paid',
+    legLinks.every(l => !/sponsored/.test(l.rel)),
+    `${legLinks.length} leg links checked`)
 
   // Nothing may overflow the panel horizontally.
   const overflow = await page.evaluate(() => {

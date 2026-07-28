@@ -355,6 +355,56 @@ const UI = (() => {
    * worth knowing about before booking rather than after. Three bands rather
    * than one number, because the same journey is a different trip depending on
    * which you take, and both are legitimate. */
+  /* Insurance is the one product this audience genuinely needs and is likeliest
+   * not to have thought about: a policy written for someone who flew in and out
+   * is no use to a person crossing Poipet on foot with an open return. */
+  function insuranceLine() {
+    if (typeof PARTNERS === 'undefined') return ''
+    const p = PARTNERS.insurance
+    return (
+      `<p class="sub disclosure"><b>Insurance.</b> Most policies assume you arrived by air and ` +
+      `leave on a booked date. Whatever you buy, check it covers land borders, ferries and an ` +
+      `open-ended trip — several of the cheap ones do not. ` +
+      `<a class="stay-book" href="${esc(p.url(p.id))}" target="_blank" ` +
+      `rel="sponsored nofollow noopener">${esc(p.name)}</a> is the one we link, because it does; ` +
+      `it pays us a commission and it is not the only option.</p>`
+    )
+  }
+
+  const STAY_COUNTRY = {
+    cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
+    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia',
+    ph: 'Philippines', mm: 'Myanmar',
+  }
+
+  /* The figures above are indicative and a year old by the time you read them.
+   * A link to real prices on real dates is the natural next thing to want, and
+   * this is the one place on the page where a paid link is not in tension with
+   * the editorial judgement — no ordering of anything is being sold.
+   *
+   * rel="sponsored": these are paid links and saying so is both Google's
+   * requirement and the honest thing. An undisclosed one is a link-scheme
+   * violation, which would cost far more than it earns. */
+  function stayLink(network, night) {
+    if (typeof PARTNERS === 'undefined' || !night.city) return ''
+    const st = network.stations[night.stationId] || {}
+    // Named, not just the city: there is a George Town in Malaysia and one in
+    // Guyana, and a search that lands in the wrong hemisphere helps nobody.
+    const country = STAY_COUNTRY[st.country] || ''
+    const href = PARTNERS.booking.url(
+      night.city,
+      country,
+      night.checkin,
+      night.checkout,
+      PARTNERS.booking.id
+    )
+    return (
+      `<a class="stay-book" href="${esc(href)}" target="_blank"` +
+      ` rel="sponsored nofollow noopener">${esc(PARTNERS.booking.label)} in ` +
+      `${esc(night.city)}</a>`
+    )
+  }
+
   function lodgingSection(network, plan) {
     if (!plan.nights || !plan.nights.length) {
       return plan.totals.sleeperNights
@@ -385,6 +435,7 @@ const UI = (() => {
             </div>
             <div class="bands">${bands}</div>
             ${n.note ? `<p class="stay-note">${esc(n.note)}</p>` : ''}
+            ${stayLink(network, n)}
           </li>`
       })
       .join('')
@@ -518,11 +569,17 @@ const UI = (() => {
       do not yet hold and buy them when inventory opens, which is a genuine cancellation risk on a
       scarce sleeper. Prefer the operator wherever the operator actually works, which is most of the
       time.</p>
-      <p class="sub disclosure"><b>No affiliate links.</b> Every link here goes straight to the
-      operator or aggregator and earns this project nothing. The operator's own site is listed first
-      because it is usually cheaper and always more reliable, not because of what it pays.
-      Booking URLs were last reviewed ${esc(network.reviewed)} and are not machine-checked — if one
-      is dead, search the operator name rather than trusting a reseller that ranks well.</p>
+      <p class="sub disclosure"><b>No affiliate links on transport.</b> Every booking link above
+      goes straight to the operator or aggregator and earns this project nothing. The operator's own
+      site is listed first because it is usually cheaper and always more reliable, not because of
+      what it pays — that ordering is the most load-bearing judgement on this page and it is not for
+      sale. Booking URLs were last reviewed ${esc(network.reviewed)} and are not machine-checked —
+      if one is dead, search the operator name rather than trusting a reseller that ranks well.</p>
+      <p class="sub disclosure"><b>Where it does earn.</b> The hotel links in “Where you sleep” and
+      the insurance link below pay a commission, at no extra cost to you. They are marked as paid
+      links. Nothing about them changes a route, a price, or the order of anything: no hotel is
+      recommended over another and no leg is routed differently because of them.</p>
+      ${insuranceLine()}
       </section>`
   }
 

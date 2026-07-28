@@ -85,6 +85,7 @@ const SCRIPTS = [
   'data/network.js',
   'data/landmarks.js',
   'data/guides.js',
+  'data/partners.js',
   'src/proj.js',
   'src/router.js',
   'src/plan.js',
@@ -182,7 +183,16 @@ const fonts = read('src/fonts.css')
 const css = read('src/app.css')
 const shell = read('src/shell.html')
 
-const sources = SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n')
+/* Affiliate ids come from the environment, never from the repo. An empty id
+ * still produces a working link — it just earns nothing — so a clone without
+ * the accounts set up builds and behaves identically. */
+const partnerIds =
+  `PARTNERS.booking.id = ${JSON.stringify(process.env.BOOKING_AID || '')};\n` +
+  `PARTNERS.insurance.id = ${JSON.stringify(process.env.SAFETYWING_REF || '')};`
+
+const sources =
+  SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n') +
+  `\n/* ===== affiliate ids (build-time) ===== */\n${partnerIds}\n`
 
 const bodyWith = photoSet => `${shell}
 <style>
