@@ -86,9 +86,14 @@ jobs:
           fi
 
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          # Play matches on this and refuses anything else, so print it beside
+          # the certificate rather than leaving it to be discovered at upload.
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           {
             echo '```'
             "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -viE '^warning' | head -12
+            echo
+            echo "package: $("$AAPT2" dump packagename "$APK" 2>/dev/null || echo unknown)"
             jarsigner -verify "$AAB" | head -2
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

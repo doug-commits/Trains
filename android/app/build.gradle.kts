@@ -13,11 +13,22 @@ val version = Properties().apply {
 }
 
 android {
+  /* Two different things that are easy to confuse.
+   *
+   * `namespace` is where the generated R class and BuildConfig live — an
+   * internal Java package, invisible to anyone but the compiler, and it is
+   * what the source directory and MainActivity's own package declaration
+   * follow.
+   *
+   * `applicationId` is the identity Play knows the app by. It is fixed for
+   * the life of the listing, appears in the store URL, and cannot be changed
+   * after the first upload — so it is set by whatever was typed into Play
+   * Console, not by what would have been tidier here. */
   namespace = "com.slowasia.overland"
   compileSdk = 35
 
   defaultConfig {
-    applicationId = "com.slowasia.overland"
+    applicationId = "com.overlandsoutheastasia"
     /* Android 8. Set by the adaptive launcher icon, which has no pre-26
      * equivalent, and no loss: a device older than this ships a WebView that
      * cannot render the canvas map or the CSS this page is built on, so it
