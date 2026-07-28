@@ -3928,17 +3928,41 @@ const MapView = (() => {
       return fitVisible(rect, (strip, tall) => Proj.create(basemap.bbox, strip, tall, pad))
     }
 
-    function size() {
+    /* Capped at 2 rather than 3. A phone reporting 3 asks for 1.3 million
+     * backing pixels for a strip of map barely 400 points wide, and every fill,
+     * stroke and blur pays for all of them. The map is line art on a flat
+     * ground; at 2 the difference is invisible and the frame is less than half
+     * the cost. */
+    const SHARP = () => Math.min(2, window.devicePixelRatio || 1)
+
+    /* And 1 while the map is moving.
+     *
+     * What is left in a frame after the caching is raster: filling the land and
+     * stroking the network, both of which cost exactly what they cover. Halving
+     * the resolution quarters the pixels, and quartering the pixels is the only
+     * thing that moves a number made of area. The map is a little soft under a
+     * moving thumb and sharp the moment it stops, which is the trade every map
+     * that feels smooth has already made. */
+    const SOFT = 1
+
+    let backing = null
+
+    function setBacking(dpr) {
+      if (backing === dpr) return
+      backing = dpr
       const rect = canvas.getBoundingClientRect()
-      /* Capped at 2 rather than 3. A phone reporting 3 asks for 1.3 million
-       * backing pixels for a strip of map barely 400 points wide, and every
-       * fill, stroke and blur pays for all of them. The map is line art on a
-       * flat ground; at 2 the difference is invisible and the frame is more
-       * than twice as cheap. */
-      const dpr = Math.min(2, window.devicePixelRatio || 1)
       canvas.width = Math.max(1, Math.round(rect.width * dpr))
       canvas.height = Math.max(1, Math.round(rect.height * dpr))
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      // The baked sea and vignette are sized in device pixels, so they are no
+      // longer the right size. backdrops() rebuilds on its own key.
+      backdrop = null
+    }
+
+    function size() {
+      const rect = canvas.getBoundingClientRect()
+      backing = null // the element's own size changed; force the store to follow
+      setBacking(SHARP())
 
       if (!view) {
         view = baseView(rect)
@@ -4080,15 +4104,20 @@ const MapView = (() => {
        * most expensive thing on the map — a blur over the whole coast — so a
        * gesture in progress goes without it and picks it up on the frame it
        * settles. Nobody can see a coastal halo on a map that is moving. */
-      if (!moving) {
+      ctx.fillStyle = colors.land
+      if (moving) {
+        ctx.fill(world.all)
+      } else {
         ctx.shadowColor = colors.coast
         ctx.shadowBlur = 16
+        ctx.fill(world.all)
+        ctx.shadowBlur = 0
+        // Again, so the interior is the flat land colour rather than whatever
+        // the glow spilled onto it. Only worth doing if there was a glow: the
+        // second fill of a thirteen-thousand-point path was costing a quarter
+        // of every frame of a drag to paint the identical shape twice.
+        ctx.fill(world.all)
       }
-      ctx.fillStyle = colors.land
-      ctx.fill(world.all)
-      ctx.shadowBlur = 0
-      // Again without the shadow, so the interior is the flat land colour.
-      ctx.fill(world.all)
 
       /* The hairline along every coast and frontier — thirteen thousand points
        * of it, and the most expensive stroke on the map by a wide margin. Like
@@ -4186,12 +4215,78 @@ const MapView = (() => {
       return { a: p.a, b: out[out.length - 1], ctrl: null, via: out }
     }
 
-    function drawIdleNetwork(usedLegs) {
+    /* The unused network, as three paths instead of two hundred and thirty-two.
+     *
+     * It is static geometry — every leg not on the current route — so like the
+     * coastline it can be laid out once in world coordinates and projected by
+     * the canvas. Drawn leg by leg it was a save, a restore, a setLineDash, a
+     * beginPath and a stroke apiece, every frame of every drag, to produce the
+     * same lattice each time. Rebuilt only when the route changes, which is
+     * when the set of unused legs actually changes. */
+    let lattice = null
+
+    function idleLattice(usedLegs) {
+      if (lattice && lattice.for === state.route) return lattice
+      const paths = { rail: new Path2D(), ferry: new Path2D(), road: new Path2D() }
+      const wx = id => network.stations[id].lon
+      const wy = id => Proj.screenY(network.stations[id].lat)
+
       for (const leg of network.legs) {
         if (usedLegs.has(leg)) continue
-        const p = pathFor(leg)
-        strokePath(p, STYLE[leg.mode], colors.idle, leg.mode === 'rail' ? 1.6 : 1.2, 1)
+        const path = paths[leg.mode] || paths.road
+        const track = rails[`${leg.from}|${leg.to}`]
+        if (track) {
+          path.moveTo(track[0][0], Proj.screenY(track[0][1]))
+          for (let i = 1; i < track.length; i++) {
+            path.lineTo(track[i][0], Proj.screenY(track[i][1]))
+          }
+          continue
+        }
+        const ax = wx(leg.from)
+        const ay = wy(leg.from)
+        const bx = wx(leg.to)
+        const by = wy(leg.to)
+        path.moveTo(ax, ay)
+        if (leg.mode !== 'ferry') {
+          path.lineTo(bx, by)
+          continue
+        }
+        /* The ferry's bow, in degrees rather than pixels. Its cap used to be 26
+         * screen pixels, which made the arc flatten as you zoomed in; in world
+         * units it keeps its shape, which is the more honest drawing of a route
+         * that does not change when you look closer. */
+        const dx = bx - ax
+        const dy = by - ay
+        const len = Math.hypot(dx, dy) || 1
+        const bow = Math.min(26 / (view.baseScale || 1), len * 0.16)
+        path.quadraticCurveTo(
+          (ax + bx) / 2 - (dy / len) * bow,
+          (ay + by) / 2 + (dx / len) * bow,
+          bx,
+          by
+        )
       }
+      lattice = { for: state.route, paths }
+      return lattice
+    }
+
+    function drawIdleNetwork(usedLegs) {
+      const { paths } = idleLattice(usedLegs)
+      ctx.save()
+      ctx.transform(view.scale, 0, 0, view.scale, view.dx, view.dy)
+      ctx.strokeStyle = colors.idle
+      for (const mode of ['rail', 'ferry', 'road']) {
+        const style = STYLE[mode]
+        const width = mode === 'rail' ? 1.6 : 1.2
+        // Divided by the scale, so a hairline stays a hairline and a dash stays
+        // the same length on the glass however far in the map is zoomed.
+        ctx.lineWidth = width / view.scale
+        ctx.lineCap = style.dash.length ? 'butt' : 'round'
+        ctx.setLineDash(style.dash.map(d => (d * (width / 3)) / view.scale))
+        ctx.stroke(paths[mode])
+      }
+      ctx.setLineDash([])
+      ctx.restore()
     }
 
     /* The sights, drawn where they actually are rather than on the railhead
@@ -4414,6 +4509,7 @@ const MapView = (() => {
         cancelAnimationFrame(pending)
         pending = null
       }
+      setBacking(moving ? SOFT : SHARP())
       colors = themeColors(document.documentElement)
       const used = new Set(state.route ? state.route.legs.map(e => e.leg) : [])
       const routeSet = new Set(state.route ? state.route.stationIds : [])
