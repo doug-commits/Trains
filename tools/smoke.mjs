@@ -1466,6 +1466,94 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------------ the map is big enough to read */
+{
+  /* How close you may get should be a real-world scale, not a multiple of how
+   * far out you happened to start. Tied to the fitted view it was the latter,
+   * and the phone — starting further out because its canvas is smaller — was
+   * capped at a third of the desktop's closest approach. */
+  const closest = {}
+  for (const [name, opts] of [
+    ['desktop', {}],
+    ['phone', { viewport: { width: 412, height: 915 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }],
+  ]) {
+    const { page, context } = await newPage(opts)
+    await page.goto(url)
+    await page.waitForFunction(() => document.querySelector('#panel h1'))
+    await page.waitForTimeout(400)
+    for (let i = 0; i < 45; i++) await page.click('#zoomin')
+    await page.waitForTimeout(400)
+    closest[name] = Number((await page.evaluate(() =>
+      window.OverlandMap.viewSignature())).split(',')[0])
+    await context.close()
+  }
+  check('a phone can zoom in as far as a desktop',
+    Math.abs(closest.phone - closest.desktop) < 1,
+    `${(closest.phone / 111).toFixed(2)} vs ${(closest.desktop / 111).toFixed(2)} px/km`)
+}
+
+/* ------------------------------------------------- the map fills the phone */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, deviceScaleFactor: 3,
+    isMobile: true, hasTouch: true,
+  })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(1200)
+
+  const shape = () => page.evaluate(() => {
+    const r = document.querySelector('#map').getBoundingClientRect()
+    return {
+      h: Math.round(r.height),
+      full: document.querySelector('.app').dataset.mapfull === 'true',
+      touch: getComputedStyle(document.querySelector('#map')).touchAction,
+    }
+  })
+  const letterbox = await shape()
+  await page.locator('#expand').tap()
+  await page.waitForTimeout(500)
+  const opened = await shape()
+  check('the map opens to the whole screen', opened.h > letterbox.h * 2,
+    `${letterbox.h}px → ${opened.h}px`)
+
+  /* With no page behind it there is nothing for a single finger to scroll
+     past, so it becomes the map's — a pinch is not the only way in. */
+  check('and one finger becomes the map\'s', opened.touch === 'none')
+
+  const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
+  const before = await sig()
+  await page.evaluate(() => {
+    const c = document.querySelector('#map')
+    const r = c.getBoundingClientRect()
+    const send = (t, x, y) => c.dispatchEvent(new PointerEvent(t, {
+      pointerId: 1, pointerType: 'touch', bubbles: true, cancelable: true,
+      clientX: r.left + x, clientY: r.top + y,
+    }))
+    send('pointerdown', 200, 300)
+    for (let i = 1; i <= 12; i++) send('pointermove', 200 + i * 10, 300 + i * 5)
+    send('pointerup', 320, 360)
+  })
+  await page.waitForTimeout(300)
+  check('one finger pans it', (await sig()) !== before)
+
+  /* Android's back button is how you leave things. Without an entry to go
+     back to, a reader closing the map would close the app instead. */
+  await page.goBack()
+  await page.waitForTimeout(500)
+  const closed = await shape()
+  check('back closes the map rather than the app', !closed.full && closed.h === letterbox.h,
+    `${closed.h}px`)
+
+  // And the route survived the round trip — back must not have undone it.
+  check('and the route is still there',
+    (await page.locator('.route tbody tr').count()) > 0)
+
+  await context.close()
+}
+
 await browser.close()
 
 console.log('')

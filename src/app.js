@@ -378,6 +378,13 @@
         drag = { ...midpoint(), panning: true }
         pinch = spread()
         hideTip()
+        return
+      }
+      /* Full screen, one finger is the map's: there is no page behind it left
+       * to scroll. It still has to earn the pan, or every station you tap
+       * shifts the map out from under the tap. */
+      if (mapFull() && touches.size === 1) {
+        drag = { x: e.offsetX, y: e.offsetY, originX: e.offsetX, originY: e.offsetY, panning: false }
       }
       return
     }
@@ -388,7 +395,25 @@
   canvas.addEventListener('pointermove', e => {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
-      if (touches.size < 2 || !drag) return
+      if (!drag) return
+      // One finger, full screen: the same threshold the mouse gets, below.
+      if (touches.size < 2) {
+        if (!mapFull()) return
+        const dx1 = e.offsetX - drag.x
+        const dy1 = e.offsetY - drag.y
+        drag.x = e.offsetX
+        drag.y = e.offsetY
+        if (!drag.panning) {
+          if (Math.hypot(e.offsetX - drag.originX, e.offsetY - drag.originY) < PAN_THRESHOLD) return
+          drag.panning = true
+          hideTip()
+          return
+        }
+        e.preventDefault()
+        map.panBy(dx1, dy1)
+        hideTip()
+        return
+      }
       // Two fingers down means the browser has already yielded the gesture,
       // so panning and pinching here costs the page nothing.
       e.preventDefault()
@@ -596,11 +621,34 @@
     compute()
   })
 
+  /* Double-tap zooms in on the spot, which is what a thumb reaches for before
+   * it tries a pinch. Two taps close together in time and place — a second tap
+   * somewhere else is two taps on two stations, not a gesture. */
+  const DOUBLE_TAP_MS = 320
+  const DOUBLE_TAP_PX = 36
+  let lastTap = null
+
   canvas.addEventListener('pointerup', e => {
     const wasPinch = e.pointerType === 'touch' && touches.size > 1
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId)
       if (touches.size < 2) pinch = null
+    }
+
+    if (e.pointerType === 'touch' && !wasPinch && !(drag && drag.panning)) {
+      const now = performance.now()
+      if (
+        lastTap &&
+        now - lastTap.t < DOUBLE_TAP_MS &&
+        Math.hypot(e.offsetX - lastTap.x, e.offsetY - lastTap.y) < DOUBLE_TAP_PX
+      ) {
+        lastTap = null
+        drag = null
+        hideTip()
+        map.zoomAt(e.offsetX, e.offsetY, 2)
+        return
+      }
+      lastTap = { t: now, x: e.offsetX, y: e.offsetY }
     }
     // Only a press that actually panned suppresses the click.
     const wasDrag = drag && drag.panning
@@ -1311,6 +1359,63 @@
 
   foldBtn.addEventListener('click', () => {
     applyFold(controls.dataset.collapsed !== 'true')
+  })
+
+  /* ------------------------------------------------------- full screen map */
+
+  /* The map fills the screen, and the back button gets you out.
+   *
+   * On a phone the map is a letterbox above the itinerary, which is right for
+   * reading a route and wrong for examining one. Expanding it is a view of the
+   * same map, not a different page — so it does not touch the hash, which
+   * belongs to the journey and has to survive being shared. It does push a
+   * history entry, because on Android the back button is how you leave things,
+   * and the alternative is a reader who taps back to close the map and finds
+   * they have closed the app. */
+  const expandBtn = $('#expand')
+  const mapFull = () => app.dataset.mapfull === 'true'
+  let pushedFull = false
+
+  function setMapFull(on, fromHistory = false) {
+    if (on === mapFull()) return
+    if (on) app.dataset.mapfull = 'true'
+    else delete app.dataset.mapfull
+    expandBtn.setAttribute('aria-pressed', String(on))
+    hideTip()
+
+    /* Whether the entry is ours is remembered here rather than read back off
+     * history.state, because choosing a route replaceStates the hash and takes
+     * any state object with it — so by the time the reader closes the map, the
+     * flag that said we had pushed would be gone and the entry would be left
+     * on the stack for a later back press to fall into. */
+    if (on && !fromHistory) {
+      history.pushState({ mapfull: true }, '', location.href)
+      pushedFull = true
+    }
+    if (!on && !fromHistory && pushedFull) {
+      pushedFull = false
+      history.back()
+    }
+    if (!on && fromHistory) pushedFull = false
+
+    /* The canvas has just changed size by a factor of two and a half, and it is
+     * sized in device pixels, so it has to be told. Next frame, once the layout
+     * it is measuring itself against actually exists. */
+    requestAnimationFrame(() => {
+      updateInset()
+      map.resize()
+    })
+  }
+
+  expandBtn.addEventListener('click', () => setMapFull(!mapFull()))
+
+  window.addEventListener('popstate', () => {
+    if (mapFull()) setMapFull(false, true)
+  })
+
+  // Escape is the desktop equivalent, and costs nothing to honour everywhere.
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && mapFull()) setMapFull(false)
   })
 
   let resizeTimer = null

@@ -57,11 +57,28 @@ const Proj = (() => {
     }
   }
 
+  /* How far in you may go, in pixels per degree of longitude — a real-world
+   * scale, not a multiple of how far out you started.
+   *
+   * A ceiling of "fourteen times the fitted view" sounds device-independent and
+   * is the opposite: the fitted view is whatever squeezes the whole region into
+   * the canvas, so a phone starts four times further out than a desktop and its
+   * ceiling is four times weaker. It could reach 0.96 pixels per kilometre
+   * against the desktop's 2.64, on the screen with the least room to spare —
+   * you could never get close enough to read a border crossing.
+   *
+   * 320 is about where this data stops being able to answer: the coastline is
+   * simplified to 0.01 degrees and the rail alignments to 0.006, so past here
+   * the map would be drawing its own approximations at a size that invites them
+   * to be read as detail. */
+  const MAX_PX_PER_DEGREE = 320
+
   /** Zoom about a fixed screen point, so the pixel under the cursor stays put. */
-  function zoomAt(view, x, y, factor, minZoom = 1, maxZoom = 14) {
+  function zoomAt(view, x, y, factor, minZoom = 1, maxZoom = MAX_PX_PER_DEGREE) {
     const target = view.scale * factor
     const lo = view.baseScale * minZoom
-    const hi = view.baseScale * maxZoom
+    // Never below the fitted scale, however small the canvas is.
+    const hi = Math.max(lo, maxZoom)
     const scale = Math.max(lo, Math.min(hi, target))
     const k = scale / view.scale
     return {

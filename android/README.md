@@ -41,9 +41,14 @@ then:
 
 `tools/build-android.mjs` stages `index.html` and `data/photos/` into
 `app/src/main/assets/` (about 22 MB) and writes `version.properties`. The
-version code is days-since-2026-01-01 rather than a number someone has to
-remember to increment, because Play rejects a repeat and a manual counter is a
-counter you will eventually forget.
+version code is ten-minute ticks since 2026-01-01 rather than a number someone
+has to remember to increment, because Play rejects a repeat and a manual
+counter is a counter you will eventually forget.
+
+It counts ticks rather than days because a bug found in a build that has
+already been uploaded gets fixed the same day, and a day counter hands that fix
+the same code as the build it is fixing. Ten minutes is finer than anyone can
+rebuild, and still four thousand years short of Play's ceiling of 2100000000.
 
 ## Signing
 
