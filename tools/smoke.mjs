@@ -1604,6 +1604,38 @@ function check(label, condition, detail = '') {
   })
   check('the itinerary scrolls inside the sheet', scrolled > 0, `${scrolled}px`)
 
+  /* Scrolling is not the same as being able to reach the end.
+   *
+   * The sheet is a full-height box slid down the screen, so at half its lower
+   * 500px hang below the viewport — and the scroller inside it used to be that
+   * whole height. It reported itself scrollable and scrolled quite happily, and
+   * the last line of an itinerary still finished 455px under the bottom of the
+   * screen, because the container considered itself done while a third of it
+   * was off the glass. Scrolled fully down, the end of every route was
+   * unreachable at anything but full.
+   *
+   * The invariant is the container, not the scrolling: no part of the scroller
+   * may sit below the screen, at any height the sheet stops at. Tested that way
+   * because scrolling it is no longer a way to find out — reading on raises the
+   * sheet to full, so a test that scrolls measures full three times. */
+  for (let i = 0; i < 3; i++) {
+    const box = await page.evaluate(() => {
+      const el = document.querySelector('#sheet-scroll')
+      const r = el.getBoundingClientRect()
+      return {
+        snap: document.querySelector('#sheet').dataset.snap,
+        bottom: Math.round(r.bottom),
+        height: Math.round(r.height),
+        viewport: window.innerHeight,
+      }
+    })
+    check(`the scroller fits the screen at ${box.snap}`,
+      box.bottom <= box.viewport + 2,
+      `${box.height}px ending at ${box.bottom} of ${box.viewport}`)
+    await page.evaluate(() => document.querySelector('#grip').click())
+    await page.waitForTimeout(450)
+  }
+
   /* One finger moves the map, both ways. Nothing scrolls behind it to be
      protected, which is what the split axes were working around. */
   const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())

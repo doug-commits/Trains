@@ -1459,7 +1459,7 @@
    * treacle. */
   const sheet = $('#sheet')
   const sheetScroll = $('#sheet-scroll')
-  const grip = $('#grip')
+  const gripEl = $('#grip')
   const PEEK = 118 // enough for the grip and the first field
 
   const onPhone = () => !window.matchMedia('(min-width: 60.0625rem)').matches
@@ -1482,10 +1482,34 @@
     sheet.style.setProperty('--sheet-y', `${y}px`)
   }
 
+  /* The scroller has to be the height you can see, not the height of the sheet.
+   *
+   * The sheet is a full-height box slid down the screen, so at half its lower
+   * 500 pixels hang below the viewport — and the scroller inside it was that
+   * whole height. Scrolled to its very bottom, the last line of an itinerary
+   * still sat 455 pixels under the bottom of the screen, because the container
+   * considered itself finished while a third of it was off the glass. The end
+   * of every route was unreachable at anything but full. That is what "it does
+   * not scroll, I can't see anything" was.
+   *
+   * Sized to the visible strip, the same scroll reaches the end.
+   *
+   * Only at rest. During a drag the sheet moves every frame and re-measuring a
+   * few thousand elements with it would cost more than the whole gesture, so it
+   * is opened to its tallest for the duration — content fills the space being
+   * revealed instead of trailing a blank edge behind the finger. */
+  function fitScroller(y) {
+    const grip = gripEl.getBoundingClientRect().height
+    const visible = Math.max(80, window.innerHeight - y - grip)
+    sheetScroll.style.maxHeight = `${Math.round(visible)}px`
+  }
+
   function setSnap(next, glide = true) {
     snap = next
     sheet.dataset.snap = next
-    placeSheet(snapPoints()[next], glide)
+    const y = snapPoints()[next]
+    placeSheet(y, glide)
+    fitScroller(y)
     // The map is fitted to the strip the sheet leaves, so moving the sheet
     // changes what "fit the route" means.
     updateInset()
@@ -1522,11 +1546,12 @@
     if (!onPhone()) return
     sheetDrag = { y: e.clientY, from: sheetY, at: performance.now(), moved: 0, fromContent }
     sheet.dataset.gliding = 'false'
+    fitScroller(snapPoints().full) // tallest, for the length of the gesture
   }
 
-  grip.addEventListener('pointerdown', e => {
+  gripEl.addEventListener('pointerdown', e => {
     startSheetDrag(e, false)
-    grip.setPointerCapture(e.pointerId)
+    gripEl.setPointerCapture(e.pointerId)
   })
 
   /* Only from the very top of the contents, and only downwards.
@@ -1583,11 +1608,11 @@
   window.addEventListener('pointercancel', () => { sheetDrag = null; setSnap(snap) })
 
   // The grip is a button, so it answers a keyboard too.
-  grip.addEventListener('click', () => {
+  gripEl.addEventListener('click', () => {
     if (!onPhone()) return
     setSnap(snap === 'full' ? 'peek' : snap === 'half' ? 'full' : 'half')
   })
-  grip.addEventListener('keydown', e => {
+  gripEl.addEventListener('keydown', e => {
     const order = ['peek', 'half', 'full']
     const i = order.indexOf(snap)
     if (e.key === 'ArrowUp' && i < 2) { e.preventDefault(); setSnap(order[i + 1]) }
