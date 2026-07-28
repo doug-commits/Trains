@@ -65,6 +65,34 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon bundleRelease assembleRelease
 
+      # Proves the signature rather than assuming it. apksigner reads the actual
+      # v2/v3 block out of the APK and prints the certificate; jarsigner checks
+      # the bundle. If a keystore was supplied and the result does not verify,
+      # the job fails here and the artefact is never uploaded — handing over a
+      # bundle that Play will reject helps nobody.
+      - name: Verify the signature
+        run: |
+          set -euo pipefail
+          AAB=$(find android/app/build/outputs/bundle/release -name '*.aab' | head -1)
+          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          {
+            echo "### Signature"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "${ANDROID_KEYSTORE_PATH:-}" ]; then
+            echo "No keystore was supplied — nothing to verify." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          {
+            echo '```'
+            "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -viE '^warning' | head -12
+            jarsigner -verify "$AAB" | head -2
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Say what came out
         run: |
           {
