@@ -1061,6 +1061,19 @@ function check(label, condition, detail = '') {
 
   check('canonical points at the configured origin',
     html.includes('<link rel="canonical" href="https://example.test/bangkok-to-singapore-by-train">'))
+  /* Titles lead with what people search and close with the brand. An unknown
+   * brand in the first characters is spending the most valuable string on the
+   * page on a word nobody types. */
+  const homeTitle = readFileSync(join(root, 'index.html'), 'utf8').match(/<title>([^<]*)<\/title>/)[1]
+  check('the homepage title leads with the search phrase, not the brand',
+    /^Southeast Asia/.test(homeTitle) && /Overland SEA$/.test(homeTitle), homeTitle)
+  check('and stays inside what a result actually shows',
+    homeTitle.length <= 62, `${homeTitle.length} chars`)
+  check('route page titles do the same',
+    /^Bangkok to Singapore by train — Overland SEA$/.test(
+      html.match(/<title>([^<]*)<\/title>/)[1]
+    ))
+
   check('social cards are filled in',
     /og:title/.test(html) && /og:description/.test(html) && /twitter:card/.test(html))
 

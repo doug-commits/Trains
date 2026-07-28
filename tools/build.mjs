@@ -19,7 +19,14 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = p => readFileSync(join(root, p), 'utf8')
 
-const TITLE = 'Overland SEA — rail-first Southeast Asia planner'
+/* The phrase people search leads; the brand follows.
+ *
+ * "Overland SEA" is worth nothing as a search term until people already know
+ * it, and a title that opens with an unknown brand spends its most valuable
+ * characters on a word nobody types. The route pages already do this the right
+ * way round — "Bangkok to Singapore by train — Overland SEA" — and the
+ * homepage was the one page still doing it backwards. */
+const TITLE = 'Southeast Asia overland by train and ferry — Overland SEA'
 const DESCRIPTION =
   'Plan a Southeast Asian journey that stays on rails as far as the rails go, ' +
   'bridges the gaps by sea, and tells you what happens at every border.'
