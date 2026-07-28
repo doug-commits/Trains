@@ -267,16 +267,15 @@
      But only once there is a route: doing this on the idle state scrolled the
      search box off the top of a phone before anyone had typed in it, which is
      the first thing you want to see and the last thing to hide. */
+  /* A new answer starts at the top of itself. On a phone that is the sheet's
+   * own scroller rather than the window, which no longer moves — and a result
+   * arriving while the sheet is down is worth raising it for, because the
+   * alternative is an answer delivered off the bottom of the screen. */
   function resetScroll(toResult) {
     panel.scrollTop = 0
-    if (!toResult) {
-      window.scrollTo({ top: 0 })
-      return
-    }
-    if (!window.matchMedia('(min-width: 60.0625rem)').matches) {
-      const wrap = document.querySelector('.mapwrap')
-      if (wrap) window.scrollTo({ top: wrap.offsetTop, behavior: 'smooth' })
-    }
+    if (sheetScroll) sheetScroll.scrollTop = 0
+    window.scrollTo({ top: 0 })
+    if (toResult) revealResult()
   }
 
   function paintScenes() {
@@ -395,41 +394,27 @@
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
       if (!drag) return
-      /* One finger. Full screen it moves the map in both directions, because
-       * there is no page behind it left to scroll. In the letterbox the axes
-       * are split, and that split is not arbitrary — it is the one the browser
-       * has already made. touch-action: pan-y hands vertical to the document
-       * and keeps horizontal for us, so up and down scrolls the itinerary past
-       * the map and left and right moves the map itself.
+      /* One finger moves the map, in whichever direction it was moved.
        *
-       * Left and right did nothing at all before this: the browser would not
-       * scroll horizontally because there is nowhere to scroll to, and we were
-       * not panning because only two fingers counted. The gesture was reserved
-       * for the map and then never used by it. */
+       * Nothing scrolls behind it to be protected any more: the map owns the
+       * screen and the itinerary rides over it on the sheet, which does its own
+       * scrolling. The map having to share its own vertical axis with a page
+       * underneath was a symptom of the stacked layout, and it went with it. */
       if (touches.size < 2) {
-        const free = mapFull()
         const dx1 = e.offsetX - drag.x
         const dy1 = e.offsetY - drag.y
         drag.x = e.offsetX
         drag.y = e.offsetY
 
         if (!drag.panning) {
-          const offX = e.offsetX - drag.originX
-          const offY = e.offsetY - drag.originY
-          if (Math.hypot(offX, offY) < PAN_THRESHOLD) return
-          // In the letterbox a drag that is mostly vertical is the page's, and
-          // taking it here would fight the scroll the reader actually asked for.
-          if (!free && Math.abs(offX) <= Math.abs(offY)) {
-            drag = null
-            return
-          }
+          if (Math.hypot(e.offsetX - drag.originX, e.offsetY - drag.originY) < PAN_THRESHOLD) return
           drag.panning = true
           hideTip()
           return
         }
 
         e.preventDefault()
-        map.panBy(dx1, free ? dy1 : 0)
+        map.panBy(dx1, dy1)
         hideTip()
         return
       }
@@ -1017,6 +1002,10 @@
     window.addEventListener('resize', () => {
       if (open) place()
     })
+    // The sheet the field rides on has just finished moving underneath it.
+    window.addEventListener('sheetmoved', () => {
+      if (open) place()
+    })
 
     input.addEventListener('keydown', e => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1299,9 +1288,21 @@
   systemDark.addEventListener('change', redraw)
 
   function updateInset() {
-    // Below the breakpoint the panes stack, so nothing overlays the map.
+    /* On a phone the map is the whole screen and the overlays are on top of
+     * it: the bar along the top and the sheet coming up from the bottom. What
+     * is left between them is where a route has to fit, or it is drawn behind
+     * the itinerary describing it. */
     if (!window.matchMedia('(min-width: 60.0625rem)').matches) {
-      return map.setInset({ left: 0, right: 0 })
+      const bar = document.querySelector('.topbar').getBoundingClientRect()
+      const covered = Math.max(0, window.innerHeight - (sheetY ?? window.innerHeight))
+      return map.setInset({
+        left: 0,
+        right: 0,
+        top: bar.height,
+        // Never more than half, so a sheet pulled to full does not squeeze the
+        // fit into a sliver — at that point the reader is looking at the list.
+        bottom: Math.min(covered, window.innerHeight * 0.5),
+      })
     }
     const controls = document.querySelector('.controls').getBoundingClientRect()
     map.setInset({
@@ -1432,62 +1433,144 @@
     applyFold(controls.dataset.collapsed !== 'true')
   })
 
-  /* ------------------------------------------------------- full screen map */
+  /* --------------------------------------------------------- the sheet */
 
-  /* The map fills the screen, and the back button gets you out.
+  /* On a phone the map is the page and the itinerary is a sheet over it.
    *
-   * On a phone the map is a letterbox above the itinerary, which is right for
-   * reading a route and wrong for examining one. Expanding it is a view of the
-   * same map, not a different page — so it does not touch the hash, which
-   * belongs to the journey and has to survive being shared. It does push a
-   * history entry, because on Android the back button is how you leave things,
-   * and the alternative is a reader who taps back to close the map and finds
-   * they have closed the app. */
-  const expandBtn = $('#expand')
-  const mapFull = () => app.dataset.mapfull === 'true'
-  let pushedFull = false
+   * Three positions. Two is not enough: you either want a glance at the next
+   * departure with the map still readable, or the whole itinerary, and a
+   * single "open" has to be one or the other. Peek shows the search box, half
+   * shows the first legs, full is the document.
+   *
+   * The transition is added on release and removed on grab, so a drag tracks
+   * the finger exactly and only the snap glides. A transition left on during
+   * the drag is what makes a sheet feel like it is being dragged through
+   * treacle. */
+  const sheet = $('#sheet')
+  const sheetScroll = $('#sheet-scroll')
+  const grip = $('#grip')
+  const PEEK = 118 // enough for the grip and the first field
 
-  function setMapFull(on, fromHistory = false) {
-    if (on === mapFull()) return
-    if (on) app.dataset.mapfull = 'true'
-    else delete app.dataset.mapfull
-    expandBtn.setAttribute('aria-pressed', String(on))
-    hideTip()
-
-    /* Whether the entry is ours is remembered here rather than read back off
-     * history.state, because choosing a route replaceStates the hash and takes
-     * any state object with it — so by the time the reader closes the map, the
-     * flag that said we had pushed would be gone and the entry would be left
-     * on the stack for a later back press to fall into. */
-    if (on && !fromHistory) {
-      history.pushState({ mapfull: true }, '', location.href)
-      pushedFull = true
-    }
-    if (!on && !fromHistory && pushedFull) {
-      pushedFull = false
-      history.back()
-    }
-    if (!on && fromHistory) pushedFull = false
-
-    /* The canvas has just changed size by a factor of two and a half, and it is
-     * sized in device pixels, so it has to be told. Next frame, once the layout
-     * it is measuring itself against actually exists. */
-    requestAnimationFrame(() => {
-      updateInset()
-      map.resize()
-    })
+  const onPhone = () => !window.matchMedia('(min-width: 60.0625rem)').matches
+  const snapPoints = () => {
+    const h = window.innerHeight
+    return { full: Math.round(h * 0.06), half: Math.round(h * 0.55), peek: h - PEEK }
+  }
+  const nearestSnap = (y, bias = 0) => {
+    const pts = snapPoints()
+    return Object.keys(pts).reduce((best, k) =>
+      Math.abs(pts[k] - (y + bias)) < Math.abs(pts[best] - (y + bias)) ? k : best, 'half')
   }
 
-  expandBtn.addEventListener('click', () => setMapFull(!mapFull()))
+  let snap = 'half'
+  let sheetY = null
 
-  window.addEventListener('popstate', () => {
-    if (mapFull()) setMapFull(false, true)
+  function placeSheet(y, gliding) {
+    sheetY = y
+    sheet.dataset.gliding = gliding ? 'true' : 'false'
+    sheet.style.setProperty('--sheet-y', `${y}px`)
+  }
+
+  function setSnap(next, glide = true) {
+    snap = next
+    sheet.dataset.snap = next
+    placeSheet(snapPoints()[next], glide)
+    // The map is fitted to the strip the sheet leaves, so moving the sheet
+    // changes what "fit the route" means.
+    updateInset()
+    /* Anything measuring where it sits on screen has to measure again, and not
+     * until the sheet has finished moving. The station list is the one that
+     * matters: it opens downwards out of a field that is somewhere else by the
+     * time the glide ends. */
+    clearTimeout(movedTimer)
+    movedTimer = setTimeout(
+      () => window.dispatchEvent(new CustomEvent('sheetmoved')),
+      glide ? 300 : 0
+    )
+  }
+  let movedTimer = null
+
+  /* Focusing a field raises the sheet.
+   *
+   * The keyboard takes half the screen, and a field sitting at 55% of it is
+   * then underneath the keyboard along with anything it drops open. Every
+   * phone map app does this; the alternative is typing blind. */
+  sheet.addEventListener('focusin', e => {
+    if (!onPhone()) return
+    if (!e.target.matches('input, textarea, select')) return
+    if (snap !== 'full') setSnap('full')
   })
 
-  // Escape is the desktop equivalent, and costs nothing to honour everywhere.
-  window.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && mapFull()) setMapFull(false)
+  /* Dragging the grip moves the sheet. Dragging the contents scrolls them —
+   * unless they are already at the top and the drag is downwards, which is the
+   * gesture that closes a sheet everywhere else and would otherwise do
+   * nothing here. */
+  let sheetDrag = null
+
+  const startSheetDrag = (e, fromContent) => {
+    if (!onPhone()) return
+    sheetDrag = { y: e.clientY, from: sheetY, at: performance.now(), moved: 0, fromContent }
+    sheet.dataset.gliding = 'false'
+  }
+
+  grip.addEventListener('pointerdown', e => {
+    startSheetDrag(e, false)
+    grip.setPointerCapture(e.pointerId)
   })
+
+  sheetScroll.addEventListener('pointerdown', e => {
+    if (snap === 'full' && sheetScroll.scrollTop > 0) return
+    startSheetDrag(e, true)
+  })
+
+  const moveSheet = e => {
+    if (!sheetDrag) return
+    const dy = e.clientY - sheetDrag.y
+    sheetDrag.moved = Math.max(sheetDrag.moved, Math.abs(dy))
+
+    /* A drag that began on the contents only takes over once it is clearly a
+     * downward pull, so a flick meant for the list is still a scroll. */
+    if (sheetDrag.fromContent && dy < 12) return
+    if (e.cancelable) e.preventDefault()
+
+    const pts = snapPoints()
+    placeSheet(Math.max(pts.full, Math.min(pts.peek, sheetDrag.from + dy)), false)
+  }
+
+  const endSheetDrag = e => {
+    if (!sheetDrag) return
+    const held = sheetDrag
+    sheetDrag = null
+    if (held.moved < 4) return setSnap(snap) // a tap, not a drag
+
+    /* A flick should land where it was thrown, not where it stopped. The bias
+     * is the distance the sheet would keep travelling at the speed it left. */
+    const dt = Math.max(16, performance.now() - held.at)
+    const velocity = (e.clientY - held.y) / dt
+    setSnap(nearestSnap(sheetY, velocity * 140))
+  }
+
+  window.addEventListener('pointermove', moveSheet, { passive: false })
+  window.addEventListener('pointerup', endSheetDrag)
+  window.addEventListener('pointercancel', () => { sheetDrag = null; setSnap(snap) })
+
+  // The grip is a button, so it answers a keyboard too.
+  grip.addEventListener('click', () => {
+    if (!onPhone()) return
+    setSnap(snap === 'full' ? 'peek' : snap === 'half' ? 'full' : 'half')
+  })
+  grip.addEventListener('keydown', e => {
+    const order = ['peek', 'half', 'full']
+    const i = order.indexOf(snap)
+    if (e.key === 'ArrowUp' && i < 2) { e.preventDefault(); setSnap(order[i + 1]) }
+    if (e.key === 'ArrowDown' && i > 0) { e.preventDefault(); setSnap(order[i - 1]) }
+  })
+
+  /* A new answer is worth showing. Landing on the itinerary rather than
+   * leaving it folded away under a map the reader has to think to move. */
+  function revealResult() {
+    if (onPhone() && snap === 'peek') setSnap('half')
+  }
 
   let resizeTimer = null
   window.addEventListener('resize', () => {
@@ -1510,11 +1593,18 @@
     // panel width it is about to stop having.
     let folded = false
     try {
-      folded = localStorage.getItem(FOLD_KEY) === '1'
+      // Not on a phone: the fold control is hidden there in favour of the
+      // sheet, so a remembered fold would hide the search with nothing left
+      // on screen to bring it back.
+      folded = !onPhone() && localStorage.getItem(FOLD_KEY) === '1'
     } catch (e) {
       /* private mode — open is the right default */
     }
     applyFold(folded, false)
+    // Half: the map readable and the first legs of the answer already showing.
+    // Placed without a glide, so the sheet is where it belongs on the first
+    // frame rather than sliding in as though something had happened.
+    setSnap('half', false)
     map.resize()
     compute()
   }

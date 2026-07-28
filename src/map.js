@@ -58,7 +58,7 @@ const MapView = (() => {
     let moves = 0
     // The controls and the itinerary panel overlay the map on wide screens, so
     // a route fitted to the full canvas ends up half-hidden behind them.
-    let inset = { left: 0, right: 0 }
+    let inset = { left: 0, right: 0, top: 0, bottom: 0 }
 
     /* What a drag is not allowed to lose. The basemap box runs well past the
      * network on every side, so clamping to it still lets the map be dragged
@@ -117,21 +117,27 @@ const MapView = (() => {
       return { all, outlines }
     })()
 
-    /** Fit into the strip the overlays leave visible, then shift it into place. */
+    /* Fit into the window the overlays leave visible, then shift it into place.
+     *
+     * Vertical as well as horizontal, because on a phone the itinerary is a
+     * sheet over the bottom of the map rather than a column beside it — a
+     * route fitted to the whole canvas would put half of itself underneath. */
     function fitVisible(rect, fit) {
       const strip = Math.max(240, rect.width - inset.left - inset.right)
-      const fitted = fit(strip)
+      const tall = Math.max(200, rect.height - inset.top - inset.bottom)
+      const fitted = fit(strip, tall)
       return {
         ...fitted,
         w: rect.width,
         h: rect.height,
         dx: fitted.dx + inset.left,
+        dy: fitted.dy + inset.top,
       }
     }
 
     function baseView(rect) {
       const pad = rect.width < 700 ? 12 : 28
-      return fitVisible(rect, strip => Proj.create(basemap.bbox, strip, rect.height, pad))
+      return fitVisible(rect, (strip, tall) => Proj.create(basemap.bbox, strip, tall, pad))
     }
 
     function size() {
@@ -796,7 +802,7 @@ const MapView = (() => {
         return [view.scale, view.dx, view.dy].map(n => Math.round(n * 100) / 100).join(',')
       },
       setInset(next) {
-        inset = { left: 0, right: 0, ...next }
+        inset = { left: 0, right: 0, top: 0, bottom: 0, ...next }
       },
       setRoute(route, animate = true) {
         state.route = route
@@ -805,8 +811,8 @@ const MapView = (() => {
           const pts = route.stationIds.map(id => network.stations[id])
           const rect = canvas.getBoundingClientRect()
           const pad = rect.width < 700 ? 40 : 70
-          view = fitVisible(rect, strip =>
-            Proj.fitPoints({ ...view, w: strip }, pts, pad)
+          view = fitVisible(rect, (strip, tall) =>
+            Proj.fitPoints({ ...view, w: strip, h: tall }, pts, pad)
           )
         }
         if (animate) animateIn()
@@ -820,9 +826,17 @@ const MapView = (() => {
         state.focusLeg = index
         drawNow()
       },
+      /* Returns how much of the drag the map actually took. The clamp can
+       * refuse some or all of it, and the caller needs to know what is left
+       * over — on a phone the page behind the map is what gets the remainder,
+       * so a finger that runs the map into its own edge carries on scrolling
+       * the itinerary instead of dying against it. */
       panBy(dx, dy) {
+        const fromX = view.dx
+        const fromY = view.dy
         view = Proj.clamp(Proj.pan(view, dx, dy), reach)
         schedule()
+        return { dx: view.dx - fromX, dy: view.dy - fromY }
       },
       zoomAt(x, y, factor) {
         view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach)

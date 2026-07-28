@@ -442,12 +442,28 @@ function check(label, condition, detail = '') {
   check('the search box is on screen when the page opens',
     !!box && box.y >= 0 && box.y < 844, box ? `y=${Math.round(box.y)}` : 'not found')
 
-  // Picking a route should still carry you down to the answer.
+  /* Picking a route should still carry you to the answer — but the page no
+     longer scrolls on a phone. The map holds the screen and the itinerary is
+     a sheet over it, so "go to the result" means the sheet comes up. */
+  // The grip cycles half → full → peek, so two taps put it out of the way.
+  await page.evaluate(() => document.querySelector('#grip').click())
+  await page.waitForTimeout(400)
+  await page.evaluate(() => document.querySelector('#grip').click())
+  await page.waitForTimeout(500)
+  const down = await page.evaluate(() => document.querySelector('#sheet').dataset.snap)
+
   await page.locator('.corridor').first().click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1400)
-  check('choosing a route still scrolls to it',
-    (await page.evaluate(() => window.scrollY)) > 200)
+  check('choosing a route brings the answer up',
+    down === 'peek' &&
+      (await page.evaluate(() => document.querySelector('#sheet').dataset.snap)) !== 'peek',
+    `${down} → ${await page.evaluate(() => document.querySelector('#sheet').dataset.snap)}`)
+
+  check('and nothing behind the map scrolls any more',
+    (await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight
+    )) <= 0)
   await context.close()
 }
 
@@ -1307,12 +1323,14 @@ function check(label, condition, detail = '') {
   await page.waitForTimeout(300)
   check('the zoom buttons work on their own', (await sig()) !== beforeBtn)
 
-  // Touch is the case where the page really does scroll, so one finger stays
-  // the page's and two are the map's.
-  check('one finger is still the page\'s, not the map\'s',
+  /* Every touch reaches the map, including the vertical ones the browser
+     would otherwise scroll with. Not the map claiming the gesture — it is
+     what lets app.js give the map the part of a drag it can use and pass the
+     remainder to the page. The phone section below tests both halves. */
+  check('the map is given the whole touch to divide up',
     (await page.evaluate(
       () => getComputedStyle(document.querySelector('#map')).touchAction
-    )) === 'pan-y')
+    )) === 'none')
 
   await page.screenshot({ path: join(outDir, '20-wheel-zoom.png') })
   await context.close()
@@ -1509,7 +1527,12 @@ function check(label, condition, detail = '') {
     `${(closest.phone / 111).toFixed(2)} vs ${(closest.desktop / 111).toFixed(2)} px/km`)
 }
 
-/* ------------------------------------------------- the map fills the phone */
+/* ------------------------------------------- the map is the page on a phone */
+
+/* Not a letterbox with the route scrolling beneath it. The map holds the whole
+ * screen and the itinerary rides over it on a sheet you drag — three positions,
+ * because a glance at the next departure and reading the whole itinerary are
+ * different jobs and one "open" cannot be both. */
 {
   const { page, context } = await newPage({
     viewport: { width: 412, height: 915 }, deviceScaleFactor: 3,
@@ -1519,65 +1542,73 @@ function check(label, condition, detail = '') {
   await page.waitForFunction(() => document.querySelector('#panel h1'))
   await page.locator('.corridor', { hasText: 'Bangkok → Singapore' }).click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
-  await page.waitForTimeout(1200)
+  await page.waitForTimeout(1400)
 
   const shape = () => page.evaluate(() => {
-    const r = document.querySelector('#map').getBoundingClientRect()
+    const m = document.querySelector('#map').getBoundingClientRect()
+    const s = document.querySelector('#sheet').getBoundingClientRect()
     return {
-      h: Math.round(r.height),
-      full: document.querySelector('.app').dataset.mapfull === 'true',
-      touch: getComputedStyle(document.querySelector('#map')).touchAction,
+      map: [Math.round(m.width), Math.round(m.height)],
+      snap: document.querySelector('#sheet').dataset.snap,
+      sheetTop: Math.round(s.top),
+      page: document.documentElement.scrollHeight - window.innerHeight,
     }
   })
-  const letterbox = await shape()
-  await page.locator('#expand').tap()
-  await page.waitForTimeout(500)
+
   const opened = await shape()
-  check('the map opens to the whole screen', opened.h > letterbox.h * 2,
-    `${letterbox.h}px → ${opened.h}px`)
+  check('the map fills the screen from the start',
+    opened.map[0] === 412 && opened.map[1] === 915, opened.map.join('x'))
+  check('and there is no page behind it to scroll', opened.page <= 0)
+  check('the sheet opens half way up', opened.snap === 'half',
+    `top ${opened.sheetTop} of 915`)
 
-  /* With no page behind it there is nothing for a single finger to scroll
-     past, so it becomes the map's — a pinch is not the only way in. */
-  check('and one finger becomes the map\'s', opened.touch === 'none')
-
-  const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
-  const before = await sig()
-  await page.evaluate(() => {
-    const c = document.querySelector('#map')
-    const r = c.getBoundingClientRect()
-    const send = (t, x, y) => c.dispatchEvent(new PointerEvent(t, {
+  /* Dragging the handle moves it, and a release lands on the nearest of the
+     three rather than wherever the finger stopped. */
+  const dragGrip = to => page.evaluate(to => {
+    const g = document.querySelector('#grip')
+    const r = g.getBoundingClientRect()
+    const x = r.left + r.width / 2
+    const from = r.top + r.height / 2
+    const ev = (t, y, target) => target.dispatchEvent(new PointerEvent(t, {
       pointerId: 1, pointerType: 'touch', bubbles: true, cancelable: true,
-      clientX: r.left + x, clientY: r.top + y,
+      clientX: x, clientY: y,
     }))
-    send('pointerdown', 200, 300)
-    for (let i = 1; i <= 12; i++) send('pointermove', 200 + i * 10, 300 + i * 5)
-    send('pointerup', 320, 360)
+    ev('pointerdown', from, g)
+    for (let i = 1; i <= 12; i++) ev('pointermove', from + ((to - from) * i) / 12, window)
+    ev('pointerup', to, window)
+  }, to)
+
+  await dragGrip(40)
+  await page.waitForTimeout(500)
+  const up = await shape()
+  check('dragging the handle up opens the itinerary', up.snap === 'full',
+    `top ${up.sheetTop}`)
+  check('and the map is still the full height behind it',
+    up.map[1] === 915, up.map.join('x'))
+
+  await dragGrip(890)
+  await page.waitForTimeout(500)
+  const down = await shape()
+  check('dragging it down gets out of the way of the map', down.snap === 'peek',
+    `top ${down.sheetTop} of 915`)
+
+  /* The itinerary scrolls inside the sheet, and only when the sheet is fully
+     up — below that a drag on the contents moves the sheet, which is what a
+     hand reaching for it expects. */
+  await dragGrip(40)
+  await page.waitForTimeout(500)
+  const scrolled = await page.evaluate(() => {
+    const el = document.querySelector('#sheet-scroll')
+    el.scrollTop = 400
+    return el.scrollTop
   })
-  await page.waitForTimeout(300)
-  check('one finger pans it', (await sig()) !== before)
+  check('the itinerary scrolls inside the sheet', scrolled > 0, `${scrolled}px`)
 
-  /* Android's back button is how you leave things. Without an entry to go
-     back to, a reader closing the map would close the app instead. */
-  await page.goBack()
+  /* One finger moves the map, both ways. Nothing scrolls behind it to be
+     protected, which is what the split axes were working around. */
+  const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
+  await dragGrip(890)
   await page.waitForTimeout(500)
-  const closed = await shape()
-  check('back closes the map rather than the app', !closed.full && closed.h === letterbox.h,
-    `${closed.h}px`)
-
-  // And the route survived the round trip — back must not have undone it.
-  check('and the route is still there',
-    (await page.locator('.route tbody tr').count()) > 0)
-
-  /* Back in the letterbox the axes are split, and the split is the browser's:
-     touch-action: pan-y gives vertical to the document and keeps horizontal
-     for the map. Left and right used to do nothing at all — the page had
-     nowhere to scroll sideways, and the map only listened to two fingers.
-
-     From a reset view, so the drag is not tested against a map already panned
-     up against its own clamp, where the right answer is also no movement. */
-  await page.click('#reset')
-  await page.waitForTimeout(500)
-
   const swipe = (dx, dy) => page.evaluate(([dx, dy]) => {
     const c = document.querySelector('#map')
     const r = c.getBoundingClientRect()
@@ -1585,22 +1616,22 @@ function check(label, condition, detail = '') {
       pointerId: 1, pointerType: 'touch', bubbles: true, cancelable: true,
       clientX: r.left + x, clientY: r.top + y,
     }))
-    send('pointerdown', 200, 150)
-    for (let i = 1; i <= 15; i++) send('pointermove', 200 + (dx * i) / 15, 150 + (dy * i) / 15)
-    send('pointerup', 200 + dx, 150 + dy)
+    send('pointerdown', 200, 300)
+    for (let i = 1; i <= 15; i++) send('pointermove', 200 + (dx * i) / 15, 300 + (dy * i) / 15)
+    send('pointerup', 200 + dx, 300 + dy)
   }, [dx, dy])
 
-  const flat = await sig()
-  await swipe(130, 0)
+  const before = await sig()
+  await swipe(120, 0)
   await page.waitForTimeout(300)
-  check('one finger moves the map left and right in the letterbox too',
-    (await sig()) !== flat)
+  check('one finger moves the map left and right', (await sig()) !== before)
 
-  const sideways = await sig()
-  await swipe(0, 130)
+  const afterX = await sig()
+  await swipe(0, 120)
   await page.waitForTimeout(300)
-  check('but up and down still belongs to the page', (await sig()) === sideways)
+  check('and up and down as well', (await sig()) !== afterX)
 
+  await page.screenshot({ path: join(outDir, '22-sheet.png') })
   await context.close()
 }
 

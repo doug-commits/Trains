@@ -41,6 +41,31 @@
   </header>
 
   <div class="stage">
+    <div class="mapwrap">
+      <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
+      <div id="tip" class="tip" role="status" hidden></div>
+
+      <div class="mapfoot">
+        <div class="legend">
+          <span class="key"><i class="line rail"></i>Rail</span>
+          <span class="key"><i class="line ferry"></i>Sea</span>
+          <span class="key"><i class="line road"></i>Road</span>
+          <span class="key"><i class="bmark"></i>Border</span>
+          <span class="key"><i class="lmark"></i>Sight</span>
+        </div>
+        <div class="zoomers">
+          <button type="button" id="zoomout" class="btn-zoom" aria-label="Zoom the map out">−</button>
+          <button type="button" id="zoomin" class="btn-zoom" aria-label="Zoom the map in">+</button>
+        </div>
+        <button type="button" id="reset" class="btn-ghost">Reset view</button>
+      </div>
+    </div>
+
+    <div class="sheet" id="sheet" data-snap="half">
+      <button type="button" class="sheet-grip" id="grip" aria-label="Resize the panel">
+        <span aria-hidden="true"></span>
+      </button>
+      <div class="sheet-scroll" id="sheet-scroll">
     <form class="controls" onsubmit="return false" data-collapsed="false">
       <!-- The panel covers northwest Thailand at the default view, which is
            where Chiang Mai, Pai and the Mae Hong Son loop all are. -->
@@ -145,29 +170,8 @@
       </div>
     </form>
 
-    <div class="mapwrap">
-      <canvas id="map" aria-label="Map of the Southeast Asian rail, sea and road network"></canvas>
-      <div id="tip" class="tip" role="status" hidden></div>
-
-      <div class="mapfoot">
-        <div class="legend">
-          <span class="key"><i class="line rail"></i>Rail</span>
-          <span class="key"><i class="line ferry"></i>Sea</span>
-          <span class="key"><i class="line road"></i>Road</span>
-          <span class="key"><i class="bmark"></i>Border</span>
-          <span class="key"><i class="lmark"></i>Sight</span>
-        </div>
-        <div class="zoomers">
-          <button type="button" id="zoomout" class="btn-zoom" aria-label="Zoom the map out">−</button>
-          <button type="button" id="zoomin" class="btn-zoom" aria-label="Zoom the map in">+</button>
-        </div>
-        <button type="button" id="reset" class="btn-ghost">Reset view</button>
-        <button type="button" id="expand" class="btn-ghost" aria-pressed="false">
-          <span class="expand-in">Full screen</span><span class="expand-out">Close map</span>
-        </button>
+    <aside id="panel" class="panel" aria-live="polite"></aside>
       </div>
     </div>
-
-    <aside id="panel" class="panel" aria-live="polite"></aside>
   </div>
 </div>
