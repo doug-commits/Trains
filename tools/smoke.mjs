@@ -1649,7 +1649,23 @@ function check(label, condition, detail = '') {
     `${inlined} found`)
 
   const kb = Math.round(statSync(join(root, 'index.html')).size / 1024)
-  check('and the document stays under a megabyte', kb < 1024, `${kb} KB`)
+  check('and the document stays small', kb < 300, `${kb} KB`)
+
+  /* The program is beside the page rather than inside it. Inline, it was 758
+     KB the parser had to finish before the document was done, and it came down
+     again on every visit because HTML cannot be cached like a static file.
+     Deferred: FCP 156ms to 112ms, DOM interactive 812ms to 333ms, and a repeat
+     visit gets a 304 with no body. */
+  check('the program is deferred rather than parsed inline',
+    /<script defer src="app\.js"><\/script>/.test(html) && !/<script>\n\(function\(\)/.test(html))
+  check('and it is actually there to load',
+    existsSync(join(root, 'app.js')) &&
+      statSync(join(root, 'app.js')).size > 100000)
+
+  /* Vercel copies both. Losing app.js from the build command would deploy a
+     page that renders nothing at all, and nothing here would otherwise say so. */
+  const vercel = readFileSync(join(root, 'vercel.json'), 'utf8')
+  check('and the deploy carries it', /cp index\.html app\.js public\//.test(vercel))
 
   const { page, context } = await newPage({ viewport: { width: 412, height: 915 } })
   let bytes = 0

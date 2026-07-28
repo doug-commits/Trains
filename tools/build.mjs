@@ -217,24 +217,45 @@ const sources =
   SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n') +
   `\n/* ===== affiliate ids (build-time) ===== */\n${partnerIds}\n`
 
-const bodyWith = photoSet => `${shell}
-<style>
-${fonts}
-${css}</style>
-<script>
-(function(){
+/* The program itself, as one self-executing block. */
+const programFor = photoSet => `(function(){
 "use strict";
 /* Built by tools/build.mjs — edit the files in src/ and data/, not this. */
 const BASEMAP = ${basemap};
 const RAILS = ${rails};
 ${photoJs(photoSet)}
 ${sources}
-})();
+})();`
+
+/* Inline, for the two outputs that have to be one file: the published fragment,
+ * which has nothing beside it to link to, and the app, which is bundled. */
+const bodyWith = photoSet => `${shell}
+<style>
+${fonts}
+${css}</style>
+<script>
+${programFor(photoSet)}
 </script>`
+
+/* Beside the page, for the website.
+ *
+ * Inline, the program was 758 KB of script the parser had to get through
+ * before it could finish the document — and it came down again on every single
+ * visit, because HTML cannot be cached the way a static file can. Deferred, the
+ * page parses and paints while it is still arriving, and a reader who comes
+ * back gets a 304 and no body at all.
+ *
+ * The offline promise is not affected. It belongs to the app and to
+ * dist/planner.html, which still carry everything inside them. */
+const bodyLinking = (photoSet, src) => `${shell}
+<style>
+${fonts}
+${css}</style>
+<script defer src="${src}"></script>`
 
 mkdirSync(join(root, 'dist'), { recursive: true })
 
-const htmlDoc = (photoSet, app) => `<!doctype html>
+const htmlDoc = (photoSet, app, body) => `<!doctype html>
 <html lang="en"${app ? ' data-app="true"' : ''}>
 <head>
 <meta charset="utf-8">
@@ -244,7 +265,7 @@ const htmlDoc = (photoSet, app) => `<!doctype html>
 ${app ? '' : headMeta()}
 </head>
 <body>
-${bodyWith(photoSet)}
+${body ?? bodyWith(photoSet)}
 </body>
 </html>
 `
@@ -261,9 +282,13 @@ if (APP) {
     `<title>${TITLE}</title>\n<meta name="description" content="${DESCRIPTION}">\n${bodyWith(photos.embedded)}\n`
   )
 
-  /* Standalone document for opening off disk, and what the site deploys.
-   * Every photograph linked, none inlined. */
-  writeFileSync(join(root, 'index.html'), htmlDoc(photos.linked, false))
+  /* What the site deploys, and what opens off disk when app.js is beside it.
+   * Every photograph linked, none inlined; the program linked too. */
+  writeFileSync(join(root, 'app.js'), programFor(photos.linked) + '\n')
+  writeFileSync(
+    join(root, 'index.html'),
+    htmlDoc(null, false, bodyLinking(photos.linked, 'app.js'))
+  )
 }
 
 const kb = p => (readFileSync(join(root, p)).length / 1024).toFixed(0)
@@ -280,5 +305,5 @@ if (APP) {
   console.log(`dist/app.html      ${kb('dist/app.html')} KB`)
 } else {
   console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
-  console.log(`index.html         ${kb('index.html')} KB`)
+  console.log(`index.html         ${kb('index.html')} KB + app.js ${kb('app.js')} KB`)
 }
