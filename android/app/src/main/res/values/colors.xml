@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The chart palette, so the window behind the WebView matches the page and
+       there is no flash of white while it loads. -->
+  <color name="sea">#0A191F</color>
+  <color name="sea_light">#D7E3E5</color>
+  <color name="rail">#E9A63E</color>
+  <color name="ink">#E7EFEA</color>
+</resources>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- No INTERNET permission, deliberately and permanently.
+       The planner fetches nothing: the network, the map, the photographs and
+       the itinerary logic are all inside the package. Outbound links (Google
+       Maps, operator booking sites) are handed to the browser as intents, which
+       needs no permission of ours. The app therefore cannot phone home even by
+       accident, which is both the honest position and what makes the Play data
+       safety declaration trivially true. -->
+
+  <application
+      android:allowBackup="true"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher"
+      android:label="@string/app_name"
+      android:supportsRtl="true"
+      android:hardwareAccelerated="true"
+      android:theme="@style/Theme.Overland">
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:launchMode="singleTask"
+        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
+        android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+
+  <!-- Declares that we may hand a link to a browser or a maps app. Required on
+       Android 11+ for the intent resolution to see them at all. -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="https" />
+    </intent>
+  </queries>
+
+</manifest>

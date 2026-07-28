@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The site's own mark: a rail over its sleepers. Drawn inside the 72dp safe
+     circle of the 108dp adaptive canvas, so no launcher mask can clip it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+  <!-- sleepers -->
+  <group>
+    <path android:fillColor="#7D9BA2" android:pathData="M32,58h5v14h-5z"/>
+    <path android:fillColor="#7D9BA2" android:pathData="M43,58h5v14h-5z"/>
+    <path android:fillColor="#7D9BA2" android:pathData="M54,58h5v14h-5z"/>
+    <path android:fillColor="#7D9BA2" android:pathData="M65,58h5v14h-5z"/>
+    <path android:fillColor="#7D9BA2" android:pathData="M76,58h5v14h-5z"/>
+  </group>
+
+  <!-- the rail itself, the one warm line on the mark -->
+  <path android:fillColor="#E9A63E" android:pathData="M28,50h56v7h-56z"/>
+</vector>
