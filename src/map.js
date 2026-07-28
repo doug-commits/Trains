@@ -49,6 +49,13 @@ const MapView = (() => {
     }
     let colors = themeColors(document.documentElement)
     let raf = null
+    /* True while a pan or a pinch is still arriving. It is a quality dial, not
+     * a mode: the coastal glow and the coastline hairline sit it out, and the
+     * frame the gesture settles on puts them back. */
+    let moving = false
+    let pending = null
+    let quality = null
+    let moves = 0
     // The controls and the itinerary panel overlay the map on wide screens, so
     // a route fitted to the full canvas ends up half-hidden behind them.
     let inset = { left: 0, right: 0 }
@@ -67,6 +74,47 @@ const MapView = (() => {
         south: Math.min(...lats) - 1,
         north: Math.max(...lats) + 1,
       }
+    })()
+
+    /* The coastline, built once, in world coordinates.
+     *
+     * Projection is a pure affine map — x = lon*scale + dx, y = screenY(lat)*
+     * scale + dy — so a path laid out in (lon, screenY(lat)) can be handed to
+     * the canvas transform and drawn without touching a single coordinate.
+     * Rebuilding it per frame meant thirteen thousand projections and four
+     * hundred Path2D allocations for every pixel of a pan, which is what made
+     * the map unusable on a phone: 93ms a frame, so about ten. */
+    const world = (() => {
+      const ring = (path, pts) => {
+        for (let i = 0; i < pts.length; i++) {
+          const x = pts[i][0]
+          const y = Proj.screenY(pts[i][1])
+          if (i === 0) path.moveTo(x, y)
+          else path.lineTo(x, y)
+        }
+        path.closePath()
+      }
+
+      const all = new Path2D()
+      const outlines = []
+      for (const country of basemap.countries) {
+        const path = new Path2D()
+        for (const r of country.rings) ring(path, r)
+        outlines.push(path)
+        all.addPath(path)
+      }
+
+      /* The small islands, which are land without being any country's outline.
+       * They come from their own dataset because several places this network
+       * calls at — Koh Tao, Phi Phi, Samet, the Gilis, Boracay — are absent
+       * from the country polygons at every resolution, which left ferry
+       * terminals floating in open water. */
+      const isles = new Path2D()
+      for (const r of basemap.islands || []) ring(isles, r)
+      outlines.push(isles)
+      all.addPath(isles)
+
+      return { all, outlines }
     })()
 
     /** Fit into the strip the overlays leave visible, then shift it into place. */
@@ -88,7 +136,12 @@ const MapView = (() => {
 
     function size() {
       const rect = canvas.getBoundingClientRect()
-      const dpr = Math.min(3, window.devicePixelRatio || 1)
+      /* Capped at 2 rather than 3. A phone reporting 3 asks for 1.3 million
+       * backing pixels for a strip of map barely 400 points wide, and every
+       * fill, stroke and blur pays for all of them. The map is line art on a
+       * flat ground; at 2 the difference is invisible and the frame is more
+       * than twice as cheap. */
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
       canvas.width = Math.max(1, Math.round(rect.width * dpr))
       canvas.height = Math.max(1, Math.round(rect.height * dpr))
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -159,85 +212,101 @@ const MapView = (() => {
       ctx.restore()
     }
 
-    /* Darkens the corners so the eye settles in the middle where the route is.
-     * Drawn on the ground rather than over everything, so it never dims a leg. */
-    function drawVignette() {
-      const g = ctx.createRadialGradient(
+    /* The sea and the vignette that darkens its corners, baked once.
+     *
+     * Neither moves with the map: both are painted in screen space and depend
+     * only on the size of the canvas and the palette. Evaluating two gradient
+     * ramps across every pixel of the viewport, sixty times a second, to arrive
+     * at the identical image each time, cost more than everything else on the
+     * map put together — a third of the frame. Painted once into a bitmap and
+     * blitted, they cost a copy. */
+    let backdrop = null
+
+    function backdrops() {
+      const key = [canvas.width, canvas.height, colors.sea, colors.seaDeep].join('|')
+      if (backdrop && backdrop.key === key) return backdrop
+
+      const layer = () => {
+        const c = document.createElement('canvas')
+        c.width = canvas.width
+        c.height = canvas.height
+        const g = c.getContext('2d')
+        g.scale(canvas.width / view.w, canvas.height / view.h)
+        return { c, g }
+      }
+
+      // A sea that deepens toward the bottom of the frame. One flat fill across
+      // two thirds of the viewport is the least interesting thing a map can do.
+      const sea = layer()
+      const sky = sea.g.createLinearGradient(0, 0, 0, view.h)
+      sky.addColorStop(0, colors.sea)
+      sky.addColorStop(1, colors.seaDeep)
+      sea.g.fillStyle = sky
+      sea.g.fillRect(0, 0, view.w, view.h)
+
+      /* Darkens the corners so the eye settles in the middle where the route
+       * is. Drawn on the ground rather than over everything, so it never dims
+       * a leg. */
+      const vig = layer()
+      const rg = vig.g.createRadialGradient(
         view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.32,
         view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.78
       )
-      g.addColorStop(0, 'rgba(0,0,0,0)')
-      g.addColorStop(1, colors.seaDeep)
-      ctx.save()
-      ctx.globalAlpha = 0.5
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, view.w, view.h)
-      ctx.restore()
+      rg.addColorStop(0, 'rgba(0,0,0,0)')
+      rg.addColorStop(1, colors.seaDeep)
+      vig.g.fillStyle = rg
+      vig.g.fillRect(0, 0, view.w, view.h)
+
+      backdrop = { key, sea: sea.c, vignette: vig.c }
+      return backdrop
     }
 
     function drawBasemap() {
-      // A sea that deepens toward the bottom of the frame. One flat fill across
-      // two thirds of the viewport is the least interesting thing a map can do.
-      const sky = ctx.createLinearGradient(0, 0, 0, view.h)
-      sky.addColorStop(0, colors.sea)
-      sky.addColorStop(1, colors.seaDeep)
-      ctx.fillStyle = sky
-      ctx.fillRect(0, 0, view.w, view.h)
+      const baked = backdrops()
+      ctx.drawImage(baked.sea, 0, 0, view.w, view.h)
 
       drawGraticule()
-      drawVignette()
+
+      ctx.save()
+      ctx.globalAlpha = 0.5
+      ctx.drawImage(baked.vignette, 0, 0, view.w, view.h)
+      ctx.restore()
 
       ctx.lineJoin = 'round'
 
-      /* All the land as one path, filled once with a soft shadow so the glow
-       * lands in the water and not along every internal frontier. The country
-       * outlines are stroked separately afterwards. */
-      const all = new Path2D()
-      const paths = []
-      for (const country of basemap.countries) {
-        const path = new Path2D()
-        for (const ring of country.rings) {
-          for (let i = 0; i < ring.length; i++) {
-            const p = Proj.project(view, ring[i][0], ring[i][1])
-            if (i === 0) path.moveTo(p.x, p.y)
-            else path.lineTo(p.x, p.y)
-          }
-          path.closePath()
-        }
-        paths.push(path)
-        all.addPath(path)
-      }
-
-      /* The small islands, which are land without being any country's outline.
-       * They come from their own dataset because several places this network
-       * calls at — Koh Tao, Phi Phi, Samet, the Gilis, Boracay — are absent
-       * from the country polygons at every resolution, which left ferry
-       * terminals floating in open water. */
-      const isles = new Path2D()
-      for (const ring of basemap.islands || []) {
-        for (let i = 0; i < ring.length; i++) {
-          const p = Proj.project(view, ring[i][0], ring[i][1])
-          if (i === 0) isles.moveTo(p.x, p.y)
-          else isles.lineTo(p.x, p.y)
-        }
-        isles.closePath()
-      }
-      paths.push(isles)
-      all.addPath(isles)
-
+      /* The cached world-space coastline, projected by the canvas rather than
+       * by hand. Line widths are divided by the scale because the transform
+       * multiplies them back up; shadowBlur is not, because the canvas keeps
+       * blur radii in device pixels whatever the matrix says. */
       ctx.save()
-      ctx.shadowColor = colors.coast
-      ctx.shadowBlur = 16
-      ctx.fillStyle = colors.land
-      ctx.fill(all)
-      ctx.restore()
-      // Again without the shadow, so the interior is the flat land colour.
-      ctx.fillStyle = colors.land
-      ctx.fill(all)
+      ctx.transform(view.scale, 0, 0, view.scale, view.dx, view.dy)
 
-      ctx.strokeStyle = colors.landEdge
-      ctx.lineWidth = 0.8
-      for (const path of paths) ctx.stroke(path)
+      /* All the land filled once with a soft shadow, so the glow lands in the
+       * water and not along every internal frontier. The glow is the single
+       * most expensive thing on the map — a blur over the whole coast — so a
+       * gesture in progress goes without it and picks it up on the frame it
+       * settles. Nobody can see a coastal halo on a map that is moving. */
+      if (!moving) {
+        ctx.shadowColor = colors.coast
+        ctx.shadowBlur = 16
+      }
+      ctx.fillStyle = colors.land
+      ctx.fill(world.all)
+      ctx.shadowBlur = 0
+      // Again without the shadow, so the interior is the flat land colour.
+      ctx.fill(world.all)
+
+      /* The hairline along every coast and frontier — thirteen thousand points
+       * of it, and the most expensive stroke on the map by a wide margin. Like
+       * the glow it waits for the frame the gesture settles on. The land is a
+       * filled shape either way, so what goes missing mid-drag is the crispness
+       * of its edge, on a map that is sliding under a thumb. */
+      if (!moving) {
+        ctx.strokeStyle = colors.landEdge
+        ctx.lineWidth = 0.8 / view.scale
+        for (const path of world.outlines) ctx.stroke(path)
+      }
+      ctx.restore()
     }
 
     /** Ferries arc; land legs run straight between stations. */
@@ -547,6 +616,10 @@ const MapView = (() => {
 
     function draw() {
       if (!view) return
+      if (pending) {
+        cancelAnimationFrame(pending)
+        pending = null
+      }
       colors = themeColors(document.documentElement)
       const used = new Set(state.route ? state.route.legs.map(e => e.leg) : [])
       const routeSet = new Set(state.route ? state.route.stationIds : [])
@@ -560,6 +633,56 @@ const MapView = (() => {
       drawRouteStations()
       drawLabels()
       buildHitTargets()
+    }
+
+    /* One draw per displayed frame, not one per event.
+     *
+     * A finger dragging across a phone screen produces pointermove far faster
+     * than the display refreshes — and Chrome coalesces several into one event
+     * that still arrives as one call. Drawing on each of them spends the whole
+     * frame budget rendering pictures nobody sees, and the queue only grows,
+     * so the map falls further behind the finger the longer you drag. */
+    function schedule() {
+      moves++
+      moving = true
+      if (pending) return
+      pending = requestAnimationFrame(() => {
+        pending = null
+        const seq = moves
+        draw()
+
+        /* Settling is decided by whether anything moved, not by a stopwatch.
+         *
+         * A timer has to be given a length, and there is no length that is
+         * right: pick 90ms and on a phone drawing at eight frames a second the
+         * timer expires between every pair of frames, so the expensive pass
+         * runs on all of them — the machine that can least afford the full
+         * quality frame is the only one that always draws it. Waiting one frame
+         * and asking "did the finger move?" costs nothing and is right at every
+         * speed. */
+        if (quality) cancelAnimationFrame(quality)
+        quality = requestAnimationFrame(() => {
+          quality = null
+          if (moves !== seq) return // still going; the next frame asks again
+          moving = false
+          draw()
+        })
+      })
+    }
+
+    /* Anything that reads what is on screen has to see the frame that is owed,
+     * not the one before it. */
+    function flush() {
+      if (!pending) return
+      cancelAnimationFrame(pending)
+      pending = null
+      draw()
+    }
+
+    /** A draw that is not part of a gesture, and so is never the cheap one. */
+    function drawNow() {
+      moving = false
+      draw()
     }
 
     /* ---------------------------------------------------------- animation */
@@ -607,6 +730,9 @@ const MapView = (() => {
     const STATION_BIAS = 5
 
     function pick(x, y) {
+      // Hit targets are a by-product of drawing, so a frame still owed would
+      // have this testing against where things were, not where they are.
+      flush()
       let bestStation = null
       let bestD = 14
       for (const s of hit.stations) {
@@ -650,7 +776,7 @@ const MapView = (() => {
     return {
       resize() {
         size()
-        draw()
+        drawNow()
       },
       /* Where a lon/lat currently sits on screen, in CSS pixels, or null if it
        * is off the canvas. The map is the only thing that knows the live view,
@@ -686,28 +812,28 @@ const MapView = (() => {
         if (animate) animateIn()
         else {
           state.progress = 1
-          draw()
+          drawNow()
         }
       },
       focusLeg(index) {
         if (state.focusLeg === index) return
         state.focusLeg = index
-        draw()
+        drawNow()
       },
       panBy(dx, dy) {
         view = Proj.clamp(Proj.pan(view, dx, dy), reach)
-        draw()
+        schedule()
       },
       zoomAt(x, y, factor) {
         view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach)
-        draw()
+        schedule()
       },
       resetView() {
         view = baseView(canvas.getBoundingClientRect())
-        draw()
+        drawNow()
       },
       pick,
-      redraw: draw,
+      redraw: drawNow,
     }
   }
 

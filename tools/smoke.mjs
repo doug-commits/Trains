@@ -1369,6 +1369,103 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ----------------------------------------------------------- on a phone */
+
+/* Everything above drives a mouse on a desktop-shaped window, which is how two
+ * faults shipped that made the Android build barely usable: a dropdown that
+ * could not be tapped, and a map that panned at three frames a second. Neither
+ * is visible without a touch pointer and a phone-sized viewport. */
+{
+  const phone = {
+    viewport: { width: 412, height: 915 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+  }
+  const { page, context } = await newPage(phone)
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(600)
+
+  /* A finger, not a mouse. The list scrolls, so the browser withholds the
+   * touch until it knows the gesture is not a scroll, and a tap with any
+   * wobble in it is withdrawn before pointerdown is ever delivered — which is
+   * every real tap. Selecting on pointerdown therefore worked under every
+   * mouse and under no thumb. */
+  await page.locator('#from-q').tap()
+  await page.locator('#from-q').fill('bangkok')
+  await page.waitForTimeout(250)
+  const rows = await page.locator('#from-list li[data-i]').count()
+  check('the station list opens under a thumb', rows > 0, `${rows} rows`)
+
+  await page.locator('#from-list li[data-i]').first().tap()
+  await page.waitForTimeout(250)
+  const picked = await page.inputValue('#from')
+  check('and a tap on a row actually chooses it', picked !== '', picked)
+
+  /* The soft keyboard takes half the screen the moment the field is focused,
+   * and the list drops out of an input that is now near the bottom of what is
+   * left. Android shrinks the window for it, so a shorter viewport is what it
+   * looks like from in here. */
+  await page.locator('#to-q').tap()
+  await page.setViewportSize({ width: 412, height: 440 })
+  await page.waitForTimeout(300)
+  await page.locator('#to-q').fill('singapore')
+  await page.waitForTimeout(300)
+  const fit = await page.evaluate(() => {
+    const b = document.querySelector('#to-list').getBoundingClientRect()
+    return { top: Math.round(b.top), bottom: Math.round(b.bottom), h: window.innerHeight }
+  })
+  check('the list stays on screen with the keyboard up',
+    fit.top >= 0 && fit.bottom <= fit.h,
+    `${fit.top}–${fit.bottom} of ${fit.h}`)
+
+  const kbRows = await page.locator('#to-list li[data-i]').count()
+  await page.locator('#to-list li[data-i]').first().tap()
+  await page.waitForTimeout(250)
+  check('and can still be tapped there', (await page.inputValue('#to')) !== '',
+    `${kbRows} rows offered`)
+
+  await page.setViewportSize(phone.viewport)
+  await page.waitForTimeout(400)
+
+  /* A frame budget, not a benchmark. The threshold is deliberately loose —
+   * this ran at 365ms a frame before the basemap was cached and the sea was
+   * baked, so anything near it means a per-frame rebuild has crept back in,
+   * and no CI machine is slow enough to fail it otherwise. */
+  const frame = await page.evaluate(async () => {
+    const c = document.querySelector('#map')
+    const b = c.getBoundingClientRect()
+    const cx = b.left + b.width / 2
+    const cy = b.top + b.height / 2
+    const send = (t, x, y, id) => c.dispatchEvent(new PointerEvent(t, {
+      pointerId: id, pointerType: 'touch', bubbles: true, cancelable: true,
+      clientX: x, clientY: y,
+    }))
+    send('pointerdown', cx - 40, cy, 1)
+    send('pointerdown', cx + 40, cy, 2)
+    const gaps = []
+    let last = performance.now()
+    for (let i = 0; i < 30; i++) {
+      const d = (i % 20) - 10
+      send('pointermove', cx - 40 + d, cy + d * 0.5, 1)
+      send('pointermove', cx + 40 + d, cy + d * 0.5, 2)
+      await new Promise(r => requestAnimationFrame(r))
+      const now = performance.now()
+      gaps.push(now - last)
+      last = now
+    }
+    send('pointerup', cx, cy, 1)
+    send('pointerup', cx, cy, 2)
+    const s = gaps.slice(5).sort((a, b) => a - b)
+    return Math.round(s[Math.floor(s.length / 2)])
+  })
+  check('a two-finger pan keeps up with the finger', frame < 120, `${frame}ms a frame`)
+
+  await page.screenshot({ path: join(outDir, '21-phone.png') })
+  await context.close()
+}
+
 await browser.close()
 
 console.log('')

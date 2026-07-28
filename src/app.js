@@ -806,8 +806,38 @@
       open = false
       active = -1
       list.hidden = true
+      list.style.top = ''
+      list.style.bottom = ''
+      list.style.maxHeight = ''
       input.setAttribute('aria-expanded', 'false')
       input.removeAttribute('aria-activedescendant')
+    }
+
+    /* Open into whichever side has room, and never past the edge of it.
+     *
+     * On a phone the soft keyboard takes half the screen the moment this field
+     * is focused, and the list drops from an input that is now near the bottom
+     * of what is left — so it went behind the keyboard and showed one row of
+     * eight. The keyboard is not something the page is told about, but it is
+     * the difference between the visual viewport and the layout, and on Android
+     * it shrinks the window outright. Both are covered by measuring what is
+     * actually there at the moment the list opens. */
+    const GAP = 8
+    function place() {
+      const box = input.getBoundingClientRect()
+      const vv = window.visualViewport
+      const top = vv ? vv.offsetTop : 0
+      const bottom = top + (vv ? vv.height : window.innerHeight)
+
+      const below = bottom - box.bottom - GAP
+      const above = box.top - top - GAP
+      // Below unless it is genuinely cramped and above is better. Flipping for
+      // a few pixels would make the list jump around as you type.
+      const flip = below < 132 && above > below
+      list.style.top = flip ? 'auto' : ''
+      list.style.bottom = flip ? '100%' : ''
+      const room = Math.max(96, Math.min(272, Math.floor(flip ? above : below)))
+      list.style.maxHeight = room + 'px'
     }
 
     function paint(q) {
@@ -827,6 +857,7 @@
       open = true
       list.hidden = false
       input.setAttribute('aria-expanded', 'true')
+      place()
     }
 
     function highlight(i) {
@@ -856,6 +887,18 @@
       paint('')
     })
 
+    /* The keyboard arrives a beat after the focus that summons it, so the
+     * measurement taken when the list opened describes a screen that no longer
+     * exists. Measure again when the viewport actually changes. */
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (open) place()
+      })
+    }
+    window.addEventListener('resize', () => {
+      if (open) place()
+    })
+
     input.addEventListener('keydown', e => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
@@ -882,12 +925,26 @@
       if (e.key === 'Tab') close()
     })
 
-    // pointerdown, not click: blur would close the list before click landed.
-    list.addEventListener('pointerdown', e => {
+    /* Keep the press from moving focus, then act on the click.
+     *
+     * The press is what blurs the input, and the blur is what closes the list —
+     * so without this the row is gone before anything lands on it. Cancelling
+     * the mousedown's default cancels the focus change and nothing else: the
+     * click still follows, from a finger as well as a mouse.
+     *
+     * It has to be the click and not the pointerdown. The list scrolls, so a
+     * touch is held back while the browser decides whether it is a scroll, and
+     * a tap with a pixel of wobble in it is withdrawn as pointercancel with no
+     * pointerdown ever delivered. Every tap on a phone has a pixel of wobble in
+     * it. That is why this list worked under a mouse and was dead under a
+     * thumb. */
+    list.addEventListener('mousedown', e => {
+      if (e.target.closest('li[data-i]')) e.preventDefault()
+    })
+
+    list.addEventListener('click', e => {
       const li = e.target.closest('li[data-i]')
-      if (!li) return
-      e.preventDefault()
-      choose(Number(li.dataset.i))
+      if (li) choose(Number(li.dataset.i))
     })
 
     input.addEventListener('blur', () => {
