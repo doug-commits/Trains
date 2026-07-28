@@ -1085,15 +1085,26 @@ function check(label, condition, detail = '') {
   check('robots points at the sitemap',
     /Sitemap: https:\/\/example\.test\/sitemap\.xml/.test(readFileSync(join(pub, 'robots.txt'), 'utf8')))
 
-  // The honest half: with no origin configured, nothing wrong is emitted.
+  // The honest half: with the origin explicitly cleared, nothing wrong is
+  // emitted. This is what a build on an unknown host should do.
   execFileSync('node', [join(root, 'tools/build-pages.mjs')], {
     cwd: root,
     env: { ...process.env, SITE_ORIGIN: '' },
     stdio: 'pipe',
   })
   const bare = readFileSync(join(pub, 'bangkok-to-singapore-by-train.html'), 'utf8')
-  check('without an origin it emits no canonical rather than a wrong one',
+  check('a cleared origin emits no canonical rather than a wrong one',
     !/<link rel="canonical"/.test(bare) && !existsSync(join(pub, 'sitemap.xml')))
+
+  /* And the default is the live domain, so a normal build needs no environment
+   * at all. A preview overriding SITE_ORIGIN must not canonicalise itself to
+   * production — that tells Google to index a page it did not just crawl. */
+  execFileSync('node', [join(root, 'tools/build-pages.mjs')], { cwd: root, stdio: 'pipe' })
+  const live = readFileSync(join(pub, 'bangkok-to-singapore-by-train.html'), 'utf8')
+  check('a plain build canonicalises to the real domain',
+    live.includes('<link rel="canonical" href="https://slowasia.com/bangkok-to-singapore-by-train">'))
+  check('and the sitemap lists it there',
+    readFileSync(join(pub, 'sitemap.xml'), 'utf8').includes('https://slowasia.com/'))
 }
 
 /* ------------------------------------------------- finding a station by typing */

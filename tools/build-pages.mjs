@@ -12,11 +12,13 @@
  * app's own output, rendered early.
  *
  *   node tools/build-pages.mjs
- *   SITE_ORIGIN=https://example.com node tools/build-pages.mjs
+ *   SITE_ORIGIN=https://preview.example.com node tools/build-pages.mjs
  *
- * Without SITE_ORIGIN there is no canonical, no og:url and no sitemap. A
- * canonical pointing at the wrong host is worse than none at all — it tells
- * Google to index a page that does not exist.
+ * The origin defaults to the live domain. Override it for preview builds — a
+ * preview that canonicalises itself to production is telling Google to index
+ * a page it did not just crawl, and a canonical pointing at the wrong host is
+ * worse than none at all. Setting it empty drops canonical and sitemap
+ * entirely, which is the right answer when the host is genuinely unknown.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
@@ -26,7 +28,10 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = p => readFileSync(join(root, p), 'utf8')
 
-const ORIGIN = (process.env.SITE_ORIGIN || '').replace(/\/$/, '')
+// `??` not `||`: SITE_ORIGIN='' is an explicit "I do not know the host,
+// emit nothing absolute", and an empty string is falsy. With `||` that
+// instruction silently became the production domain.
+const ORIGIN = (process.env.SITE_ORIGIN ?? 'https://slowasia.com').replace(/\/$/, '')
 
 /* Photographs by absolute path rather than inlined. These pages are served
  * from a host that also serves data/photos, and a static page has no reason to

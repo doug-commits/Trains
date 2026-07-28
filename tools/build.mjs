@@ -24,11 +24,17 @@ const DESCRIPTION =
   'Plan a Southeast Asian journey that stays on rails as far as the rails go, ' +
   'bridges the gaps by sea, and tells you what happens at every border.'
 
-/* Absolute URLs are required for canonical, og:url and the sitemap, and a
- * canonical pointing at a host you do not own is worse than none — it tells a
- * crawler to index a page that is not there. So they only appear when the host
- * is actually known. */
-const ORIGIN = (process.env.SITE_ORIGIN || '').replace(/\/$/, '')
+/* Absolute URLs are required for canonical, og:url and the sitemap.
+ *
+ * This was left unset while there was no domain, because a canonical pointing
+ * at a host you do not own is worse than none — it tells a crawler to index a
+ * page that is not there. The domain exists now, so it is the default, and
+ * SITE_ORIGIN still overrides it for preview deployments, which must not
+ * canonicalise themselves to production. */
+// `??` not `||`: SITE_ORIGIN='' is an explicit "I do not know the host,
+// emit nothing absolute", and an empty string is falsy. With `||` that
+// instruction silently became the production domain.
+const ORIGIN = (process.env.SITE_ORIGIN ?? 'https://slowasia.com').replace(/\/$/, '')
 
 const headMeta = () => {
   const ld = JSON.stringify({
