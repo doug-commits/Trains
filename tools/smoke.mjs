@@ -1151,12 +1151,27 @@ function check(label, condition, detail = '') {
   await page.goto(url)
   await page.waitForFunction(() => document.querySelector('#panel h1'))
 
-  const rows = () => page.locator('#from-list li').allTextContents()
+  // Station rows only — the country headings are list items too.
+  const rows = () => page.locator('#from-list li[data-i]').allTextContents()
+  const groups = () => page.locator('#from-list .combo-group').allTextContents()
 
   await page.click('#from-q')
   await page.waitForTimeout(150)
-  check('focusing the box offers the whole list', (await rows()).length > 20,
-    `${(await rows()).length} shown`)
+  const everything = await rows()
+  check('focusing the box offers the whole list',
+    everything.length === Object.keys(NETWORK.stations).length,
+    `${everything.length} of ${Object.keys(NETWORK.stations).length} stations`)
+
+  /* Grouped, and down the map rather than down the alphabet: the countries run
+     in the order the railway does, which is the order someone planning this
+     already has in their head. */
+  const order = await groups()
+  check('and groups them by country', order.length === 11, order.join(' → '))
+  check('in the order the railway runs',
+    order[0] === 'China' && order[1] === 'Laos' &&
+    order.indexOf('Malaysia') < order.indexOf('Singapore') &&
+    order.indexOf('Singapore') < order.indexOf('Indonesia'),
+    order.join(' → '))
 
   // The case a native select cannot do: the platform name, not the city.
   await page.fill('#from-q', 'gubeng')
@@ -1197,9 +1212,11 @@ function check(label, condition, detail = '') {
   check('and the box shows the station it chose',
     /Jakarta/.test(await page.inputValue('#to-q')), await page.inputValue('#to-q'))
 
+  // Not rows(): a miss has no station rows, which is the whole point of it.
+  await page.fill('#from-q', 'zzzz')
+  await page.waitForTimeout(150)
   check('a miss says so rather than showing nothing',
-    /Nothing matches/.test((await page.fill('#from-q', 'zzzz'), await page.waitForTimeout(150),
-      (await rows()).join(''))))
+    /Nothing matches/.test(await page.textContent('#from-list')) && (await rows()).length === 0)
 
   // A choice made anywhere else has to read back into the box, or the two
   // disagree about where you are going.
@@ -1550,6 +1567,39 @@ function check(label, condition, detail = '') {
   // And the route survived the round trip — back must not have undone it.
   check('and the route is still there',
     (await page.locator('.route tbody tr').count()) > 0)
+
+  /* Back in the letterbox the axes are split, and the split is the browser's:
+     touch-action: pan-y gives vertical to the document and keeps horizontal
+     for the map. Left and right used to do nothing at all — the page had
+     nowhere to scroll sideways, and the map only listened to two fingers.
+
+     From a reset view, so the drag is not tested against a map already panned
+     up against its own clamp, where the right answer is also no movement. */
+  await page.click('#reset')
+  await page.waitForTimeout(500)
+
+  const swipe = (dx, dy) => page.evaluate(([dx, dy]) => {
+    const c = document.querySelector('#map')
+    const r = c.getBoundingClientRect()
+    const send = (t, x, y) => c.dispatchEvent(new PointerEvent(t, {
+      pointerId: 1, pointerType: 'touch', bubbles: true, cancelable: true,
+      clientX: r.left + x, clientY: r.top + y,
+    }))
+    send('pointerdown', 200, 150)
+    for (let i = 1; i <= 15; i++) send('pointermove', 200 + (dx * i) / 15, 150 + (dy * i) / 15)
+    send('pointerup', 200 + dx, 150 + dy)
+  }, [dx, dy])
+
+  const flat = await sig()
+  await swipe(130, 0)
+  await page.waitForTimeout(300)
+  check('one finger moves the map left and right in the letterbox too',
+    (await sig()) !== flat)
+
+  const sideways = await sig()
+  await swipe(0, 130)
+  await page.waitForTimeout(300)
+  check('but up and down still belongs to the page', (await sig()) === sideways)
 
   await context.close()
 }

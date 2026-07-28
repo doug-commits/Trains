@@ -644,14 +644,30 @@ body {
 .combo-list li[aria-selected='true'],
 .combo-list li:hover { background: var(--raise); }
 
-/* The line that says which of the three Padang Besars this is. */
-.combo-list .where {
-  margin-left: auto;
-  padding-left: 0.5rem;
-  flex: none;
-  font-size: 0.78rem;
+/* The country each run of stations belongs to.
+   Sticky, because the whole point is knowing where you are in a list of two
+   hundred — a heading that scrolls away answers the question only until you
+   start looking. Countries are ordered by how well they match what was typed,
+   not alphabetically; see byCountry in app.js. */
+.combo-group {
+  position: sticky;
+  top: -0.25rem;
+  z-index: 1;
+  margin: 0.25rem -0.25rem 0.1rem;
+  padding: 0.35rem 0.8rem 0.3rem;
+  background: var(--panel-solid);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--muted);
+  border-bottom: 1px solid var(--panel-edge);
 }
+.combo-group:first-child { margin-top: -0.25rem; }
+.combo-list li.combo-group:hover { background: var(--panel-solid); }
+
+/* The station rows sit in under their heading. */
+.combo-list li[data-i] { padding-left: 0.9rem; }
 
 .combo-list b { font-weight: 600; color: var(--rail); }
 

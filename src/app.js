@@ -380,10 +380,9 @@
         hideTip()
         return
       }
-      /* Full screen, one finger is the map's: there is no page behind it left
-       * to scroll. It still has to earn the pan, or every station you tap
-       * shifts the map out from under the tap. */
-      if (mapFull() && touches.size === 1) {
+      /* One finger gets to move the map. It still has to earn the pan, or
+       * every station you tap shifts the map out from under the tap. */
+      if (touches.size === 1) {
         drag = { x: e.offsetX, y: e.offsetY, originX: e.offsetX, originY: e.offsetY, panning: false }
       }
       return
@@ -396,21 +395,41 @@
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
       if (!drag) return
-      // One finger, full screen: the same threshold the mouse gets, below.
+      /* One finger. Full screen it moves the map in both directions, because
+       * there is no page behind it left to scroll. In the letterbox the axes
+       * are split, and that split is not arbitrary — it is the one the browser
+       * has already made. touch-action: pan-y hands vertical to the document
+       * and keeps horizontal for us, so up and down scrolls the itinerary past
+       * the map and left and right moves the map itself.
+       *
+       * Left and right did nothing at all before this: the browser would not
+       * scroll horizontally because there is nowhere to scroll to, and we were
+       * not panning because only two fingers counted. The gesture was reserved
+       * for the map and then never used by it. */
       if (touches.size < 2) {
-        if (!mapFull()) return
+        const free = mapFull()
         const dx1 = e.offsetX - drag.x
         const dy1 = e.offsetY - drag.y
         drag.x = e.offsetX
         drag.y = e.offsetY
+
         if (!drag.panning) {
-          if (Math.hypot(e.offsetX - drag.originX, e.offsetY - drag.originY) < PAN_THRESHOLD) return
+          const offX = e.offsetX - drag.originX
+          const offY = e.offsetY - drag.originY
+          if (Math.hypot(offX, offY) < PAN_THRESHOLD) return
+          // In the letterbox a drag that is mostly vertical is the page's, and
+          // taking it here would fight the scroll the reader actually asked for.
+          if (!free && Math.abs(offX) <= Math.abs(offY)) {
+            drag = null
+            return
+          }
           drag.panning = true
           hideTip()
           return
         }
+
         e.preventDefault()
-        map.panBy(dx1, dy1)
+        map.panBy(dx1, free ? dy1 : 0)
         hideTip()
         return
       }
@@ -787,6 +806,7 @@
     id,
     city: s.city,
     name: s.name,
+    country: s.country,
     where: COUNTRY_NAME[s.country],
     // Where a city has several stations, the one people mean comes first:
     // "sing" should offer HarbourFront before Woodlands CIQ, which is a
@@ -795,13 +815,32 @@
     hay: fold(`${s.city} ${s.name} ${COUNTRY_NAME[s.country]}`),
   }))
 
+  /* A cap for a search, not for the list.
+   *
+   * Typing narrows, so sixty ranked matches is far more than anyone reads. An
+   * empty box is the opposite act — it is browsing, and the whole point of
+   * grouping the stations under their countries is to be able to go and look
+   * at Vietnam. Cutting that off at sixty stops the list halfway through the
+   * third country, which is worse than not grouping it at all. */
   const MAX_ROWS = 60
 
   /* Ranked, so typing "sing" puts Singapore above Sungai Petani. A match at
    * the start of a word beats one buried mid-string, and the city beats the
    * station name — people think in cities. */
   function search(q) {
-    if (!q) return CHOICES.slice().sort((a, b) => a.city.localeCompare(b.city))
+    /* Nothing typed: down the map rather than down the alphabet. The countries
+     * come out in the order the railway runs — Kunming at the top, Java at the
+     * bottom — which is the order someone planning this journey already has in
+     * their head, and the order the groups are then rendered in. */
+    if (!q) {
+      return CHOICES.slice().sort(
+        (a, b) =>
+          COUNTRY_ORDER.indexOf(a.country) - COUNTRY_ORDER.indexOf(b.country) ||
+          a.city.localeCompare(b.city) ||
+          a.weight - b.weight ||
+          a.name.localeCompare(b.name)
+      )
+    }
     const n = fold(q)
     const scored = []
     for (const c of CHOICES) {
@@ -819,6 +858,24 @@
         a.c.name.localeCompare(b.c.name)
     )
     return scored.map(s => s.c)
+  }
+
+  /* Two hundred stations under eleven headings rather than in one column.
+   *
+   * Grouping without reordering: a Map keeps its keys in the order they were
+   * first seen, so walking the ranked list and dropping each station into its
+   * country's bucket leaves the countries ordered by their own best match, and
+   * each country's stations in the order the ranking put them. The top hit is
+   * still the first row of the first group — which is what Enter takes, and
+   * what would quietly break if this sorted alphabetically by country. */
+  function byCountry(list) {
+    const groups = new Map()
+    for (const c of list) {
+      const g = groups.get(c.where)
+      if (g) g.push(c)
+      else groups.set(c.where, [c])
+    }
+    return [...groups].map(([country, items]) => ({ country, items }))
   }
 
   const mark = (text, q) => {
@@ -889,18 +946,31 @@
     }
 
     function paint(q) {
-      rows = search(q).slice(0, MAX_ROWS)
-      if (!rows.length) {
+      const all = search(q)
+      const found = q ? all.slice(0, MAX_ROWS) : all
+      if (!found.length) {
+        rows = []
         list.innerHTML = `<li class="combo-empty">Nothing matches “${UI.esc(q)}”</li>`
       } else {
-        list.innerHTML = rows
-          .map(
-            (c, i) =>
-              `<li id="${which}-opt-${i}" role="option" aria-selected="${i === active}" data-i="${i}">` +
-              `<span>${mark(c.city === c.name ? c.name : `${c.city} — ${c.name}`, q)}</span>` +
-              `<span class="where">${UI.esc(c.where)}</span></li>`
+        /* rows is the flat, ranked list the keyboard walks; the markup is the
+         * same stations under their country. The two are kept in step by
+         * rebuilding rows from the groups, so an index is an index either way. */
+        rows = []
+        const html = []
+        for (const { country, items } of byCountry(found)) {
+          html.push(
+            `<li class="combo-group" role="presentation">${UI.esc(country)}</li>`
           )
-          .join('')
+          for (const c of items) {
+            const i = rows.push(c) - 1
+            html.push(
+              `<li id="${which}-opt-${i}" role="option" aria-selected="${i === active}" data-i="${i}">` +
+                `<span>${mark(c.city === c.name ? c.name : `${c.city} — ${c.name}`, q)}</span>` +
+                `</li>`
+            )
+          }
+        }
+        list.innerHTML = html.join('')
       }
       open = true
       list.hidden = false
@@ -913,7 +983,8 @@
       if (prev) prev.setAttribute('aria-selected', 'false')
       active = i
       if (i < 0) return input.removeAttribute('aria-activedescendant')
-      const el = list.children[i]
+      // By index, not by position: the country headings are children too.
+      const el = list.querySelector(`[data-i="${i}"]`)
       if (!el) return
       el.setAttribute('aria-selected', 'true')
       el.scrollIntoView({ block: 'nearest' })
