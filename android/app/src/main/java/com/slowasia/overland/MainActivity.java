@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -64,6 +65,34 @@ public class MainActivity extends AppCompatActivity {
       @Override
       public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         return loader.shouldInterceptRequest(request.getUrl());
+      }
+
+      /**
+       * If the bundled page ever fails to load, the default is a white screen
+       * and no way to tell whether the asset is missing, the loader is
+       * misconfigured, or the WebView is too old. Say so instead.
+       *
+       * This is the failure mode that matters most here, because the app has no
+       * network to fall back on and no server-side log to inspect — whatever
+       * went wrong went wrong on someone's phone in a place with no signal.
+       */
+      @Override
+      public void onReceivedError(WebView view, WebResourceRequest request,
+                                  WebResourceError error) {
+        if (!request.isForMainFrame()) return;
+        view.loadDataWithBaseURL(null,
+            "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            + "<style>body{font:16px/1.5 system-ui,sans-serif;margin:2rem;"
+            + "background:#0a191f;color:#e7efea}code{color:#e9a63e;"
+            + "word-break:break-all}</style></head><body>"
+            + "<h1>The planner did not load</h1>"
+            + "<p>The page is bundled inside this app, so this is not a "
+            + "connection problem — there is nothing to connect to.</p>"
+            + "<p><code>" + error.getDescription() + "</code><br>"
+            + "<code>" + request.getUrl() + "</code></p>"
+            + "<p>Please report this with your Android version.</p>"
+            + "</body></html>",
+            "text/html", "utf-8", null);
       }
 
       /**
