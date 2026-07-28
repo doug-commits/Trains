@@ -37,7 +37,16 @@ async function newPage(opts = {}) {
   })
   const page = await context.newPage()
   page.on('console', m => {
-    if (m.type() === 'error') problems.push(`console.error: ${m.text()}`)
+    if (m.type() !== 'error') return
+    /* A build with a Mapbox token asks api.mapbox.com for the library. Any
+     * machine without a route to it — this sandbox, an offline CI runner —
+     * logs the failure, and the point of the fallback is that the page carries
+     * on regardless. So the failure to reach it is not a problem; anything the
+     * page then does wrong still is, and is caught by every other check. */
+    if (/Failed to load resource/.test(m.text()) && /mapbox/i.test(m.location()?.url || '')) {
+      return
+    }
+    problems.push(`console.error: ${m.text()}`)
   })
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
   return { page, context }
@@ -679,9 +688,18 @@ function check(label, condition, detail = '') {
 }
 
 /* --------------------------------------------- nothing is fetched at runtime
- * The premise the whole thing rests on: it works at a border post with no
- * signal, and inside a strict-CSP artifact. Linking out to Google Maps is fine;
- * loading it would end both. This is the guard on that decision. */
+ *
+ * The premise the app rests on: it works at a border post with no signal, and
+ * inside a strict-CSP artifact. Linking out to Google Maps is fine; loading it
+ * would end both. This is the guard on that decision.
+ *
+ * The website is now allowed one exception, and exactly one. With a Mapbox
+ * token configured it fetches the library and its tiles, because tiles are the
+ * entire point of it and a website has a network by definition. Nothing else
+ * may appear in this list, and the app build below must still fetch nothing at
+ * all whatever the website is doing — it has no INTERNET permission to do it
+ * with. */
+const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
 {
   const { page, context } = await newPage()
   const external = []
@@ -694,7 +712,22 @@ function check(label, condition, detail = '') {
   await page.locator('.corridor').first().click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1000)
-  check('the page fetches nothing from the network', external.length === 0,
+  /* The fallback is the point of the arrangement, so it is tested rather than
+     assumed: with a token configured and no route to Mapbox — this sandbox, a
+     plane, a censored network — the reader gets the drawn map and a working
+     route, not an empty frame. */
+  if (external.some(u => MAPBOX_HOST.test(u))) {
+    check('an unreachable Mapbox falls back to the drawn map',
+      (await page.evaluate(() => window.OverlandMap.kind || 'canvas')) === 'canvas')
+    check('and the route still plans on it',
+      (await page.locator('.route tbody tr').count()) > 0)
+  }
+
+  const strays = external.filter(u => !MAPBOX_HOST.test(u))
+  const gl = external.length - strays.length
+  check('the page fetches nothing but its map tiles', strays.length === 0,
+    strays.slice(0, 3).join(', ') || `${gl} Mapbox request(s), nothing else`)
+  if (!gl) check('the page fetches nothing from the network', external.length === 0,
     external.slice(0, 3).join(', ') || 'zero requests')
 
   // Every external host in the page must be a link, never a loaded resource.
@@ -1759,6 +1792,21 @@ function check(label, condition, detail = '') {
     /* The program is a separate file here too, and a missing subresource is
        the app's quietest possible failure: WebView reports nothing for one, so
        it would open, draw the shell and sit there. */
+    /* Never Mapbox, whatever the environment says. The app has no INTERNET
+       permission, so tiles would be a request it cannot make and a token it
+       cannot spend — and the offline promise is the reason it exists. */
+    const appHtml = readFileSync(appFile, 'utf8')
+    const appJs = readFileSync(join(root, 'dist/app.js'), 'utf8')
+    check('the app carries no map tiles, no token and no renderer for them',
+      !/api\.mapbox\.com/i.test(appHtml) &&
+        !/api\.mapbox\.com/i.test(appJs) &&
+        // The module itself, by something only it contains. app.js still
+        // names MapboxView in a typeof guard, which is how it decides.
+        !/mapbox:\/\/styles/.test(appJs) &&
+        /const MAPBOX_TOKEN = ""/.test(appJs))
+    check('and draws its own map',
+      (await page.evaluate(() => window.OverlandMap.kind || 'canvas')) === 'canvas')
+
     check('the app loads its program as a deferred file',
       existsSync(join(root, 'dist/app.js')) &&
         statSync(join(root, 'dist/app.js')).size > 500_000 &&
