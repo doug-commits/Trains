@@ -66,6 +66,18 @@ android {
 }
 
 dependencies {
+  /* Aligns every kotlin-stdlib* artifact on one version.
+   *
+   * Without it the build fails on duplicate classes: appcompat brings
+   * kotlin-stdlib 1.8.22 while something transitive still asks for
+   * kotlin-stdlib-jdk7/jdk8 1.6.21, and since Kotlin 1.8 the jdk7 and jdk8
+   * artifacts were folded into the main stdlib — so every one of their classes
+   * exists twice. Pinned to a version where those two are empty shims, which
+   * is what makes the collision disappear rather than merely be suppressed.
+   *
+   * No Kotlin is written here. This is transitive weight from AndroidX. */
+  implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.24"))
+
   /* WebViewAssetLoader. Serving the bundled page from an https origin rather
    * than file:// is not cosmetic: modern WebView refuses localStorage on file
    * origins, and the theme choice and the folded panel are both stored there.
