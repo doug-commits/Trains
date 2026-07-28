@@ -1136,6 +1136,82 @@
     })
   }
 
+  /* --------------------------------------------- describing a place by hand */
+
+  /* Someone who half-remembers a place cannot spell their way to it — there is
+   * no spelling of "umbrella market" close enough to "Maeklong" for a typo
+   * matcher to bridge. This searches what the dataset says about each place
+   * rather than what it is called, and shows the sentence that earned the hit
+   * so the answer can be checked rather than trusted. */
+
+  const describeBox = $('#describebox')
+  const describeOut = $('#describe-out')
+
+  // Emphasise the words the reader actually typed, so the evidence is scannable.
+  function litWhy(text, matched) {
+    const set = new Set(matched)
+    return text
+      .split(/(\b)/)
+      .map(part =>
+        set.has(Ask.norm(part)) ? `<b>${UI.esc(part)}</b>` : UI.esc(part)
+      )
+      .join('')
+  }
+
+  function runDescribe() {
+    const q = describeBox.value.trim()
+    if (q.length < 3) return (describeOut.innerHTML = '')
+
+    const hits = Ask.describe(NETWORK, LANDMARKS, q, 6)
+    if (!hits.length) {
+      describeOut.innerHTML =
+        `<li class="describe-none">Nothing here matches that. Try what happens ` +
+        `at the place rather than what it looks like — a market, a crossing, a ` +
+        `boat, a climb.</li>`
+      return
+    }
+
+    describeOut.innerHTML = hits
+      .map(h => {
+        const st = NETWORK.stations[h.stationId]
+        const where = st ? `${st.city}, ${COUNTRY_NAME[st.country]}` : ''
+        return (
+          `<li>` +
+          `<span class="d-name">${UI.esc(h.label)}` +
+          `<span class="d-kind">${h.kind === 'landmark' ? 'sight' : 'station'}</span></span>` +
+          (h.why
+            ? `<span class="d-why">${UI.esc(h.why.source)}: ${litWhy(h.why.text, h.matched)}</span>`
+            : '') +
+          `<span class="d-acts">` +
+          `<button type="button" data-pick="from" data-station="${UI.esc(h.stationId)}" ` +
+          `data-label="${UI.esc(h.label)}">Start here</button>` +
+          `<button type="button" data-pick="to" data-station="${UI.esc(h.stationId)}" ` +
+          `data-label="${UI.esc(h.label)}">End here</button>` +
+          (where ? `<span class="d-kind">${UI.esc(where)}</span>` : '') +
+          `</span></li>`
+        )
+      })
+      .join('')
+  }
+
+  let describeTimer = null
+  describeBox.addEventListener('input', () => {
+    clearTimeout(describeTimer)
+    describeTimer = setTimeout(runDescribe, 120)
+  })
+
+  describeOut.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-station]')
+    if (!btn) return
+    const side = btn.dataset.pick
+    state[side] = btn.dataset.station
+    // A sight and its railhead are not the same place, so the answer is
+    // headlined in the words the reader used rather than the station's name.
+    state.labels = null
+    renderControls()
+    compute()
+  })
+
   /* ------------------------------------------------------------- folding */
 
   /* The panel covers northwest Thailand at the default view — Chiang Mai, Pai,

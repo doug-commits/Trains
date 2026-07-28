@@ -63,6 +63,18 @@
           </span>
         </label>
         <p id="asknote" class="ask-note" hidden></p>
+
+        <details class="describe">
+          <summary><span>Don't know the name? Describe it</span></summary>
+          <div class="describe-body">
+            <input type="text" id="describebox" class="describe-in"
+                   placeholder="the market the train drives through"
+                   autocomplete="off" spellcheck="false"
+                   aria-describedby="describe-help">
+            <p id="describe-help" class="sr">Type what you remember about a place. Results appear below.</p>
+            <ul id="describe-out" class="describe-out" role="listbox" aria-label="Places that match"></ul>
+          </div>
+        </details>
       </div>
 
       <p class="or"><span>or choose stations</span></p>

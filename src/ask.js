@@ -377,5 +377,155 @@ const Ask = (() => {
     return bits
   }
 
-  return { build, ask, match, split, explain, norm, COUNTRY_LABEL }
+  /* ------------------------------------------- describing a place by hand */
+
+  /* "The market where the train goes through the stalls." "That island with
+   * the full moon party." People often know a place by what happens there and
+   * not by its name, and a spelling-tolerant name matcher cannot help them —
+   * there is no spelling of "umbrella market" that is close to "Maeklong".
+   *
+   * So this indexes what the dataset already says about each place: aliases,
+   * the warnings on its station, the notes on the services that call there,
+   * how you cover the last mile to it, and any myth that names it. About four
+   * and a half thousand words, which is enough to find most descriptions.
+   *
+   * Everything is scored offline. The page makes no network requests, which is
+   * what lets it work at a border post with no signal, and asking a model to
+   * resolve this would cost that — see the note in the panel. */
+
+  /* Ordinary English, dropped before scoring. "can" earns its place here the
+   * hard way: accents fold, so "Cần Thơ" indexes as "can tho", and a query
+   * containing the word "can" was answering "a beach you can only reach by
+   * boat" with a floating market in the Mekong delta. */
+  const STOP = new Set([
+    'the', 'a', 'an', 'that', 'this', 'these', 'those', 'with', 'where',
+    'which', 'what', 'who', 'when', 'how', 'is', 'are', 'was', 'were', 'be',
+    'in', 'on', 'at', 'to', 'of', 'and', 'or', 'for', 'from', 'but', 'not',
+    'it', 'its', 'you', 'your', 'i', 'im', 'my', 'we', 'they', 'them',
+    'place', 'places', 'somewhere', 'anywhere', 'thing', 'things', 'one',
+    'go', 'goes', 'going', 'get', 'gets', 'there', 'here', 'near', 'by',
+    'has', 'have', 'had', 'can', 'could', 'would', 'should', 'will', 'just',
+    'only', 'very', 'some', 'any', 'all', 'also', 'about', 'like', 'want',
+    'looking', 'find', 'know', 'called', 'name', 'named', 'called',
+  ])
+
+  const terms = text =>
+    norm(text)
+      .split(/[^a-z0-9]+/)
+      .filter(w => w.length > 2 && !STOP.has(w))
+
+  let index = null
+
+  function buildIndex(network, landmarks) {
+    /* One document per place, with the source of each phrase kept so a result
+     * can say why it matched. A hit you cannot explain is a guess. */
+    const docs = new Map()
+    const doc = (id, kind, label, stationId) => {
+      if (!docs.has(id)) docs.set(id, { id, kind, label, stationId, bag: new Map(), why: [] })
+      return docs.get(id)
+    }
+    const feed = (d, text, source) => {
+      if (!text || typeof text !== 'string') return
+      const ws = terms(text)
+      if (!ws.length) return
+      for (const w of ws) d.bag.set(w, (d.bag.get(w) || 0) + 1)
+      d.why.push({ text, source, words: new Set(ws) })
+    }
+
+    for (const lm of landmarks) {
+      const d = doc(`lm:${lm.name}`, 'landmark', lm.name, lm.station)
+      feed(d, lm.name, 'name')
+      for (const a of lm.aka || []) feed(d, a, 'also known as')
+      if (lm.last) feed(d, lm.last, 'getting there')
+      const st = network.stations[lm.station]
+      if (st) feed(d, `${st.city} ${COUNTRY_LABEL[lm.country] || ''}`, 'where')
+    }
+
+    for (const [id, s] of Object.entries(network.stations)) {
+      const d = doc(`st:${id}`, 'station', s.city === s.name ? s.name : `${s.city} — ${s.name}`, id)
+      feed(d, `${s.city} ${s.name}`, 'name')
+      feed(d, COUNTRY_LABEL[s.country], 'country')
+      if (s.warn) feed(d, s.warn, 'about this station')
+    }
+
+    // A service note describes both ends of the leg it runs on.
+    for (const leg of network.legs) {
+      for (const end of [leg.from, leg.to]) {
+        const d = docs.get(`st:${end}`)
+        if (!d) continue
+        if (leg.note) feed(d, leg.note, 'on this route')
+        if (leg.service) feed(d, leg.service, 'service')
+      }
+    }
+
+    // Myths name places directly, and they are the most quotable text here.
+    for (const m of network.myths || []) {
+      const text = `${m.belief} ${m.reality}`
+      const ws = new Set(terms(text))
+      for (const d of docs.values()) {
+        const nameWords = terms(d.label)
+        if (nameWords.length && nameWords.every(w => ws.has(w))) feed(d, m.reality, 'worth knowing')
+      }
+    }
+
+    /* Rarity weighting. "Island" appears everywhere and settles nothing;
+     * "umbrella" appears once and settles it completely. */
+    const seen = new Map()
+    for (const d of docs.values()) for (const w of d.bag.keys()) seen.set(w, (seen.get(w) || 0) + 1)
+    const n = docs.size
+    const idf = new Map()
+    for (const [w, count] of seen) idf.set(w, Math.log(1 + n / count))
+
+    return { docs: [...docs.values()], idf }
+  }
+
+  /** Rank places by how well a free-text description fits what we know. */
+  function describe(network, landmarks, query, limit = 6) {
+    if (!index) index = buildIndex(network, landmarks)
+    const ws = terms(query)
+    if (!ws.length) return []
+
+    const scored = []
+    for (const d of index.docs) {
+      let score = 0
+      const matched = new Set()
+      for (const w of ws) {
+        const tf = d.bag.get(w)
+        if (!tf) continue
+        matched.add(w)
+        score += (index.idf.get(w) || 1) * Math.min(tf, 3)
+      }
+      if (!matched.size) continue
+      // Half the words matching is a coincidence; most of them is an answer.
+      score *= matched.size / ws.length
+      if (d.kind === 'landmark') score *= 1.15
+
+      // The phrase that did the most work, so the result can show its evidence.
+      let best = null
+      let bestHits = 0
+      for (const w of d.why) {
+        const hits = [...matched].filter(m => w.words.has(m)).length
+        if (hits > bestHits) {
+          bestHits = hits
+          best = w
+        }
+      }
+      scored.push({
+        id: d.id,
+        kind: d.kind,
+        label: d.label,
+        stationId: d.stationId,
+        score,
+        matched: [...matched],
+        why: best ? { text: best.text, source: best.source } : null,
+      })
+    }
+
+    scored.sort((a, b) => b.score - a.score)
+    // A long tail of one-weak-word matches is noise, not a shortlist.
+    const top = scored.filter(s => s.score >= scored[0].score * 0.25)
+    return top.slice(0, limit)
+  }
+
+  return { build, ask, match, split, explain, describe, norm, COUNTRY_LABEL }
 })()

@@ -461,6 +461,13 @@ function check(label, condition, detail = '') {
    * same pixel — and stations deliberately win that tie — so zoom in first,
    * exactly as a reader would. */
   const angkor = LANDMARKS.find(l => l.name === 'Angkor Wat')
+  /* Fold the controls first. Zooming here means wheeling with the pointer on
+   * the target, and as the view tightens Angkor drifts left until it is behind
+   * the panel — at which point the wheel is scrolling a form, not the map, and
+   * the zoom silently stops short. A reader looking closely at Cambodia would
+   * fold it away for the same reason. */
+  await page.click('#fold')
+  await page.waitForTimeout(400)
   await zoomOn(page, angkor.lon, angkor.lat, 18)
   const sightHit = await hover(page, angkor.lon, angkor.lat)
   const sight = sightHit && sightHit.text
@@ -869,6 +876,56 @@ function check(label, condition, detail = '') {
   check('page body does not scroll sideways on mobile', bodyOverflow <= 1, `${bodyOverflow}px`)
 
   await page.screenshot({ path: join(outDir, '06-mobile.png'), fullPage: false })
+  await context.close()
+}
+
+/* -------------------------------------------- describing a place you can't name */
+{
+  const { page, context } = await newPage()
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.click('.describe summary')
+  await page.waitForTimeout(200)
+
+  const ask = async q => {
+    await page.fill('#describebox', q)
+    await page.waitForTimeout(350)
+    return page.locator('#describe-out .d-name').allTextContents()
+  }
+
+  /* The case a spelling-tolerant matcher cannot reach: there is no spelling of
+   * "umbrella market" close to "Maeklong". */
+  const market = await ask('the market the train drives through')
+  check('a described place resolves without its name',
+    /Maeklong/.test(market[0] || ''), market[0] || 'nothing')
+
+  const beach = await ask('a beach you can only reach by boat')
+  check('and so does one described by how you get there',
+    /Railay/.test(beach[0] || ''), beach[0] || 'nothing')
+
+  const moon = await ask('island with the full moon party')
+  check('and one described by what happens there',
+    /Full Moon/.test(moon[0] || ''), moon[0] || 'nothing')
+
+  // The evidence matters as much as the hit: a match you cannot check is a guess.
+  check('each result shows the sentence that earned it',
+    (await page.locator('#describe-out .d-why').count()) > 0)
+  check('and the words you typed are marked in it',
+    (await page.locator('#describe-out .d-why b').count()) > 0)
+
+  // Picking one has to actually plan from it.
+  await ask('the market the train drives through')
+  await page.locator('#describe-out button[data-pick="from"]').first().click()
+  await page.waitForTimeout(700)
+  check('picking a described place sets the route',
+    (await page.inputValue('#from')) === 'maeklong', await page.inputValue('#from'))
+
+  const nothing = await ask('xyzzy quux flurble')
+  check('a miss says so instead of guessing', nothing.length === 0)
+  check('and suggests a better way to ask',
+    /what happens at the place/i.test(await page.textContent('#describe-out')))
+
+  await page.screenshot({ path: join(outDir, '23-describe.png') })
   await context.close()
 }
 
