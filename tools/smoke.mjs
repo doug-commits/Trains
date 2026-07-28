@@ -1767,6 +1767,125 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
   await context.close()
 }
 
+/* --------------------------------------------------- the Mapbox renderer */
+
+/* This machine has no route to api.mapbox.com, so the library cannot be
+ * fetched and the real thing cannot be driven. What can be checked is that our
+ * side of the contract executes: that the version guard admits each shape the
+ * library has shipped in, that every source and layer installs, and that the
+ * whole interface runs without throwing.
+ *
+ * It is worth the trouble. Written blind, this had two faults that only running
+ * it would find — a support check that disabled v3 entirely, and a route leg
+ * read as though it were a network leg when the planner merges consecutive hops
+ * into one and leaves it with steps and no endpoints. */
+{
+  const { execFileSync } = await import('node:child_process')
+  const { cpSync, mkdtempSync, symlinkSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+
+  const stage = mkdtempSync(join(tmpdir(), 'overland-gl-'))
+  try {
+    execFileSync(process.execPath, [join(root, 'tools/build.mjs')], {
+      cwd: root,
+      env: { ...process.env, MAPBOX_TOKEN: 'pk.test' },
+      stdio: 'ignore',
+    })
+    cpSync(join(root, 'index.html'), join(stage, 'index.html'))
+    cpSync(join(root, 'app.js'), join(stage, 'app.js'))
+    // The route banner links a photograph beside the page. Linked, not copied:
+    // it is 19 MB and it is the same 19 MB.
+    symlinkSync(join(root, 'data'), join(stage, 'data'), 'dir')
+  } finally {
+    // Back to a tokenless build before anything that can fail, so a crash here
+    // can never leave a token sitting in a file somebody then commits.
+    execFileSync(process.execPath, [join(root, 'tools/build.mjs')], {
+      cwd: root,
+      stdio: 'ignore',
+    })
+  }
+
+  /* A library that behaves, so create() runs end to end. It cannot tell us the
+   * layer definitions are valid Mapbox style-spec — only Mapbox can — but it
+   * does tell us they are reached and that nothing throws on the way. */
+  const fake = supported => `
+    function FakeMap() { this._h = {}; this._s = {}; this._l = {}; window.__map = this }
+    FakeMap.prototype.on = function (a, b, c) {
+      const f = typeof b === 'function' ? b : c
+      ;(this._h[a] ||= []).push(f)
+    }
+    FakeMap.prototype.fire = function (a) { (this._h[a] || []).forEach(f => f()) }
+    FakeMap.prototype.addSource = function (id, s) { this._s[id] = s }
+    FakeMap.prototype.getSource = function (id) {
+      return this._s[id] ? { setData: () => {} } : undefined
+    }
+    FakeMap.prototype.addLayer = function (l) { this._l[l.id] = l }
+    FakeMap.prototype.getLayer = function (id) { return this._l[id] }
+    FakeMap.prototype.setPaintProperty = function () {}
+    FakeMap.prototype.getCanvas = () => ({ style: {} })
+    FakeMap.prototype.project = () => ({ x: 10, y: 10 })
+    FakeMap.prototype.unproject = () => ({ lng: 100, lat: 13 })
+    FakeMap.prototype.getCenter = () => ({ lng: 100, lat: 13 })
+    FakeMap.prototype.getZoom = () => 4
+    FakeMap.prototype.fitBounds = function () {}
+    FakeMap.prototype.panBy = function () {}
+    FakeMap.prototype.easeTo = function () {}
+    FakeMap.prototype.setStyle = function () {}
+    FakeMap.prototype.resize = function () {}
+    FakeMap.prototype.queryRenderedFeatures = () => []
+    FakeMap.prototype.touchZoomRotate = { disableRotation() {} }
+    window.mapboxgl = { accessToken: '', Map: FakeMap${supported} }
+  `
+
+  const shapes = [
+    ['v3, which dropped mapboxgl.supported', '', 'mapbox'],
+    ['v2, which reports it supported', ', supported: () => true', 'mapbox'],
+    ['a browser it says it cannot draw on', ', supported: () => false', 'canvas'],
+  ]
+
+  for (const [what, supported, want] of shapes) {
+    const { page, context } = await newPage()
+    const thrown = []
+    page.on('pageerror', e => thrown.push(e.message))
+    await page.addInitScript(fake(supported))
+    await page.goto('file://' + join(stage, 'index.html'))
+    await page.waitForFunction(() => document.querySelector('#panel h1'))
+    await page.waitForTimeout(500)
+
+    const got = await page.evaluate(() => window.OverlandMap.kind || 'canvas')
+    check(`${what} gets the ${want} map`, got === want, got)
+
+    if (want === 'mapbox') {
+      const run = await page.evaluate(async () => {
+        const m = window.OverlandMap
+        try {
+          window.__map.fire('load')
+          document.querySelector('.corridor').click()
+          await new Promise(r => setTimeout(r, 1200))
+          m.focusLeg(0)
+          m.focusLeg(null)
+          m.resetView()
+          m.panBy(10, 10)
+          m.zoomAt(20, 20, 2)
+          m.locate(100.5, 13.8)
+          m.viewSignature()
+          m.resize()
+          window.__map.fire('style.load')
+        } catch (e) {
+          return { threw: e.message }
+        }
+        return { layers: Object.keys(window.__map._l), sources: Object.keys(window.__map._s) }
+      })
+      check('and the whole interface runs without throwing', !run.threw, run.threw || '')
+      check('with every source and layer installed',
+        !run.threw && run.sources.length === 4 && run.layers.length === 9,
+        run.threw ? '' : `${run.sources.length} sources, ${run.layers.length} layers`)
+      check('and no error reaches the page', thrown.length === 0, thrown[0] || '')
+    }
+    await context.close()
+  }
+}
+
 /* --------------------------------------------------- the Android build */
 
 /* A second artefact that can drift from the site without anyone noticing,

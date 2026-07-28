@@ -4811,29 +4811,64 @@ const MapboxView = (() => {
   }
 
   function create(wrap, network, landmarks = [], rails = {}, opts = {}) {
-    if (!opts.token || typeof mapboxgl === 'undefined' || !mapboxgl.supported?.()) {
-      return null
-    }
+    if (!opts.token || typeof mapboxgl === 'undefined') return null
+    /* mapboxgl.supported() existed in v1 and v2 and was removed in v3. Asking
+     * for it optionally and negating the answer therefore reads "unsupported"
+     * on every modern build — which would have left the website silently on the
+     * drawn map with the token set and no sign of why. Only consulted when it
+     * is actually there. */
+    if (typeof mapboxgl.supported === 'function' && !mapboxgl.supported()) return null
 
     const at = id => {
       const s = network.stations[id]
       return [s.lon, s.lat]
     }
 
-    /** The drawn shape of a leg, in lon/lat. */
-    function geometry(leg) {
-      const track = rails[`${leg.from}|${leg.to}`]
+    /** The drawn shape of one station-to-station hop, in lon/lat. */
+    function geometry(from, to, mode) {
+      const track = rails[`${from}|${to}`]
       if (track) return track
-      const a = at(leg.from)
-      const b = at(leg.to)
-      return leg.mode === 'ferry' ? bow(a, b) : [a, b]
+      const a = at(from)
+      const b = at(to)
+      return mode === 'ferry' ? bow(a, b) : [a, b]
     }
 
     const lineFeature = leg => ({
       type: 'Feature',
       properties: { mode: leg.mode },
-      geometry: { type: 'LineString', coordinates: geometry(leg) },
+      geometry: {
+        type: 'LineString',
+        coordinates: geometry(leg.from, leg.to, leg.mode),
+      },
     })
+
+    /* A leg of a route is not a leg of the network.
+     *
+     * The planner merges consecutive hops into one leg per vehicle — the point
+     * of mergeSegments — so what arrives here has steps and no endpoints of its
+     * own. Reading from and to off it gives undefined, which is what a station
+     * lookup then chokes on. Its shape is its steps, laid end to end. */
+    const routeFeature = (leg, dim) => ({
+      type: 'Feature',
+      properties: { mode: leg.mode, dim: !!dim },
+      geometry: {
+        type: 'LineString',
+        coordinates: leg.steps.flatMap((step, i) => {
+          const part = geometry(step.from, step.to, step.mode || leg.mode)
+          // The end of one hop is the start of the next; keep it once.
+          return i ? part.slice(1) : part
+        }),
+      },
+    })
+
+    /** Every station-to-station hop the route uses, so the lattice can skip it. */
+    const stepKeys = r => {
+      const keys = new Set()
+      for (const entry of r ? r.legs : []) {
+        for (const step of entry.leg.steps) keys.add(`${step.from}|${step.to}`)
+      }
+      return keys
+    }
 
     const collection = features => ({ type: 'FeatureCollection', features })
 
@@ -4902,6 +4937,7 @@ const MapboxView = (() => {
     }
 
     let inset = { left: 0, right: 0, top: 0, bottom: 0 }
+    let applied = isDark() ? STYLE.dark : STYLE.light
     let route = null
     let focused = null
     let ready = false
@@ -4956,12 +4992,8 @@ const MapboxView = (() => {
             paint: {
               'line-color': pal[mode],
               'line-width': mode === 'rail' ? 4 : 3,
-              'line-opacity': [
-                'case',
-                ['boolean', ['feature-state', 'dim'], false],
-                0.35,
-                1,
-              ],
+              // Set as a property by focusLeg, so read as one here.
+              'line-opacity': ['case', ['boolean', ['get', 'dim'], false], 0.3, 1],
             },
           })
         }
@@ -5023,9 +5055,29 @@ const MapboxView = (() => {
 
     function applyRoute() {
       const src = map.getSource('route')
-      if (!src) return
-      const used = route ? route.legs.map(e => lineFeature(e.leg)) : []
-      src.setData(collection(used))
+      if (src) {
+        src.setData(
+          collection(
+            route
+              ? route.legs.map((e, i) =>
+                  routeFeature(e.leg, focused !== null && i !== focused)
+                )
+              : []
+          )
+        )
+      }
+      /* And take the route's own hops out of the lattice underneath it, or the
+       * itinerary is drawn on top of a faint copy of itself. */
+      const idle = map.getSource('idle')
+      if (!idle) return
+      const used = stepKeys(route)
+      idle.setData(
+        collection(
+          network.legs
+            .filter(l => !used.has(`${l.from}|${l.to}`))
+            .map(lineFeature)
+        )
+      )
     }
 
     map.on('load', () => {
@@ -5115,22 +5167,12 @@ const MapboxView = (() => {
         if (!ready || !route) return
         const src = map.getSource('route')
         if (!src) return
-        const feats = route.legs.map((e, i) => {
-          const f = lineFeature(e.leg)
-          f.properties.dim = index !== null && i !== index
-          return f
-        })
-        src.setData(collection(feats))
-        for (const mode of ['rail', 'ferry', 'road']) {
-          const id = `route-${mode}`
-          if (!map.getLayer(id)) continue
-          map.setPaintProperty(id, 'line-opacity', [
-            'case',
-            ['boolean', ['get', 'dim'], false],
-            0.3,
-            1,
-          ])
-        }
+        // The layers already read `dim`; setting the data is the whole change.
+        src.setData(
+          collection(
+            route.legs.map((e, i) => routeFeature(e.leg, index !== null && i !== index))
+          )
+        )
       },
 
       panBy(dx, dy) {
@@ -5156,10 +5198,17 @@ const MapboxView = (() => {
         return null
       },
 
+      /* The canvas map redraws for anything — a theme change, the fonts
+       * arriving, a resize. Here a redraw means throwing the entire style away
+       * and fetching it again, so it happens only when the answer would
+       * actually differ. */
       redraw() {
         if (!ready) return
+        const want = isDark() ? STYLE.dark : STYLE.light
+        if (want === applied) return
+        applied = want
         try {
-          map.setStyle(isDark() ? STYLE.dark : STYLE.light)
+          map.setStyle(want)
         } catch (e) {
           /* keep the style we have */
         }
