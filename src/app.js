@@ -1029,6 +1029,10 @@
       select.dispatchEvent(new Event('change'))
       input.value = labelFor(c.id)
       close()
+      /* And let the keyboard go. It covers half a phone, and the answer to what
+       * was just typed is underneath it — the field is kept focused through the
+       * tap on purpose, so nothing gives it up unless this does. */
+      if (onPhone()) input.blur()
     }
 
     input.addEventListener('input', () => paint(input.value.trim()))
@@ -1550,8 +1554,10 @@
    * revealed instead of trailing a blank edge behind the finger. */
   function fitScroller(y) {
     const grip = gripEl.getBoundingClientRect().height
+    // Floor, not round: this whole bug was a scroller reaching past the glass,
+    // and a pixel the wrong way is the same mistake in miniature.
     const visible = Math.max(80, window.innerHeight - y - grip)
-    sheetScroll.style.maxHeight = `${Math.round(visible)}px`
+    sheetScroll.style.maxHeight = `${Math.floor(visible)}px`
   }
 
   function setSnap(next, glide = true) {
@@ -1596,7 +1602,16 @@
     if (!onPhone()) return
     sheetDrag = { y: e.clientY, from: sheetY, at: performance.now(), moved: 0, fromContent }
     sheet.dataset.gliding = 'false'
-    fitScroller(snapPoints().full) // tallest, for the length of the gesture
+    /* Nothing is resized here, and that is the point.
+     *
+     * This used to open the scroller to its full height on every press, so a
+     * press that became a drag would have content to reveal. Most presses are
+     * not drags — they are the beginning of a scroll — and resizing a scroll
+     * container as the touch lands makes the browser abandon the scroll it was
+     * starting. The list then never moved, so scrollTop stayed at zero, so the
+     * next swipe armed a drag and was abandoned in the same way. It could not
+     * recover on its own: the itinerary was simply frozen, which is what the
+     * recording showed. */
   }
 
   gripEl.addEventListener('pointerdown', e => {
@@ -1634,7 +1649,11 @@
     if (sheetDrag.fromContent && dy < 12) return
     if (e.cancelable) e.preventDefault()
 
-    sheetDrag.took = true
+    if (!sheetDrag.took) {
+      sheetDrag.took = true
+      // Now it is certainly a drag, so give it room to move into.
+      fitScroller(snapPoints().full)
+    }
     const pts = snapPoints()
     placeSheet(Math.max(pts.full, Math.min(pts.peek, sheetDrag.from + dy)), false)
   }
@@ -1682,6 +1701,17 @@
   function revealResult() {
     if (onPhone() && snap === 'peek') setSnap('half')
   }
+
+  /* The soft keyboard changes the height of the window, and the sheet is placed
+   * and sized against that height. Opening it after the sheet has been
+   * positioned leaves the two disagreeing — placed for a tall screen, sized for
+   * a short one, the bottom of the scroller below the glass. Re-applying the
+   * same snap computes both against what is actually there. */
+  const refit = () => {
+    if (onPhone()) setSnap(snap, false)
+  }
+  window.addEventListener('resize', refit)
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', refit)
 
   let resizeTimer = null
   window.addEventListener('resize', () => {

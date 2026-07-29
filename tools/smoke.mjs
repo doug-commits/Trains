@@ -1711,6 +1711,80 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
     await page.waitForTimeout(450)
   }
 
+  /* ------------------------------------------------- with the keyboard up */
+
+  /* A recording of the app showed the itinerary frozen: a route planned, the
+   * keyboard still covering half the screen, and nothing moving however much it
+   * was swiped. Three faults compounded, and all three are checked here. */
+  {
+    await page.setViewportSize({ width: 412, height: 915 })
+    await page.waitForTimeout(400)
+    await page.locator('#from-q').tap()
+    await page.locator('#from-q').fill('luang prabang')
+    await page.waitForTimeout(250)
+    await page.locator('#from-list li[data-i]').first().tap()
+    await page.waitForTimeout(250)
+
+    /* The keyboard has to go when a station is chosen. The field is kept
+       focused through the tap on purpose, so nothing releases it otherwise —
+       and it was sitting over the answer to what had just been typed. */
+    check('choosing a station lets the keyboard go',
+      (await page.evaluate(() => document.activeElement && document.activeElement.id)) !== 'from-q')
+
+    await page.locator('#to-q').tap()
+    await page.setViewportSize({ width: 412, height: 440 }) // the keyboard
+    await page.waitForTimeout(400)
+    await page.locator('#to-q').fill('muang nga')
+    await page.waitForTimeout(250)
+    await page.locator('#to-list li[data-i]').first().tap()
+    await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+    await page.waitForTimeout(900)
+
+    /* The sheet is placed and sized against the window height, and the keyboard
+       changes it. Placed for a tall screen and sized for a short one, the
+       bottom of the scroller ended up below the glass again. */
+    const fit = await page.evaluate(() => {
+      const r = document.querySelector('#sheet-scroll').getBoundingClientRect()
+      return { bottom: Math.round(r.bottom), viewport: window.innerHeight }
+    })
+    check('and the sheet re-fits the screen the keyboard left',
+      fit.bottom <= fit.viewport + 2, `ends at ${fit.bottom} of ${fit.viewport}`)
+
+    /* The freeze itself. Every press on the contents resized the scroller, so
+       that a press which became a drag had room to move into — but a press is
+       usually the start of a scroll, and resizing a scroll container as the
+       touch lands makes the browser abandon it. The list never moved, scrollTop
+       stayed at zero, and the next swipe was abandoned the same way. */
+    await page.setViewportSize({ width: 412, height: 915 })
+    await page.waitForTimeout(400)
+    // From half, where the sheet is short: a press that opened it to full
+    // height would change the number, which at full it would not.
+    for (let i = 0; i < 4; i++) {
+      if ((await page.evaluate(() => document.querySelector('#sheet').dataset.snap)) === 'half') break
+      await page.evaluate(() => document.querySelector('#grip').click())
+      await page.waitForTimeout(400)
+    }
+    check('the sheet can be put back to half', (await page.evaluate(
+      () => document.querySelector('#sheet').dataset.snap)) === 'half')
+
+    const onPress = await page.evaluate(() => {
+      const el = document.querySelector('#sheet-scroll')
+      el.scrollTop = 0
+      const before = el.style.maxHeight
+      el.dispatchEvent(new PointerEvent('pointerdown', {
+        pointerId: 11, pointerType: 'touch', bubbles: true, cancelable: true,
+        clientX: 200, clientY: el.getBoundingClientRect().top + 60,
+      }))
+      const after = el.style.maxHeight
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        pointerId: 11, pointerType: 'touch', bubbles: true, cancelable: true,
+      }))
+      return { before, after }
+    })
+    check('and a touch on the itinerary does not resize it out from under itself',
+      onPress.before === onPress.after, `${onPress.before} became ${onPress.after}`)
+  }
+
   /* One finger moves the map, both ways. Nothing scrolls behind it to be
      protected, which is what the split axes were working around. */
   const sig = () => page.evaluate(() => window.OverlandMap.viewSignature())
