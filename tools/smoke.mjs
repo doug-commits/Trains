@@ -37,16 +37,7 @@ async function newPage(opts = {}) {
   })
   const page = await context.newPage()
   page.on('console', m => {
-    if (m.type() !== 'error') return
-    /* A build with a Mapbox token asks api.mapbox.com for the library. Any
-     * machine without a route to it — this sandbox, an offline CI runner —
-     * logs the failure, and the point of the fallback is that the page carries
-     * on regardless. So the failure to reach it is not a problem; anything the
-     * page then does wrong still is, and is caught by every other check. */
-    if (/Failed to load resource/.test(m.text()) && /mapbox/i.test(m.location()?.url || '')) {
-      return
-    }
-    problems.push(`console.error: ${m.text()}`)
+    if (m.type() === 'error') problems.push(`console.error: ${m.text()}`)
   })
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
   return { page, context }
@@ -688,18 +679,9 @@ function check(label, condition, detail = '') {
 }
 
 /* --------------------------------------------- nothing is fetched at runtime
- *
- * The premise the app rests on: it works at a border post with no signal, and
- * inside a strict-CSP artifact. Linking out to Google Maps is fine; loading it
- * would end both. This is the guard on that decision.
- *
- * The website is now allowed one exception, and exactly one. With a Mapbox
- * token configured it fetches the library and its tiles, because tiles are the
- * entire point of it and a website has a network by definition. Nothing else
- * may appear in this list, and the app build below must still fetch nothing at
- * all whatever the website is doing — it has no INTERNET permission to do it
- * with. */
-const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
+ * The premise the whole thing rests on: it works at a border post with no
+ * signal, and inside a strict-CSP artifact. Linking out to Google Maps is fine;
+ * loading it would end both. This is the guard on that decision. */
 {
   const { page, context } = await newPage()
   const external = []
@@ -712,22 +694,7 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
   await page.locator('.corridor').first().click()
   await page.waitForFunction(() => document.querySelector('.route tbody tr'))
   await page.waitForTimeout(1000)
-  /* The fallback is the point of the arrangement, so it is tested rather than
-     assumed: with a token configured and no route to Mapbox — this sandbox, a
-     plane, a censored network — the reader gets the drawn map and a working
-     route, not an empty frame. */
-  if (external.some(u => MAPBOX_HOST.test(u))) {
-    check('an unreachable Mapbox falls back to the drawn map',
-      (await page.evaluate(() => window.OverlandMap.kind || 'canvas')) === 'canvas')
-    check('and the route still plans on it',
-      (await page.locator('.route tbody tr').count()) > 0)
-  }
-
-  const strays = external.filter(u => !MAPBOX_HOST.test(u))
-  const gl = external.length - strays.length
-  check('the page fetches nothing but its map tiles', strays.length === 0,
-    strays.slice(0, 3).join(', ') || `${gl} Mapbox request(s), nothing else`)
-  if (!gl) check('the page fetches nothing from the network', external.length === 0,
+  check('the page fetches nothing from the network', external.length === 0,
     external.slice(0, 3).join(', ') || 'zero requests')
 
   // Every external host in the page must be a link, never a loaded resource.
@@ -1883,125 +1850,6 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
   await context.close()
 }
 
-/* --------------------------------------------------- the Mapbox renderer */
-
-/* This machine has no route to api.mapbox.com, so the library cannot be
- * fetched and the real thing cannot be driven. What can be checked is that our
- * side of the contract executes: that the version guard admits each shape the
- * library has shipped in, that every source and layer installs, and that the
- * whole interface runs without throwing.
- *
- * It is worth the trouble. Written blind, this had two faults that only running
- * it would find — a support check that disabled v3 entirely, and a route leg
- * read as though it were a network leg when the planner merges consecutive hops
- * into one and leaves it with steps and no endpoints. */
-{
-  const { execFileSync } = await import('node:child_process')
-  const { cpSync, mkdtempSync, symlinkSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-
-  const stage = mkdtempSync(join(tmpdir(), 'overland-gl-'))
-  try {
-    execFileSync(process.execPath, [join(root, 'tools/build.mjs')], {
-      cwd: root,
-      env: { ...process.env, MAPBOX_TOKEN: 'pk.test' },
-      stdio: 'ignore',
-    })
-    cpSync(join(root, 'index.html'), join(stage, 'index.html'))
-    cpSync(join(root, 'app.js'), join(stage, 'app.js'))
-    // The route banner links a photograph beside the page. Linked, not copied:
-    // it is 19 MB and it is the same 19 MB.
-    symlinkSync(join(root, 'data'), join(stage, 'data'), 'dir')
-  } finally {
-    // Back to a tokenless build before anything that can fail, so a crash here
-    // can never leave a token sitting in a file somebody then commits.
-    execFileSync(process.execPath, [join(root, 'tools/build.mjs')], {
-      cwd: root,
-      stdio: 'ignore',
-    })
-  }
-
-  /* A library that behaves, so create() runs end to end. It cannot tell us the
-   * layer definitions are valid Mapbox style-spec — only Mapbox can — but it
-   * does tell us they are reached and that nothing throws on the way. */
-  const fake = supported => `
-    function FakeMap() { this._h = {}; this._s = {}; this._l = {}; window.__map = this }
-    FakeMap.prototype.on = function (a, b, c) {
-      const f = typeof b === 'function' ? b : c
-      ;(this._h[a] ||= []).push(f)
-    }
-    FakeMap.prototype.fire = function (a) { (this._h[a] || []).forEach(f => f()) }
-    FakeMap.prototype.addSource = function (id, s) { this._s[id] = s }
-    FakeMap.prototype.getSource = function (id) {
-      return this._s[id] ? { setData: () => {} } : undefined
-    }
-    FakeMap.prototype.addLayer = function (l) { this._l[l.id] = l }
-    FakeMap.prototype.getLayer = function (id) { return this._l[id] }
-    FakeMap.prototype.setPaintProperty = function () {}
-    FakeMap.prototype.getCanvas = () => ({ style: {} })
-    FakeMap.prototype.project = () => ({ x: 10, y: 10 })
-    FakeMap.prototype.unproject = () => ({ lng: 100, lat: 13 })
-    FakeMap.prototype.getCenter = () => ({ lng: 100, lat: 13 })
-    FakeMap.prototype.getZoom = () => 4
-    FakeMap.prototype.fitBounds = function () {}
-    FakeMap.prototype.panBy = function () {}
-    FakeMap.prototype.easeTo = function () {}
-    FakeMap.prototype.setStyle = function () {}
-    FakeMap.prototype.resize = function () {}
-    FakeMap.prototype.queryRenderedFeatures = () => []
-    FakeMap.prototype.touchZoomRotate = { disableRotation() {} }
-    window.mapboxgl = { accessToken: '', Map: FakeMap${supported} }
-  `
-
-  const shapes = [
-    ['v3, which dropped mapboxgl.supported', '', 'mapbox'],
-    ['v2, which reports it supported', ', supported: () => true', 'mapbox'],
-    ['a browser it says it cannot draw on', ', supported: () => false', 'canvas'],
-  ]
-
-  for (const [what, supported, want] of shapes) {
-    const { page, context } = await newPage()
-    const thrown = []
-    page.on('pageerror', e => thrown.push(e.message))
-    await page.addInitScript(fake(supported))
-    await page.goto('file://' + join(stage, 'index.html'))
-    await page.waitForFunction(() => document.querySelector('#panel h1'))
-    await page.waitForTimeout(500)
-
-    const got = await page.evaluate(() => window.OverlandMap.kind || 'canvas')
-    check(`${what} gets the ${want} map`, got === want, got)
-
-    if (want === 'mapbox') {
-      const run = await page.evaluate(async () => {
-        const m = window.OverlandMap
-        try {
-          window.__map.fire('load')
-          document.querySelector('.corridor').click()
-          await new Promise(r => setTimeout(r, 1200))
-          m.focusLeg(0)
-          m.focusLeg(null)
-          m.resetView()
-          m.panBy(10, 10)
-          m.zoomAt(20, 20, 2)
-          m.locate(100.5, 13.8)
-          m.viewSignature()
-          m.resize()
-          window.__map.fire('style.load')
-        } catch (e) {
-          return { threw: e.message }
-        }
-        return { layers: Object.keys(window.__map._l), sources: Object.keys(window.__map._s) }
-      })
-      check('and the whole interface runs without throwing', !run.threw, run.threw || '')
-      check('with every source and layer installed',
-        !run.threw && run.sources.length === 4 && run.layers.length === 9,
-        run.threw ? '' : `${run.sources.length} sources, ${run.layers.length} layers`)
-      check('and no error reaches the page', thrown.length === 0, thrown[0] || '')
-    }
-    await context.close()
-  }
-}
-
 /* --------------------------------------------------- the Android build */
 
 /* A second artefact that can drift from the site without anyone noticing,
@@ -2027,21 +1875,6 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
     /* The program is a separate file here too, and a missing subresource is
        the app's quietest possible failure: WebView reports nothing for one, so
        it would open, draw the shell and sit there. */
-    /* Never Mapbox, whatever the environment says. The app has no INTERNET
-       permission, so tiles would be a request it cannot make and a token it
-       cannot spend — and the offline promise is the reason it exists. */
-    const appHtml = readFileSync(appFile, 'utf8')
-    const appJs = readFileSync(join(root, 'dist/app.js'), 'utf8')
-    check('the app carries no map tiles, no token and no renderer for them',
-      !/api\.mapbox\.com/i.test(appHtml) &&
-        !/api\.mapbox\.com/i.test(appJs) &&
-        // The module itself, by something only it contains. app.js still
-        // names MapboxView in a typeof guard, which is how it decides.
-        !/mapbox:\/\/styles/.test(appJs) &&
-        /const MAPBOX_TOKEN = ""/.test(appJs))
-    check('and draws its own map',
-      (await page.evaluate(() => window.OverlandMap.kind || 'canvas')) === 'canvas')
-
     check('the app loads its program as a deferred file',
       existsSync(join(root, 'dist/app.js')) &&
         statSync(join(root, 'dist/app.js')).size > 500_000 &&

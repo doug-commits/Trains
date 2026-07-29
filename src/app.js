@@ -80,41 +80,7 @@
   const panel = $('#panel')
   const tooltip = $('#tip')
 
-  /* Two renderers, one interface.
-   *
-   * Mapbox where there is a network and a token to spend on it, which is the
-   * website. The drawn canvas everywhere else, which is the Android app — it
-   * has no INTERNET permission and exists to answer a question at a border post
-   * with the phone in flight mode, and tiles would take exactly that away.
-   *
-   * The canvas is also the fallback, and a real one: if the library does not
-   * load, the token is refused or a style will not take, create() returns null
-   * and the reader gets a complete working map rather than an empty frame. */
-  const wantGL =
-    typeof MAPBOX_TOKEN === 'string' &&
-    MAPBOX_TOKEN &&
-    !document.documentElement.dataset.app &&
-    typeof MapboxView !== 'undefined'
-
-  let map = null
-  if (wantGL) {
-    try {
-      map = MapboxView.create(canvas.parentNode, NETWORK, LANDMARKS, RAILS, {
-        token: MAPBOX_TOKEN,
-        onPick: (found, x, y) => {
-          if (!found) return hideTip()
-          if (found.type === 'station') showStationTip(x, y, found.id)
-          else showLandmarkTip(x, y, found.landmark)
-        },
-      })
-    } catch (e) {
-      map = null
-    }
-  }
-  if (map) app.dataset.map = 'gl'
-  else map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
-
-  const onCanvas = () => map.kind !== 'mapbox'
+  const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
   // to point the real pointer at a real place instead of sweeping the canvas.
   window.OverlandMap = map
@@ -406,11 +372,7 @@
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1
   }
 
-  /* Mapbox handles its own panning, pinching and hit testing, and the canvas
-   * is not even displayed then — but the listeners are cheap to leave attached
-   * and expensive to reason about half-attached, so each one asks. */
   canvas.addEventListener('pointerdown', e => {
-    if (!onCanvas()) return
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
       if (touches.size === 2) {
@@ -432,7 +394,6 @@
   })
 
   canvas.addEventListener('pointermove', e => {
-    if (!onCanvas()) return
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY })
       if (!drag) return
@@ -675,7 +636,6 @@
   let lastTap = null
 
   canvas.addEventListener('pointerup', e => {
-    if (!onCanvas()) return
     const wasPinch = e.pointerType === 'touch' && touches.size > 1
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId)
@@ -729,7 +689,6 @@
   })
 
   canvas.addEventListener('pointerleave', e => {
-    if (!onCanvas()) return
     touches.delete(e.pointerId)
     if (touches.size < 2) pinch = null
     drag = null
@@ -738,7 +697,6 @@
   })
 
   canvas.addEventListener('pointercancel', e => {
-    if (!onCanvas()) return
     touches.delete(e.pointerId)
     if (touches.size < 2) pinch = null
     drag = null
@@ -753,7 +711,6 @@
   canvas.addEventListener(
     'wheel',
     e => {
-      if (!onCanvas()) return
       e.preventDefault()
       // A trackpad pinch arrives as many small deltas, a wheel as few large
       // ones. Scaling by the delta keeps both smooth instead of stepping.

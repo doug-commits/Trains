@@ -532,15 +532,6 @@ body {
 
 .mapwrap { position: absolute; inset: 0; }
 
-/* The Mapbox surface, when there is a token to draw it with. It fills the same
-   frame the canvas does and takes its place — the canvas is still created, still
-   holds the fallback, and is simply not shown. */
-.mapgl { position: absolute; inset: 0; }
-[data-map='gl'] #map { display: none; }
-
-/* Mapbox draws its own attribution; keep it clear of the sheet and the legend. */
-[data-map='gl'] .mapboxgl-ctrl-bottom-right { z-index: 4; }
-
 #map {
   display: block;
   width: 100%;
@@ -2424,7 +2415,6 @@ table { width: 100%; border-collapse: collapse; }
 }
 .credits b { font-family: var(--sans); font-weight: 600; color: var(--ink-soft); }
 </style>
-
 <script defer src="app.js"></script>
 </body>
 </html>

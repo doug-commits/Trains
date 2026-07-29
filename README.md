@@ -313,38 +313,6 @@ node tools/smoke.mjs      # drive it in a real browser, write screenshots
 The smoke test needs Playwright and fails on any console error, so run it before
 committing. Screenshots land in `shots/`.
 
-### Two maps, and which one you get
-
-The website draws real tiles with Mapbox GL; the Android app draws its own
-coastline on a canvas. Both are behind the same eleven methods, so the rest of
-the program does not know which it is talking to.
-
-That split is not indecision. The app has **no `INTERNET` permission** and
-exists to answer "does the Padang Besar connection hold?" at a border post with
-the phone in flight mode. Tiles would take exactly that away, and with it the
-argument that this is a program rather than a wrapper around a website. So the
-Mapbox renderer is not even compiled into the app build.
-
-Tiles are off unless a token is set:
-
-```sh
-MAPBOX_TOKEN=pk.… node tools/build.mjs   # website draws Mapbox tiles
-node tools/build.mjs                     # website draws its own map
-```
-
-Unset, the page requests nothing from anyone — no library, no stylesheet, no
-beacon — and the smoke test asserts it. Set, the only external host permitted is
-Mapbox, and the smoke test asserts that too.
-
-**The canvas map is the fallback, not a placeholder.** If the library will not
-load, the token is refused, or a style will not take, the reader gets the drawn
-map and a working route rather than an empty frame. That path is tested, because
-it is the one that runs on a plane.
-
-A `pk.` token is meant to be visible in client code, but it is billable —
-restrict it by URL in the Mapbox account. It is read from the environment and
-never committed, like `BOOKING_AID` and `SAFETYWING_REF`.
-
 ### Regenerating the data files
 
 Both outputs are committed, so you only need these when the inputs change.

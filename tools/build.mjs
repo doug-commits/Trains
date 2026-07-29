@@ -93,7 +93,6 @@ const SCRIPTS = [
   'src/photos.js',
   'src/ask.js',
   'src/map.js',
-  'src/mapbox.js',
   'src/ui.js',
   'src/app.js',
 ]
@@ -224,33 +223,9 @@ const partnerIds =
   `PARTNERS.booking.id = ${JSON.stringify(process.env.BOOKING_AID || '')};\n` +
   `PARTNERS.insurance.id = ${JSON.stringify(process.env.SAFETYWING_REF || '')};`
 
-/* The Mapbox token, same rule as the affiliate ids: from the environment, never
- * from the repo. Unset — which is the default, and what a clone gets — the page
- * draws its own map and asks nothing of anyone. Public tokens are meant to be
- * visible in client code, but they are billable, so restrict this one by URL in
- * the Mapbox account as well.
- *
- * Never in the app. It has no INTERNET permission and would be asking for tiles
- * it cannot fetch. */
-const MAPBOX_TOKEN = APP ? '' : process.env.MAPBOX_TOKEN || ''
-const GL_VERSION = 'v3.9.0'
-
-/* The Mapbox renderer is not built into the app at all. It could never run
- * there — no INTERNET permission, no token — so it would be seven kilobytes of
- * unreachable code carried to a border post for nothing. */
-const scripts = APP ? SCRIPTS.filter(p => p !== 'src/mapbox.js') : SCRIPTS
-
 const sources =
-  `const MAPBOX_TOKEN = ${JSON.stringify(MAPBOX_TOKEN)};\n` +
-  scripts.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n') +
+  SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n') +
   `\n/* ===== affiliate ids (build-time) ===== */\n${partnerIds}\n`
-
-/* Only fetched when there is a token to use it with, so a build without one
- * makes no request to Mapbox at all — no stylesheet, no library, no beacon. */
-const glTags = MAPBOX_TOKEN
-  ? `<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/${GL_VERSION}/mapbox-gl.css">\n` +
-    `<script defer src="https://api.mapbox.com/mapbox-gl-js/${GL_VERSION}/mapbox-gl.js"></script>`
-  : ''
 
 /* The program itself, as one self-executing block. */
 const programFor = photoSet => `(function(){
@@ -286,7 +261,6 @@ const bodyLinking = (photoSet, src) => `${shell}
 <style>
 ${fonts}
 ${css}</style>
-${glTags}
 <script defer src="${src}"></script>`
 
 mkdirSync(join(root, 'dist'), { recursive: true })
