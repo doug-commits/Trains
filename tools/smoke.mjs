@@ -1678,7 +1678,87 @@ function check(label, condition, detail = '') {
     await page.waitForTimeout(450)
   }
 
-  /* ---------------------------------------- a real thumb on the itinerary */
+  /* --------------------------------------------------- reading the labels */
+
+/* Place names on the map were unreadable on a phone, and the size was only
+ * half of it. The word space in Barlow Condensed is 0.167em — two pixels at
+ * twelve — and the halo behind the lettering was three and a half wide, so the
+ * halo of one word's last letter reached the next word's first and "Phnom
+ * Penh" arrived as one word. */
+{
+  const shrunk = await page.evaluate(() => {
+    const c = document.createElement('canvas').getContext('2d')
+    c.font = '500 12px BarlowCond, system-ui, sans-serif'
+    return {
+      space: +c.measureText(' ').width.toFixed(2),
+      joined: c.measureText('PhnomPenh').width,
+      spaced: c.measureText('Phnom Penh').width,
+    }
+  })
+  check('the map opens its word spaces, which this face barely has',
+    shrunk.spaced - shrunk.joined >= shrunk.space,
+    `space is ${shrunk.space}px at 12px`)
+
+  /* And a halo colour that suits both grounds. It was drawn in the sea colour
+     over land as well as sea, which on the pale land of the light theme was a
+     grey smear across the letters rather than a lift under them. */
+  const halo = await page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement)
+    return {
+      halo: cs.getPropertyValue('--label-halo').trim(),
+      sea: cs.getPropertyValue('--sea').trim(),
+      land: cs.getPropertyValue('--land').trim(),
+    }
+  })
+  check('and letters are haloed in their own colour, not the sea',
+    !!halo.halo && halo.halo !== halo.sea && halo.halo !== halo.land,
+    `${halo.halo} against sea ${halo.sea} and land ${halo.land}`)
+}
+
+/* ------------------------------------------------ the palette does a job */
+
+/* The map draws rail amber, sea teal and road grey. The itinerary drew all
+ * three in the same grey with a seven-pixel dot to tell them apart, which is
+ * why the interface read as colourless: the colour existed and meant something
+ * and was almost nowhere. A leg now carries its mode down its edge, in the
+ * colour the same journey is drawn in above it. */
+{
+  const modes = await page.evaluate(() => {
+    const seen = {}
+    for (const tr of document.querySelectorAll('tr.leg')) {
+      const mode = tr.dataset.mode
+      const cell = tr.querySelector('td.num')
+      if (!mode || !cell) continue
+      seen[mode] = getComputedStyle(cell).borderLeftColor
+    }
+    const cs = getComputedStyle(document.documentElement)
+    return { seen, count: Object.keys(seen).length,
+             edge: cs.getPropertyValue('--panel-edge').trim() }
+  })
+  check('every leg carries its mode as colour, not just a dot',
+    modes.count > 0 && Object.values(modes.seen).every(c => c && c !== 'rgba(0, 0, 0, 0)'),
+    Object.entries(modes.seen).map(([m, c]) => `${m}=${c}`).join('  '))
+
+  /* The four numbers a reader came for. The cost takes the accent and the
+     per-mode times take their mode's colour, which is only worth doing if it
+     is keyed to meaning rather than to position — it used to be :last-child,
+     and the last tile stops being the cost the moment a route has road hours. */
+  const tiles = await page.evaluate(() => {
+    const q = c => document.querySelector(c)
+    const colourOf = el => (el ? getComputedStyle(el.querySelector('b')).color : null)
+    return {
+      cost: colourOf(q('.stat.is-cost')),
+      rail: colourOf(q('.stat.is-rail')),
+      plain: colourOf(q('.stat:not([class*=" is-"]):not(.is-cost)')),
+      label: q('.stat.is-cost') ? q('.stat.is-cost').querySelector('span').textContent : '',
+    }
+  })
+  check('and the accent lands on the cost, by name not by position',
+    tiles.cost && tiles.cost !== tiles.plain && /all in/i.test(tiles.label),
+    `${tiles.label} is ${tiles.cost}, the plain ones are ${tiles.plain}`)
+}
+
+/* ---------------------------------------- a real thumb on the itinerary */
 
   /* Synthetic pointer events are not a scroll.
    *

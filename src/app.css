@@ -35,6 +35,12 @@
      the least interesting thing a map can do; these give it depth without
      touching the palette it already had. */
   --sea-deep: #061217;
+  /* Behind map lettering. The halo's job is to lift text off whatever it sits
+     on, and it sat on two grounds — pale sea and paler land — while being
+     drawn in the sea colour, so over land it was a grey smear that made the
+     letters worse. One value darker than both grounds in the dark theme and
+     lighter than both in the light one does the job on either. */
+  --label-halo: #061a22;
   --grid: #16323d;
   --coast: #2d5a6b;
   /* The sights. Distinct from both the rails and the water, because a
@@ -72,6 +78,7 @@
     color-scheme: light;
     --sea: #d7e3e5;
     --land: #f4f2eb;
+    --label-halo: #fdfdfb;
     --land-edge: #d9d4c6;
     --panel: #fbfaf6;
     --panel-solid: #fbfaf6;
@@ -1041,19 +1048,43 @@ body {
 /* A grid rather than a wrapping flex row. Seven stats in a flex row broke into
    ragged lines at a different point on every route; a fixed track count means
    the numbers line up under each other whatever the itinerary is. */
+/* The four numbers a reader came for: how long, how many legs, how many
+   frontiers, what it costs. They were set as plain text between two hairlines —
+   the most important line on the page rendered as the least prominent thing on
+   it. A ground of their own, and room to be read across a platform. */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.7rem 1rem;
-  margin: 0 0 1.2rem;
-  padding: 0.95rem 0;
-  border-top: 1px solid var(--panel-edge);
-  border-bottom: 1px solid var(--panel-edge);
+  gap: 0;
+  margin: 0 0 1.4rem;
+  padding: 0;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r);
+  background: var(--raise);
+  overflow: hidden;
 }
-.stat { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.8rem 0.75rem;
+  border-left: 1px solid var(--panel-edge);
+}
+/* Four to a row, so the reset is per row rather than once — otherwise the
+   second row opens with a divider against nothing. */
+.stat:nth-child(4n + 1) { border-left: 0; }
+.stat:nth-child(n + 5) { border-top: 1px solid var(--panel-edge); }
+
+/* The cost carries the accent: it is the number people scroll back for. The
+   time on each mode carries the colour that mode is drawn in on the map. */
+.stat.is-cost b { color: var(--rail); }
+.stat.is-rail b { color: var(--rail); }
+.stat.is-ferry b { color: var(--ferry); }
+.stat.is-road b { color: var(--road); }
 .stat b {
   font-family: var(--mono);
-  font-size: 1.12rem;
+  font-size: 1.24rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -1071,6 +1102,19 @@ body {
 /* --------------------------------------------------------------- blocks */
 
 .block { margin-top: 2.7rem; }
+
+/* A short rule above each section heading. Cheap rhythm: it tells the eye
+   where one thing ends and the next begins on a page that is otherwise a
+   column of prose, and it is the one place the accent appears for free. */
+.block > h2::before {
+  content: '';
+  display: block;
+  width: 2.2rem;
+  height: 2px;
+  margin-bottom: 0.55rem;
+  border-radius: 2px;
+  background: var(--rail);
+}
 
 .panel h2 {
   margin: 0;
@@ -1098,17 +1142,26 @@ body {
 
 /* -------------------------------------------------------------- callouts */
 
+/* A box for something worth stopping at. The kind of thing it is shows in a
+   bar down its leading edge rather than a wash across the whole box, which
+   keeps the prose on the same ground as the prose around it and still says at
+   a glance whether this is a warning or a note. */
 .callout {
+  position: relative;
   margin-top: 1.2rem;
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1rem 0.85rem 1.15rem;
   background: var(--raise);
   border: 1px solid var(--panel-edge);
+  border-left: 3px solid var(--ferry);
   border-radius: var(--r);
 }
+.callout h3 { color: var(--ink); }
 .callout.alert {
-  border-color: color-mix(in srgb, var(--alert) 55%, var(--panel-edge));
+  border-color: color-mix(in srgb, var(--alert) 45%, var(--panel-edge));
+  border-left-color: var(--alert);
   background: color-mix(in srgb, var(--alert) 9%, var(--raise));
 }
+.callout.alert h3 { color: var(--alert); }
 .callout h3 { font-size: 0.98rem; }
 .callout p { font-size: 0.93rem; color: var(--ink-soft); }
 
@@ -1165,6 +1218,21 @@ table { width: 100%; border-collapse: collapse; }
 .mode-dot.rail { background: var(--rail); }
 .mode-dot.ferry { background: var(--ferry); }
 .mode-dot.road { background: var(--road); }
+
+/* And the same colour down the edge of the leg it belongs to.
+ *
+ * The map draws rail amber, sea teal and road grey; the itinerary drew all
+ * three in the same grey with a seven-pixel dot to tell them apart. Now a leg
+ * carries its mode as a bar you can follow down the page, in the colour the
+ * same journey is drawn in on the map above it — which is the only reason to
+ * add colour to a page: so that two things being the same look the same. */
+tr.leg td.num {
+  border-left: 3px solid var(--panel-edge);
+  padding-left: 0.55rem;
+}
+tr.leg[data-mode='rail'] td.num { border-left-color: var(--rail); }
+tr.leg[data-mode='ferry'] td.num { border-left-color: var(--ferry); }
+tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 
 .where { font-family: var(--sans); line-height: 1.3; }
 .where b { font-size: 0.98rem; font-weight: 600; }

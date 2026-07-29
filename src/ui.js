@@ -117,13 +117,18 @@ const UI = (() => {
       [`${t.days}`, t.days === 1 ? 'day' : 'days'],
       [`${t.legs}`, 'legs'],
       [`${t.borders}`, t.borders === 1 ? 'border' : 'borders'],
-      [money(t.totalUsd), 'all in'],
+      // Marked, not positional: the cost carries the accent, and it stopped
+      // being the last tile the moment a journey had road hours to report.
+      [money(t.totalUsd), 'all in', 'cost'],
     ]
-    if (t.railHours) bits.push([hours(t.railHours), 'on rails'])
-    if (t.seaHours) bits.push([hours(t.seaHours), 'at sea'])
-    if (t.roadHours) bits.push([hours(t.roadHours), 'by road'])
+    if (t.railHours) bits.push([hours(t.railHours), 'on rails', 'rail'])
+    if (t.seaHours) bits.push([hours(t.seaHours), 'at sea', 'ferry'])
+    if (t.roadHours) bits.push([hours(t.roadHours), 'by road', 'road'])
     return `<div class="stats">${bits
-      .map(([v, l]) => `<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`)
+      .map(
+        ([v, l, kind]) =>
+          `<div class="stat${kind ? ' is-' + kind : ''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`
+      )
       .join('')}</div>`
   }
 
@@ -191,7 +196,7 @@ const UI = (() => {
 
         const op = entry.operator
         const main = `
-          <tr class="leg" data-leg="${i}" tabindex="0">
+          <tr class="leg" data-leg="${i}" data-mode="${esc(leg.mode)}" tabindex="0">
             <td class="num"><span class="mode-dot ${leg.mode}" aria-hidden="true"></span>${i + 1}</td>
             <td class="where">
               <b>${esc(entry.fromName)}</b>

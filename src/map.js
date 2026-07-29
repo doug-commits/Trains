@@ -30,9 +30,11 @@ const MapView = (() => {
       alert: get('--alert'),
       ink: get('--ink'),
       muted: get('--muted'),
+      inkSoft: get('--ink-soft'),
       panel: get('--panel'),
       seaDeep: get('--sea-deep'),
       grid: get('--grid'),
+      halo: get('--label-halo'),
       coast: get('--coast'),
     }
   }
@@ -685,9 +687,19 @@ const MapView = (() => {
 
         const onRoute = c.priority <= 1
         const weight = c.priority === 0 ? 600 : 500
-        const base = c.priority === 0 ? 15 : c.priority === 1 ? 13 : 12
-        const fontSize = view.w < 520 ? base - 2 : base
+        const base = c.priority === 0 ? 16 : c.priority === 1 ? 14 : 13
+        /* Barely smaller on a phone, not two points smaller. A place name at
+         * ten pixels in a condensed face is a smudge, and the phone is where
+         * this map is actually read. */
+        const fontSize = view.w < 520 ? base - 1 : base
         ctx.font = `${weight} ${fontSize}px BarlowCond, system-ui, sans-serif`
+        /* The word space in this face is 0.167em — two pixels at twelve — and
+         * the halo was three and a half wide, so the halo of one word's last
+         * letter met the next word's first and "Phnom Penh" arrived as one
+         * word. Open the spaces rather than thin the halo, which is doing a
+         * job of its own. */
+        ctx.wordSpacing = '0.14em'
+        ctx.letterSpacing = '0.01em'
         const text = c.priority <= 1 || sharedCities.has(s.city) ? s.name : s.city
         const w = ctx.measureText(text).width
         const h = fontSize + 4
@@ -703,11 +715,18 @@ const MapView = (() => {
 
         ctx.save()
         ctx.textBaseline = 'middle'
-        ctx.lineWidth = 3.5
-        ctx.strokeStyle = colors.sea
-        ctx.globalAlpha = onRoute ? 0.95 : 0.7
+        // Scaled to the type, and round-joined so it does not grow spikes off
+        // the corners of letterforms at small sizes.
+        ctx.lineWidth = Math.max(2.5, fontSize * 0.26)
+        ctx.lineJoin = 'round'
+        ctx.lineCap = 'round'
+        ctx.strokeStyle = colors.halo || colors.sea
+        ctx.globalAlpha = onRoute ? 0.95 : 0.85
         ctx.strokeText(text, box.x + 3, p.y)
-        ctx.fillStyle = onRoute ? colors.ink : colors.muted
+        ctx.globalAlpha = 1
+        // Soft ink rather than muted: these were the labels being complained
+        // about, and half the problem was that they were barely there.
+        ctx.fillStyle = onRoute ? colors.ink : colors.inkSoft || colors.muted
         ctx.fillText(text, box.x + 3, p.y)
         ctx.restore()
       }
