@@ -124,6 +124,11 @@
 :root[data-theme='light'] {
   color-scheme: light;
   --sea: #d7e3e5; --land: #f4f2eb; --land-edge: #d9d4c6;
+  /* Must be here as well as in the media query. This block is what the app
+     uses — it sets data-theme explicitly — so a variable declared only under
+     prefers-color-scheme falls back to the dark value on a light map, which is
+     how map lettering came to be drawn with a black halo on pale land. */
+  --label-halo: #fdfdfb;
   --panel: #fbfaf6; --panel-solid: #fbfaf6; --panel-edge: #ddd8ca; --raise: #efece3;
   --ink: #13212a; --ink-soft: #2c3d45; --muted: #5b7178;
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;

@@ -1699,6 +1699,64 @@ function check(label, condition, detail = '') {
     shrunk.spaced - shrunk.joined >= shrunk.space,
     `space is ${shrunk.space}px at 12px`)
 
+  /* The light theme is written twice — once for the system preference and once
+     for the attribute the toggle sets — and the app sets the attribute. A
+     variable added to one and not the other is therefore invisible in every
+     browser whose system already agrees, and wrong on every phone whose does
+     not. --label-halo went in under the media query alone and map lettering
+     came out with a black halo on pale land. The two must declare the same
+     names; only the mechanism differs, never the palette. */
+  {
+    const css = readFileSync(join(root, 'src/app.css'), 'utf8')
+    const declared = start => {
+      let i = css.indexOf('{', css.indexOf(start)) + 1
+      let depth = 1
+      let j = i
+      while (depth && j < css.length) {
+        if (css[j] === '{') depth++
+        else if (css[j] === '}') depth--
+        j++
+      }
+      return new Set([...css.slice(i, j).matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]))
+    }
+    const viaMedia = declared('@media (prefers-color-scheme: light)')
+    const viaAttr = declared(":root[data-theme='light']")
+    const missing = [...viaMedia].filter(v => !viaAttr.has(v))
+    const extra = [...viaAttr].filter(v => !viaMedia.has(v))
+    check('both ways of asking for the light theme define the same palette',
+      missing.length === 0 && extra.length === 0,
+      [...missing.map(v => `${v} only under the media query`),
+       ...extra.map(v => `${v} only on the attribute`)].join(', ') || 'identical')
+  }
+
+  /* And the invariant that failing test protects: whatever the system says,
+     the halo has to be on the opposite side of the ink or it is not a halo. */
+  {
+    const lum = hex => {
+      const h = hex.replace('#', '')
+      const n = h.length === 3 ? [...h].map(c => c + c) : h.match(/../g)
+      const [r, g, b] = n.map(v => parseInt(v, 16) / 255)
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    for (const theme of ['light', 'dark']) {
+      const got = await page.evaluate(t => {
+        document.documentElement.setAttribute('data-theme', t)
+        const cs = getComputedStyle(document.documentElement)
+        return {
+          halo: cs.getPropertyValue('--label-halo').trim(),
+          ink: cs.getPropertyValue('--ink').trim(),
+          land: cs.getPropertyValue('--land').trim(),
+        }
+      }, theme)
+      const contrasts =
+        Math.abs(lum(got.halo) - lum(got.ink)) > 0.4 &&
+        Math.abs(lum(got.halo) - lum(got.land)) < 0.35
+      check(`the ${theme} halo lifts the lettering rather than smothering it`,
+        contrasts, `halo ${got.halo}, ink ${got.ink}, land ${got.land}`)
+    }
+    await page.evaluate(() => document.documentElement.removeAttribute('data-theme'))
+  }
+
   /* And a halo colour that suits both grounds. It was drawn in the sea colour
      over land as well as sea, which on the pale land of the light theme was a
      grey smear across the letters rather than a lift under them. */

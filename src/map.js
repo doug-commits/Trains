@@ -715,9 +715,12 @@ const MapView = (() => {
 
         ctx.save()
         ctx.textBaseline = 'middle'
-        // Scaled to the type, and round-joined so it does not grow spikes off
-        // the corners of letterforms at small sizes.
-        ctx.lineWidth = Math.max(2.5, fontSize * 0.26)
+        /* Enough to separate the letters from the ground and no more. A
+         * quarter of the type size sounded proportionate and is far too much
+         * on a condensed face: the stroke runs half its width inside the
+         * glyph, and at four pixels on sixteen it closes the counters of a
+         * and e and the whole word thickens into a blot. */
+        ctx.lineWidth = Math.min(3, Math.max(2, fontSize * 0.17))
         ctx.lineJoin = 'round'
         ctx.lineCap = 'round'
         ctx.strokeStyle = colors.halo || colors.sea
