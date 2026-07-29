@@ -1678,6 +1678,59 @@ function check(label, condition, detail = '') {
     await page.waitForTimeout(450)
   }
 
+  /* ---------------------------------------- a real thumb on the itinerary */
+
+  /* Synthetic pointer events are not a scroll.
+   *
+   * Every check above dispatches PointerEvents, and a page can answer those
+   * perfectly while being completely immovable under a finger — scrolling is
+   * decided in the compositor, from touch input, before any of them are seen.
+   * A recording of the app showed the itinerary frozen while all of these
+   * passed. This one drives the browser's own touch pipeline through CDP,
+   * which is the only thing here that scrolls anything.
+   *
+   * What it caught: .panel carries overflow-y: auto, because on a wide screen
+   * it is the right-hand column and scrolls itself. Inside the sheet that made
+   * a scroller nested in a scroller, with nothing to scroll — its height is its
+   * content — and Chromium still aimed the gesture at it. Touches on the search
+   * controls above scrolled the sheet; every touch on the itinerary was
+   * swallowed by a container that could not move. */
+  {
+    const cdp = await context.newCDPSession(page)
+    const swipe = async y => {
+      const T = (type, at) =>
+        cdp.send('Input.dispatchTouchEvent', {
+          type,
+          touchPoints: type === 'touchEnd' ? [] : [{ x: 206, y: at }],
+        })
+      await T('touchStart', y)
+      for (let i = 1; i <= 12; i++) await T('touchMove', y - i * 18)
+      await T('touchEnd', y - 216)
+      await page.waitForTimeout(600)
+      return page.evaluate(() => document.querySelector('#sheet-scroll').scrollTop)
+    }
+
+    for (const want of ['full', 'half']) {
+      for (let i = 0; i < 4; i++) {
+        if ((await page.evaluate(() => document.querySelector('#sheet').dataset.snap)) === want) break
+        await page.evaluate(() => document.querySelector('#grip').click())
+        await page.waitForTimeout(400)
+      }
+      await page.evaluate(() => { document.querySelector('#sheet-scroll').scrollTop = 0 })
+      const box = await page.evaluate(() => {
+        const r = document.querySelector('#sheet-scroll').getBoundingClientRect()
+        return { top: r.top, h: r.height }
+      })
+      // Inside the screen, not merely inside the element — the scroller can
+      // reach past the bottom of the viewport and a touch there hits nothing.
+      const y = Math.round(Math.min(box.top + box.h * 0.5, 915 - 140))
+      const moved = await swipe(y)
+      check(`a real touch scrolls the itinerary at ${want}`, moved > 40,
+        `moved ${moved}px from a touch at y=${y}`)
+    }
+
+  }
+
   /* ------------------------------------------------- with the keyboard up */
 
   /* A recording of the app showed the itinerary frozen: a route planned, the

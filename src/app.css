@@ -1693,6 +1693,15 @@ table { width: 100%; border-collapse: collapse; }
     z-index: auto;
     width: auto;
     height: auto;
+    /* Not a scroll container here. It is one on a wide screen, where it is the
+     * right-hand column and scrolls itself — but inside the sheet it becomes a
+     * scroller nested in a scroller, with nothing to scroll because its height
+     * is its content. Chromium still aims the gesture at it, and the itinerary
+     * is immovable: every touch landing on the panel is swallowed by a
+     * container that cannot answer it. Touches above it, on the search
+     * controls, scrolled the sheet perfectly well — which is exactly how it
+     * looked, and why it read as the itinerary being frozen. */
+    overflow: visible;
     padding: 0.4rem 1.15rem calc(3rem + env(safe-area-inset-bottom));
     border-left: none;
     border-top: 1px solid var(--panel-edge);
