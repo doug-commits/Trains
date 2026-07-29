@@ -35,20 +35,39 @@ if (!existsSync(app)) {
 
 const browser = await chromium.launch()
 
-/* 432×768 at 2.5 is 1080×1920: exactly 9:16, which is what Play asks phone
- * screenshots for, and a roomier layout than the 360-wide viewport that also
- * gets there. */
-const PHONE = {
-  viewport: { width: 432, height: 768 },
-  deviceScaleFactor: 2.5,
-  isMobile: true,
-  hasTouch: true,
+/* The two shapes Play asks for, each one a device that exists.
+ *
+ * Phone: 432×768 at 2.5 is 1080×1920 — exactly 9:16, and a roomier layout than
+ * the 360-wide viewport that also gets there.
+ *
+ * 7-inch tablet: 600×960 at 2 is 1200×1920, which is a Nexus 7 and is still
+ * the shape that slot means. 600 CSS pixels is under the app's 60rem
+ * breakpoint, so a 7-inch tablet in portrait gets the same full-screen map and
+ * pull-up sheet a phone does — which is the right layout for it, and is what
+ * these screenshots therefore show. Nothing is staged: this is what installs
+ * on that device. */
+const DEVICES = {
+  phone: {
+    prefix: 'screenshot',
+    viewport: { width: 432, height: 768 },
+    deviceScaleFactor: 2.5,
+    isMobile: true,
+    hasTouch: true,
+  },
+  tablet7: {
+    prefix: 'tablet7',
+    viewport: { width: 600, height: 960 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  },
 }
 
-async function phone(colorScheme = 'light') {
-  const context = await browser.newContext({ ...PHONE, colorScheme })
+async function screen(device, colorScheme = 'light') {
+  const { prefix, ...opts } = DEVICES[device]
+  const context = await browser.newContext({ ...opts, colorScheme })
   const page = await context.newPage()
-  page.on('pageerror', e => console.error('  pageerror:', e.message))
+  page.on('pageerror', e => console.error(`  pageerror (${device}):`, e.message))
   return { page, context }
 }
 
@@ -71,10 +90,10 @@ async function snapTo(page, want) {
   throw new Error(`could not reach snap ${want}`)
 }
 
-const shot = (page, name) =>
-  page.screenshot({ path: join(out, `screenshot-${name}.png`) })
+const shot = (page, device, name) =>
+  page.screenshot({ path: join(out, `${DEVICES[device].prefix}-${name}.png`) })
 
-const shots = []
+const shots = { phone: [], tablet7: [] }
 
 /* Scroll a named section of the itinerary to the top of the sheet. Matched on
  * the heading the app itself writes, so a renamed section fails loudly here
@@ -115,15 +134,20 @@ async function toAnswer(page) {
  * having been told is impossible. */
 const SPINE = '#from=bkk_aphiwat&to=singapore'
 
+/* Every shot is taken on both devices from the same script. Two hand-kept
+ * lists would drift, and the one that drifts is always the tablet — nobody
+ * looks at that tab of the Console twice. */
 async function capture(name, hash, prepare, colorScheme = 'light') {
-  const { page, context } = await phone(colorScheme)
-  await open(page, hash)
-  await ready(page)
-  await page.waitForTimeout(1400)
-  await prepare(page)
-  await shot(page, name)
-  shots.push(name)
-  await context.close()
+  for (const device of Object.keys(DEVICES)) {
+    const { page, context } = await screen(device, colorScheme)
+    await open(page, hash)
+    await ready(page)
+    await page.waitForTimeout(1400)
+    await prepare(page)
+    await shot(page, device, name)
+    shots[device].push(name)
+    await context.close()
+  }
 }
 
 /* 1 — the hero. A real journey drawn across the region, with the summary of it
@@ -321,5 +345,6 @@ const mapPng = await (async () => {
 
 await browser.close()
 
-console.log(`screenshots        ${shots.length} at 1080×1920 -> android/play/`)
+console.log(`phone              ${shots.phone.length} screenshots at 1080×1920 -> android/play/`)
+console.log(`7-inch tablet      ${shots.tablet7.length} screenshots at 1200×1920 -> android/play/`)
 console.log('feature graphic    1024×500 -> android/play/feature-graphic.png')

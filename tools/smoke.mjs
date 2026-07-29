@@ -2324,18 +2324,40 @@ function check(label, condition, detail = '') {
         `${got[0]}×${got[1]}`)
     }
 
-    const screens = [1, 2, 3, 4, 5, 6, 7, 8]
-      .map(n => [n, [...readdirSync(join(root, 'android/play'))]
-        .find(f => f.startsWith(`screenshot-${n}-`))])
-    const gaps = screens.filter(([, f]) => !f).map(([n]) => n)
-    check('there are eight phone screenshots, in order', gaps.length === 0,
-      gaps.length ? `missing ${gaps.join(', ')}` : '')
-    const wrong = screens.filter(([, f]) => f).map(([n, f]) => {
-      const b = readFileSync(join(root, 'android/play', f))
-      return [n, b.readUInt32BE(16), b.readUInt32BE(20)]
-    }).filter(([, w, h]) => w !== 1080 || h !== 1920)
-    check('and every one of them is 1080×1920', wrong.length === 0,
-      wrong.map(([n, w, h]) => `${n}: ${w}×${h}`).join(', '))
+    /* Both device sets, because the tablet tab of the Console is the one
+       nobody opens twice — a set that quietly went missing or came out the
+       wrong size there would not be noticed until a submission is rejected. */
+    const files = readdirSync(join(root, 'android/play'))
+    for (const [label, prefix, w, h] of [
+      ['phone', 'screenshot', 1080, 1920],
+      ['7-inch tablet', 'tablet7', 1200, 1920],
+    ]) {
+      const screens = [1, 2, 3, 4, 5, 6, 7, 8]
+        .map(n => [n, files.find(f => f.startsWith(`${prefix}-${n}-`))])
+      const gaps = screens.filter(([, f]) => !f).map(([n]) => n)
+      check(`there are eight ${label} screenshots, in order`, gaps.length === 0,
+        gaps.length ? `missing ${gaps.join(', ')}` : '')
+      const wrong = screens.filter(([, f]) => f).map(([n, f]) => {
+        const b = readFileSync(join(root, 'android/play', f))
+        return [n, b.readUInt32BE(16), b.readUInt32BE(20)]
+      }).filter(([, gw, gh]) => gw !== w || gh !== h)
+      check(`and every ${label} one is ${w}×${h}`, wrong.length === 0,
+        wrong.map(([n, gw, gh]) => `${n}: ${gw}×${gh}`).join(', '))
+      // Play takes anything between 16:9 and 9:16; both of these sit inside
+      // it, but the arithmetic is worth keeping if the shapes ever change.
+      const ratio = h / w
+      check(`and the ${label} shape is one Play accepts`,
+        ratio >= 9 / 16 && ratio <= 16 / 9, `${w}×${h}`)
+    }
+
+    // Both sets tell the same story in the same order, so a screenshot added
+    // to one and forgotten in the other shows up here rather than in the
+    // Console.
+    const named = pre => files.filter(f => f.startsWith(pre + '-'))
+      .map(f => f.replace(/^[a-z0-9]+-\d-/, '').replace(/\.png$/, '')).sort()
+    check('the phone and tablet sets show the same eight things',
+      named('screenshot').join(' ') === named('tablet7').join(' '),
+      named('screenshot').join(' '))
   }
 }
 

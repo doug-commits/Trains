@@ -402,7 +402,7 @@ function privacyPage(css) {
   <section class="block">
     <h2>Contact</h2>
     <p>Questions about any of this, including anything above you would like
-    shown rather than asserted: <a href="mailto:privacy@slowasia.com">privacy@slowasia.com</a>.</p>
+    shown rather than asserted: <a href="mailto:doug@mukbangshow.ae">doug@mukbangshow.ae</a>.</p>
   </section>`
 
   return `<!doctype html>
