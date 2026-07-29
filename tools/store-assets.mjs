@@ -35,20 +35,29 @@ if (!existsSync(app)) {
 
 const browser = await chromium.launch()
 
-/* The two shapes Play asks for, each one a device that exists.
+/* The three shapes Play asks for, each one a device that exists, and each one
+ * photographed in the layout that device actually gets.
  *
- * Phone: 432×768 at 2.5 is 1080×1920 — exactly 9:16, and a roomier layout than
+ * Phone — 432×768 at 2.5 is 1080×1920, exactly 9:16, and a roomier layout than
  * the 360-wide viewport that also gets there.
  *
- * 7-inch tablet: 600×960 at 2 is 1200×1920, which is a Nexus 7 and is still
- * the shape that slot means. 600 CSS pixels is under the app's 60rem
- * breakpoint, so a 7-inch tablet in portrait gets the same full-screen map and
- * pull-up sheet a phone does — which is the right layout for it, and is what
- * these screenshots therefore show. Nothing is staged: this is what installs
- * on that device. */
+ * 7-inch tablet — 600×960 at 2 is 1200×1920, which is a Nexus 7. 600 CSS
+ * pixels is under the app's 60rem breakpoint, so this gets the same
+ * full-screen map and pull-up sheet a phone does.
+ *
+ * 10-inch tablet — 1280×800 at 2 is 2560×1600, landscape, which is how a
+ * tablet that size is held. 1280 CSS pixels is over the breakpoint, so this is
+ * the app's other layout entirely: the map across the frame with the itinerary
+ * in a column beside it rather than a sheet over it. Worth the extra pass —
+ * it is the layout a tablet owner will actually see, and a stretched phone
+ * screenshot in that slot is the usual reason a tablet listing looks like an
+ * afterthought.
+ *
+ * Nothing here is staged. Each set is what installs on that device. */
 const DEVICES = {
   phone: {
     prefix: 'screenshot',
+    layout: 'sheet',
     viewport: { width: 432, height: 768 },
     deviceScaleFactor: 2.5,
     isMobile: true,
@@ -56,15 +65,24 @@ const DEVICES = {
   },
   tablet7: {
     prefix: 'tablet7',
+    layout: 'sheet',
     viewport: { width: 600, height: 960 },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
   },
+  tablet10: {
+    prefix: 'tablet10',
+    layout: 'panel',
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 2,
+    isMobile: false,
+    hasTouch: true,
+  },
 }
 
 async function screen(device, colorScheme = 'light') {
-  const { prefix, ...opts } = DEVICES[device]
+  const { prefix, layout, ...opts } = DEVICES[device]
   const context = await browser.newContext({ ...opts, colorScheme })
   const page = await context.newPage()
   page.on('pageerror', e => console.error(`  pageerror (${device}):`, e.message))
@@ -79,54 +97,78 @@ const ready = page =>
 
 const open = (page, hash = '') => page.goto('file://' + app + hash)
 
-// The grip cycles half → full → peek → half. Clicking to a named snap beats
-// synthesising a drag, and it is the same code path a thumb takes.
-async function snapTo(page, want) {
-  for (let i = 0; i < 4; i++) {
-    if (await page.evaluate(() => document.querySelector('#sheet').dataset.snap) === want) return
-    await page.locator('#grip').click()
-    await page.waitForTimeout(420)
-  }
-  throw new Error(`could not reach snap ${want}`)
-}
-
 const shot = (page, device, name) =>
   page.screenshot({ path: join(out, `${DEVICES[device].prefix}-${name}.png`) })
 
-const shots = { phone: [], tablet7: [] }
+const shots = Object.fromEntries(Object.keys(DEVICES).map(d => [d, []]))
 
-/* Scroll a named section of the itinerary to the top of the sheet. Matched on
- * the heading the app itself writes, so a renamed section fails loudly here
- * rather than silently producing two screenshots of the same thing — which is
- * what happened when this matched on substrings. */
-async function toSection(page, title) {
-  const ok = await page.evaluate(t => {
-    const box = document.querySelector('#sheet-scroll')
-    const h = [...document.querySelectorAll('#panel .block > h2')]
-      .find(e => e.textContent.trim().toLowerCase() === t.toLowerCase())
-    if (!h) return false
-    box.scrollTop += h.getBoundingClientRect().top - box.getBoundingClientRect().top - 16
-    return true
-  }, title)
-  if (!ok) throw new Error(`no section titled "${title}" — the itinerary changed`)
-  await page.waitForTimeout(400)
-}
-
-/* Past the search controls to the answer itself — the headline and the four
- * numbers under it.
+/* The same instructions, spoken to whichever layout is on screen.
  *
- * Only ever at the sheet's full height: the app promotes a half-open sheet to
- * full the moment its contents scroll, so doing this any lower produces a
- * screenshot of a sheet that has swallowed the map. */
-async function toAnswer(page) {
-  await page.evaluate(() => {
-    const box = document.querySelector('#sheet-scroll')
-    // .head, not h1 — the headline, the four numbers under it and the
-    // timezone warning are one block, and the block is the screenshot.
-    const h = document.querySelector('#panel .head')
-    box.scrollTop += h.getBoundingClientRect().top - box.getBoundingClientRect().top - 14
-  })
-  await page.waitForTimeout(500)
+ * The two are genuinely different mechanisms rather than the same one at two
+ * sizes: a sheet is dragged to a height and scrolls inside itself, a panel is
+ * always open and scrolls as a column. Writing each shot twice would mean
+ * maintaining two lists that quietly stop agreeing. */
+function controls(page, device) {
+  const sheet = DEVICES[device].layout === 'sheet'
+  // Where the itinerary scrolls. On a wide screen the sheet is display:contents
+  // and the panel is the scroller; scrolling #sheet-scroll there does nothing
+  // at all, silently.
+  const box = sheet ? '#sheet-scroll' : '#panel'
+
+  const scrollTo = async (selector, gap, what) => {
+    const ok = await page.evaluate(([b, sel, g]) => {
+      const scroller = document.querySelector(b)
+      const el = document.querySelector(sel)
+      if (!scroller || !el) return false
+      scroller.scrollTop += el.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top - g
+      return true
+    }, [box, selector, gap])
+    if (!ok) throw new Error(`could not reach ${what} on ${device}`)
+    await page.waitForTimeout(450)
+  }
+
+  return {
+    page,
+    wait: ms => page.waitForTimeout(ms),
+    to: scrollTo,
+
+    /* The grip cycles half → full → peek → half. Clicking to a named snap
+       beats synthesising a drag, and it is the same code path a thumb takes.
+       On the wide layout there is no sheet and nothing to do — the itinerary
+       is already beside the map. */
+    async snapTo(want) {
+      if (!sheet) return
+      for (let i = 0; i < 4; i++) {
+        if (await page.evaluate(() =>
+          document.querySelector('#sheet').dataset.snap) === want) return
+        await page.locator('#grip').click()
+        await page.waitForTimeout(420)
+      }
+      throw new Error(`could not reach snap ${want}`)
+    },
+
+    /* Past the search controls to the answer itself — the headline, the four
+       numbers under it and the timezone warning, which are one block.
+
+       On a phone only ever at the sheet's full height: the app promotes a
+       half-open sheet to full the moment its contents scroll, so doing this
+       any lower produces a screenshot of a sheet that has swallowed the map. */
+    toAnswer: () => scrollTo('#panel .head', 14, 'the summary'),
+
+    /* A named section of the itinerary, matched on the heading the app itself
+       writes — so a renamed section fails loudly here rather than silently
+       producing two screenshots of the same thing, which is what happened
+       when this matched on substrings. */
+    async toSection(title) {
+      const found = await page.evaluate(t =>
+        [...document.querySelectorAll('#panel .block > h2')]
+          .findIndex(e => e.textContent.trim().toLowerCase() === t.toLowerCase()),
+        title)
+      if (found < 0) throw new Error(`no section titled "${title}" — the itinerary changed`)
+      await scrollTo(`#panel .block:nth-of-type(${found + 1})`, 16, title)
+    },
+  }
 }
 
 /* One route, photographed from several places. Bangkok → Singapore because it
@@ -134,16 +176,14 @@ async function toAnswer(page) {
  * having been told is impossible. */
 const SPINE = '#from=bkk_aphiwat&to=singapore'
 
-/* Every shot is taken on both devices from the same script. Two hand-kept
- * lists would drift, and the one that drifts is always the tablet — nobody
- * looks at that tab of the Console twice. */
+/* Every shot is taken on every device from the same script. */
 async function capture(name, hash, prepare, colorScheme = 'light') {
   for (const device of Object.keys(DEVICES)) {
     const { page, context } = await screen(device, colorScheme)
     await open(page, hash)
     await ready(page)
     await page.waitForTimeout(1400)
-    await prepare(page)
+    await prepare(controls(page, device))
     await shot(page, device, name)
     shots[device].push(name)
     await context.close()
@@ -157,70 +197,67 @@ async function capture(name, hash, prepare, colorScheme = 'light') {
  * the sheet down first shows more sea and not more map: the route is fitted to
  * the space above the sheet at the moment it is computed, so a lower sheet just
  * adds empty water under a drawing that has already decided how big it is. */
-await capture('1-map', SPINE, async page => {
-  await snapTo(page, 'half')
-  await page.waitForTimeout(600)
+await capture('1-map', SPINE, async ui => {
+  await ui.snapTo('half')
+  await ui.wait(600)
 })
 
 /* 2 — the answer. The headline, and the four numbers everyone wants before
  * they read a single leg: days, legs, borders, all-in cost. */
-await capture('2-answer', SPINE, async page => {
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
-  await toAnswer(page)
+await capture('2-answer', SPINE, async ui => {
+  await ui.snapTo('full')
+  await ui.wait(500)
+  await ui.toAnswer()
 })
 
-/* 2 — the itinerary. What the app is for: numbered legs, named operators,
+/* 3 — the itinerary. What the app is for: numbered legs, named operators,
  * running times, fares, and the change between each pair. */
-await capture('3-itinerary', SPINE, async page => {
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
-  await page.evaluate(() => {
-    const box = document.querySelector('#sheet-scroll')
-    const t = document.querySelector('.route')
-    box.scrollTop += t.getBoundingClientRect().top - box.getBoundingClientRect().top - 8
-  })
-  await page.waitForTimeout(400)
+await capture('3-itinerary', SPINE, async ui => {
+  await ui.snapTo('full')
+  await ui.wait(500)
+  // The table, not the section heading above it. The paragraph in between is
+  // worth reading in the app and is dead weight in a store screenshot.
+  await ui.to('#panel .route', 8, 'the leg table')
 })
 
-/* 3 — the border mechanics. The part no mainstream planner carries and the
+/* 4 — the border mechanics. The part no mainstream planner carries and the
  * part that actually strands people. */
-await capture('4-borders', SPINE, async page => {
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
-  await toSection(page, 'Border crossings')
+await capture('4-borders', SPINE, async ui => {
+  await ui.snapTo('full')
+  await ui.wait(500)
+  await ui.toSection('Border crossings')
 })
 
-/* 4 — where the route is fragile. An itinerary that only lists the happy path
+/* 5 — where the route is fragile. An itinerary that only lists the happy path
  * is the thing this app exists to replace. */
-await capture('5-risks', SPINE, async page => {
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
-  await toSection(page, 'Where this breaks')
+await capture('5-risks', SPINE, async ui => {
+  await ui.snapTo('full')
+  await ui.wait(500)
+  await ui.toSection('Where this breaks')
 })
 
-/* 5 — the money. The other question everyone arrives with. */
-await capture('6-costs', SPINE, async page => {
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
-  await toSection(page, 'Costs')
+/* 6 — the money. The other question everyone arrives with. */
+await capture('6-costs', SPINE, async ui => {
+  await ui.snapTo('full')
+  await ui.wait(500)
+  await ui.toSection('Costs')
 })
 
-/* 6 — a sea crossing. "Rail as far as the rails go, then a boat" is the whole
- * thesis, and Singapore → Bali is where it shows. */
-await capture('7-sea', '#from=bkk_aphiwat&to=denpasar', async page => {
-  await snapTo(page, 'half')
-  await page.waitForTimeout(600)
+/* 7 — a sea crossing. "Rail as far as the rails go, then a boat" is the whole
+ * thesis, and Bangkok → Bali is where it shows end to end. */
+await capture('7-sea', '#from=bkk_aphiwat&to=denpasar', async ui => {
+  await ui.snapTo('half')
+  await ui.wait(600)
 })
 
-/* 7 — dark, on the landing page. Says there is a night mode without spending
+/* 8 — dark, on the landing page. Says there is a night mode without spending
  * a whole screenshot on saying it. */
-await capture('8-dark', '', async page => {
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
-  await page.waitForTimeout(700)
-  await page.evaluate(() => window.OverlandMap && window.OverlandMap.redraw())
-  await snapTo(page, 'full')
-  await page.waitForTimeout(500)
+await capture('8-dark', '', async ui => {
+  await ui.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await ui.wait(700)
+  await ui.page.evaluate(() => window.OverlandMap && window.OverlandMap.redraw())
+  await ui.snapTo('full')
+  await ui.wait(500)
 }, 'dark')
 
 /* ---------------------------------------------------------- the feature */
@@ -345,6 +382,8 @@ const mapPng = await (async () => {
 
 await browser.close()
 
-console.log(`phone              ${shots.phone.length} screenshots at 1080×1920 -> android/play/`)
-console.log(`7-inch tablet      ${shots.tablet7.length} screenshots at 1200×1920 -> android/play/`)
+for (const [device, { prefix, viewport, deviceScaleFactor }] of Object.entries(DEVICES)) {
+  const px = `${viewport.width * deviceScaleFactor}×${viewport.height * deviceScaleFactor}`
+  console.log(`${device.padEnd(18)} ${shots[device].length} screenshots at ${px} -> android/play/${prefix}-*.png`)
+}
 console.log('feature graphic    1024×500 -> android/play/feature-graphic.png')

@@ -2331,6 +2331,7 @@ function check(label, condition, detail = '') {
     for (const [label, prefix, w, h] of [
       ['phone', 'screenshot', 1080, 1920],
       ['7-inch tablet', 'tablet7', 1200, 1920],
+      ['10-inch tablet', 'tablet10', 2560, 1600],
     ]) {
       const screens = [1, 2, 3, 4, 5, 6, 7, 8]
         .map(n => [n, files.find(f => f.startsWith(`${prefix}-${n}-`))])
@@ -2355,9 +2356,10 @@ function check(label, condition, detail = '') {
     // Console.
     const named = pre => files.filter(f => f.startsWith(pre + '-'))
       .map(f => f.replace(/^[a-z0-9]+-\d-/, '').replace(/\.png$/, '')).sort()
-    check('the phone and tablet sets show the same eight things',
-      named('screenshot').join(' ') === named('tablet7').join(' '),
-      named('screenshot').join(' '))
+    const sets = ['screenshot', 'tablet7', 'tablet10'].map(named)
+    check('all three sets show the same eight things',
+      sets.every(set => set.join(' ') === sets[0].join(' ')),
+      sets.map(set => set.length).join('/'))
   }
 }
 
