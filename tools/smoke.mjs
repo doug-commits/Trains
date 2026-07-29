@@ -7,7 +7,7 @@
  */
 
 import { chromium } from 'playwright'
-import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs'
+import { mkdirSync, readFileSync, existsSync, statSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -2262,6 +2262,80 @@ function check(label, condition, detail = '') {
 
     await page.screenshot({ path: join(outDir, '24-privacy.png') })
     await context.close()
+  }
+}
+
+/* ------------------------------------------------------- the store listing */
+
+/* The listing quotes the network back at people — how many stations, how many
+ * legs, how many crossings — and those are the first numbers to go stale when
+ * the data grows. Nobody re-reads a store description looking for arithmetic,
+ * so the build does it. Same reason the privacy page is checked above: text
+ * that makes claims about the code has to be held to them. */
+{
+  const file = join(root, 'android/play/listing.md')
+  if (!existsSync(file)) {
+    check('the store listing is written', false, 'android/play/listing.md missing')
+  } else {
+    const md = readFileSync(file, 'utf8')
+    const blocks = [...md.matchAll(/```\n([\s\S]*?)\n```/g)].map(m => m[1])
+    const [name, short, full] = blocks
+
+    check('the store name fits and matches the app', name && name.length <= 30 &&
+      readFileSync(join(root, 'android/app/src/main/res/values/strings.xml'), 'utf8')
+        .includes(`>${name}<`), name)
+    check('the short description fits Play\'s 80', short && short.length <= 80,
+      `${short?.length} chars`)
+    check('and the full one fits 4000', full && full.length <= 4000, `${full?.length} chars`)
+
+    const stations = Object.keys(NETWORK.stations).length
+    const legs = NETWORK.legs.length
+    const borders = Object.keys(NETWORK.borders).length
+    check('the listing counts the stations the network has',
+      full.includes(`${stations} stations`), `data says ${stations}`)
+    check('and the legs', full.includes(`${legs} legs`), `data says ${legs}`)
+    check('and the crossings', full.includes(`${borders} international crossings`),
+      `data says ${borders}`)
+
+    // Every country named in the listing has to actually be in the network,
+    // and every country in the network has to be named. Adding Timor-Leste
+    // and forgetting the description is exactly the kind of miss this catches.
+    const NAMES = {
+      th: 'Thailand', my: 'Malaysia', sg: 'Singapore', la: 'Laos', kh: 'Cambodia',
+      vn: 'Vietnam', id: 'Indonesia', mm: 'Myanmar', bn: 'Brunei',
+      ph: 'the Philippines', cn: 'China',
+    }
+    const inData = [...new Set(Object.values(NETWORK.stations).map(s => s.country))]
+    const missing = inData.filter(c => !NAMES[c] || !full.includes(NAMES[c]))
+    check('and names every country it actually reaches', missing.length === 0,
+      missing.join(', '))
+
+    // The graphics Play will not accept a submission without.
+    for (const [label, rel, w, h] of [
+      ['the icon', 'android/play/icon-512.png', 512, 512],
+      ['the feature graphic', 'android/play/feature-graphic.png', 1024, 500],
+    ]) {
+      const p = join(root, rel)
+      if (!existsSync(p)) { check(`${label} exists`, false, rel); continue }
+      // PNG: width and height are big-endian 32-bit at byte 16 of the IHDR.
+      const b = readFileSync(p)
+      const got = [b.readUInt32BE(16), b.readUInt32BE(20)]
+      check(`${label} is the size Play asks for`, got[0] === w && got[1] === h,
+        `${got[0]}×${got[1]}`)
+    }
+
+    const screens = [1, 2, 3, 4, 5, 6, 7, 8]
+      .map(n => [n, [...readdirSync(join(root, 'android/play'))]
+        .find(f => f.startsWith(`screenshot-${n}-`))])
+    const gaps = screens.filter(([, f]) => !f).map(([n]) => n)
+    check('there are eight phone screenshots, in order', gaps.length === 0,
+      gaps.length ? `missing ${gaps.join(', ')}` : '')
+    const wrong = screens.filter(([, f]) => f).map(([n, f]) => {
+      const b = readFileSync(join(root, 'android/play', f))
+      return [n, b.readUInt32BE(16), b.readUInt32BE(20)]
+    }).filter(([, w, h]) => w !== 1080 || h !== 1920)
+    check('and every one of them is 1080×1920', wrong.length === 0,
+      wrong.map(([n, w, h]) => `${n}: ${w}×${h}`).join(', '))
   }
 }
 
