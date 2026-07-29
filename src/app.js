@@ -1720,6 +1720,47 @@
    * and redraws once the real faces are ready. The difference between the two
    * frames is a few pixels of label placement, and by then there is a map. */
   start()
+
+  /* Take the launch screen away.
+   *
+   * Two rules. It does not leave before the map is on the screen behind it —
+   * hence waiting on a pair of frames after start(), the second of which is
+   * the one that has actually painted. And it does not leave before it has
+   * been readable, which is the ANIMATION figure: the mark finishes drawing
+   * itself at about 1.5s and cutting it off mid-stroke looks like a fault
+   * rather than a flourish. On a slow phone the boot is the longer of the two
+   * and the screen is doing its job; on a fast one the animation is, and the
+   * wait is the price of not flickering.
+   *
+   * A touch takes it away early. Somebody who has opened the app twice does
+   * not need to watch this again, and the alternative — showing it once and
+   * remembering — means the animation you built is seen exactly once. */
+  ;(() => {
+    const intro = document.getElementById('intro')
+    if (!intro || !document.documentElement.dataset.app) return
+    const ANIMATION = 1500
+    let going = false
+    const dismiss = () => {
+      if (going) return
+      going = true
+      intro.classList.add('is-gone')
+      // Length of the CSS transition. Removed rather than left transparent
+      // over the map: a full-screen layer that is invisible is still a layer
+      // the compositor carries and still something to hit-test against.
+      setTimeout(() => intro.remove(), 400)
+    }
+    const settled = () => {
+      // performance.now() is measured from navigation, which is the moment
+      // the intro's own animations were declared to start from too.
+      const left = ANIMATION - performance.now()
+      if (left > 0) setTimeout(dismiss, left)
+      else dismiss()
+    }
+    requestAnimationFrame(() => requestAnimationFrame(settled))
+    // 250ms of grace so the tap that opened the app cannot land on this.
+    setTimeout(() => intro.addEventListener('pointerdown', dismiss), 250)
+  })()
+
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       map.redraw()

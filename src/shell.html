@@ -16,6 +16,32 @@
     /* private mode, or storage disabled — fall through to the system setting */
   }
 </script>
+<!-- The launch screen, and only in the app: a website that paints a curtain
+     over itself before showing anything is a website nobody waits for. Here
+     there is a second or so of work to do before the map exists, and the choice
+     is between a blank screen and this. It is markup and two transforms, so it
+     costs nothing it is covering for. -->
+<div class="intro" id="intro" aria-hidden="true">
+  <!-- The launcher icon's mark, on the icon's own 108 grid so the two cannot
+       drift apart, but cropped to the mark itself: at icon scale it sits in a
+       square with room for a mask to bite into, and there is no mask here. -->
+  <svg class="intro-mark" viewBox="34 20 40 69" width="100" height="172" aria-hidden="true">
+    <g class="intro-sleepers">
+      <rect x="38" y="27.5" width="32" height="5" rx="1"/>
+      <rect x="38" y="37.5" width="32" height="5" rx="1"/>
+      <rect x="38" y="47.5" width="32" height="5" rx="1"/>
+      <rect x="38" y="57.5" width="32" height="5" rx="1"/>
+    </g>
+    <rect class="intro-rail" x="49" y="24" width="10" height="42" rx="1"/>
+    <g class="intro-sea">
+      <rect x="49" y="71" width="10" height="6" rx="1"/>
+      <rect x="49" y="81" width="10" height="4" rx="1"/>
+    </g>
+  </svg>
+  <p class="intro-word">Overland<b>SEA</b></p>
+  <p class="intro-line">Rail while there is land. A boat where it ends.</p>
+</div>
+
 <div class="app" data-active="false">
   <header class="topbar">
     <button type="button" id="home" class="brand" title="Back to the start">

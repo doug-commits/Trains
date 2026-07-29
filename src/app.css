@@ -2279,3 +2279,135 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   color: var(--muted);
 }
 .credits b { font-family: var(--sans); font-weight: 600; color: var(--ink-soft); }
+
+/* ------------------------------------------------------------------ intro */
+
+/* The launch screen, app only.
+ *
+ * It is the launcher icon carrying on moving: same gradient ground, same
+ * amber rail, same teal dashes, drawn at the size of a phone instead of the
+ * size of a thumbnail. Tapping the icon and watching the mark on it finish
+ * itself is a nicer way into the app than a blank frame, and there is real
+ * work happening underneath — the network is parsed, the map is projected and
+ * the first draw goes up in about a second on a mid-range phone. This covers
+ * exactly that, and gets out of the way the moment it is over.
+ *
+ * Deliberately one theme. The app opens light, but the icon is dark and the
+ * point of the screen is that it is the icon; a pale splash would break the
+ * only continuity it has. */
+.intro { display: none; }
+
+[data-app='true'] .intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  padding: 2rem;
+  background: linear-gradient(to bottom, #12303c 0%, #0a191f 55%, #061217 100%);
+  /* Faster than it arrived: a splash you are waiting on has outstayed it. */
+  transition: opacity 0.34s ease, transform 0.34s ease;
+}
+
+.intro-mark {
+  width: 100px;
+  height: 172px;
+  overflow: visible;
+}
+/* fill-box so a rect scales from its own top edge rather than the corner of
+   the 108-unit canvas. */
+.intro-mark rect { transform-box: fill-box; }
+
+.intro-sleepers rect {
+  fill: #8ca9b0;
+  transform-origin: center;
+  animation: intro-sleeper 0.34s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.intro-sleepers rect:nth-child(1) { animation-delay: 0.06s; }
+.intro-sleepers rect:nth-child(2) { animation-delay: 0.16s; }
+.intro-sleepers rect:nth-child(3) { animation-delay: 0.26s; }
+.intro-sleepers rect:nth-child(4) { animation-delay: 0.36s; }
+
+/* The rail is laid down the track, top to bottom, after the sleepers are
+   under it — which is the order it happens in. */
+.intro-rail {
+  fill: #e9a63e;
+  transform-origin: top;
+  animation: intro-rail 0.62s cubic-bezier(0.3, 0.7, 0.2, 1) 0.14s both;
+}
+
+/* And then it runs out, and the sea takes over. */
+.intro-sea rect {
+  fill: #57b6c8;
+  animation: intro-sea 0.42s ease-out both;
+}
+.intro-sea rect:nth-child(1) { animation-delay: 0.74s; }
+.intro-sea rect:nth-child(2) { animation-delay: 0.88s; }
+
+.intro-word {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #8ca9b0;
+  animation: intro-rise 0.5s ease-out 0.86s both;
+}
+.intro-word b { color: #f2f6f4; font-weight: 600; }
+
+.intro-line {
+  margin: -0.7rem 0 0;
+  max-width: 22rem;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.5;
+  text-align: center;
+  color: #6d8f99;
+  animation: intro-rise 0.5s ease-out 1.02s both;
+}
+
+.intro.is-gone {
+  opacity: 0;
+  /* Pulled towards the viewer as it goes, so it reads as the screen being
+     lifted off the map rather than the map fading up through it. */
+  transform: scale(1.06);
+  pointer-events: none;
+}
+
+@keyframes intro-sleeper {
+  from { opacity: 0; transform: scaleX(0.45); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+@keyframes intro-rail {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes intro-sea {
+  from { opacity: 0; transform: translateY(-7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The global reduce rule collapses durations but not delays, which would
+   leave the mark blank for a second and then snap. Here the whole thing is
+   simply already drawn. */
+@media (prefers-reduced-motion: reduce) {
+  .intro-sleepers rect,
+  .intro-rail,
+  .intro-sea rect,
+  .intro-word,
+  .intro-line {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .intro.is-gone { transform: none; }
+}

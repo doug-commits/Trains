@@ -133,6 +133,12 @@ function check(label, condition, detail = '') {
   check('the sea has depth rather than one flat fill',
     new Set(water).size > 1, water.join('  '))
 
+  /* The launch screen belongs to the app. A website that draws a curtain over
+     itself before showing anything is a website nobody waits for — and this
+     one paints in well under the time the curtain would have been up for. */
+  check('the website shows no launch screen',
+    (await page.evaluate(() => getComputedStyle(document.getElementById('intro')).display)) === 'none')
+
   await page.screenshot({ path: join(outDir, '01-idle-dark.png') })
   await context.close()
 }
@@ -2060,8 +2066,41 @@ function check(label, condition, detail = '') {
       colorScheme: 'dark', // the system says dark; the app should not care
     })
     await page.goto('file://' + appFile)
+
+    /* The launch screen, checked before anything else because it is only on
+       the screen for a moment and everything below waits longer than that.
+       It has to cover — a splash you can see the boot happening through is
+       worse than none — and it has to be gone, which is the half of it that
+       can actually break: it is drawn by CSS whatever happens, and removed
+       only if the program got far enough to remove it. */
+    const splash = await page.evaluate(() => {
+      const i = document.getElementById('intro')
+      if (!i) return null
+      const r = i.getBoundingClientRect()
+      const s = getComputedStyle(i)
+      return {
+        covers: r.width >= innerWidth && r.height >= innerHeight,
+        opaque: s.opacity === '1' && /gradient/.test(s.backgroundImage),
+        above: Number(s.zIndex) > 40, // the topbar, which it has to cover
+        mark: !!document.querySelector('.intro-rail'),
+      }
+    })
+    check('the app opens on a launch screen', splash && splash.covers && splash.opaque &&
+      splash.above && splash.mark, JSON.stringify(splash))
+
+    const cleared = await page
+      .waitForFunction(() => !document.getElementById('intro'), null, { timeout: 8000 })
+      .then(() => true, () => false)
+    check('and takes it away by itself', cleared)
+
     await page.waitForFunction(() => document.querySelector('#panel h1'))
     await page.waitForTimeout(700)
+
+    /* Removed, not left transparent over the map: an invisible full-screen
+       layer still swallows every touch on the thing underneath it. */
+    check('leaving the map on top where it belongs',
+      (await page.evaluate(() =>
+        document.elementFromPoint(innerWidth / 2, innerHeight / 3)?.id)) === 'map')
 
     /* The program is a separate file here too, and a missing subresource is
        the app's quietest possible failure: WebView reports nothing for one, so
