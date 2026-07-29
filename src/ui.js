@@ -864,6 +864,11 @@ const UI = (() => {
         border mechanics and connection buffers — deliberately not departure times, because
         SRT, KTMB, LCR, DSVN and KAI publish nothing in a common format and a remembered
         departure is the fastest way to miss a train. Verify live before booking.</p>
+        <!-- Absolute, not /privacy: in the app this document is served from an
+             internal asset host, where a root-relative link would resolve to a
+             page that does not exist inside the package. -->
+        <p><a href="https://slowasia.com/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+        — nothing here is collected, and that page says so in checkable detail.</p>
       </footer>`
   }
 

@@ -143,6 +143,15 @@ function related(current, pages) {
   )
 }
 
+/* Shared by every page here, so the privacy policy is reachable from anywhere
+ * on the site rather than only from the Play listing that is obliged to carry
+ * a link to it. */
+const DOCFOOT = `<footer class="docfoot">
+  <p>Overland SEA plans journeys that stay on rails as far as the rails go,
+  put a boat where the land ends, and use a road vehicle only where neither
+  exists. <a href="/">Open the planner</a> · <a href="/privacy">Privacy</a>.</p>
+</footer>`
+
 function page({ r, plan, pages, css }) {
   const url = ORIGIN ? `${ORIGIN}/${r.slug}` : null
   const title = `${r.h1} — ${TITLE_SUFFIX}`
@@ -217,11 +226,225 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
   ${related(r, pages)}
 </main>
 
-<footer class="docfoot">
-  <p>Overland SEA plans journeys that stay on rails as far as the rails go,
-  put a boat where the land ends, and use a road vehicle only where neither
-  exists. <a href="/">Open the planner</a>.</p>
-</footer>
+${DOCFOOT}
+</body>
+</html>
+`
+}
+
+/* ------------------------------------------------------- privacy policy */
+
+/* Play will not take a submission without one of these at a public URL, which
+ * is why it exists — but the reason it can be this short is that the app was
+ * built without a network permission in the first place. Everything below is
+ * checkable against the repository rather than a promise: the manifest, the
+ * dependency list and the two storage keys are all in the source, and
+ * tools/smoke.mjs fails the build if the page starts claiming something the
+ * code stopped doing.
+ *
+ * Dates are written out rather than taken from the clock: a policy whose
+ * effective date silently moves on every deploy is a policy nobody can cite. */
+const PRIVACY_UPDATED = '29 July 2026'
+
+function privacyPage(css) {
+  const url = ORIGIN ? `${ORIGIN}/privacy` : null
+  const title = `Privacy — ${TITLE_SUFFIX}`
+  const desc =
+    'Overland SEA collects nothing. The Android app has no internet permission ' +
+    'at all; the website sets no cookies and runs no analytics. What is stored, ' +
+    'where, and the few exceptions — in full.'
+
+  const body = `
+  <section class="block">
+    <h2>The short version</h2>
+    <p>There is no account to make, no form that submits anywhere, and no
+    server behind the planner to submit to. Where you are going, when, and
+    which passport you carry are worked out on the device you typed them
+    into. We do not know who you are and have not built anything capable of
+    finding out.</p>
+    <p>The rest of this page is the long version, because "we value your
+    privacy" is what every page says and the only useful form of the claim is
+    the checkable one.</p>
+  </section>
+
+  <section class="block">
+    <h2>The Android app</h2>
+
+    <div class="callout">
+      <h3>It has no internet permission</h3>
+      <p>Not "we choose not to send anything" — the app does not request
+      <code>android.permission.INTERNET</code>, so Android will not let it open
+      a network connection at all, including by accident and including if a
+      future bug tried to. The rail network, the map, the photographs and the
+      routing are all inside the installed package. That is also why it works
+      in flight mode at a border with no signal, which is the point of it.</p>
+    </div>
+
+    <p>What it keeps on your phone: two settings — whether you chose the light
+    or dark theme, and whether you left the search panel folded. They are
+    written to the app's own local storage on the device, are never sent
+    anywhere, and go when you uninstall the app or clear its data.</p>
+
+    <p>What it does not have: any account or sign-in, your email address, your
+    location, your contacts, an advertising identifier, an analytics library,
+    or a crash-reporting library. Its only dependencies are two of Google's own
+    AndroidX components, WebView and AppCompat. There is no third-party SDK in
+    the build.</p>
+
+    <p>When you tap an operator's booking site or "open in maps", the app hands
+    that address to whichever browser or maps app you have and stops being
+    involved. From that moment you are on someone else's site under their
+    policy.</p>
+
+    <p>One thing that is not ours to switch off: if you have left Google Play's
+    automatic crash reporting on at the system level, Android may send Google a
+    crash or ANR report for any app on your phone, this one included. We did not
+    build that channel and cannot see into it. What reaches us is the aggregate
+    view in the Play Console — stack traces and device models, with no identity
+    attached to them.</p>
+  </section>
+
+  <section class="block">
+    <h2>The website</h2>
+
+    <p>No analytics, no tag manager, no advertising pixel, no consent banner —
+    because there is nothing to consent to. The site sets no cookies of any
+    kind.</p>
+
+    <p>It stores the same two settings the app does, in your browser's local
+    storage, and nothing else. Clearing site data for slowasia.com removes
+    them.</p>
+
+    <p>Fonts and photographs are served from slowasia.com itself rather than
+    from Google Fonts or a CDN, so opening a page here does not announce your
+    visit to a third party as a side effect of loading the design.</p>
+
+    <p>The route you plan lives in the part of the address after the
+    <code>#</code>. Browsers do not send that fragment to the server, so an
+    itinerary link you share carries the journey and reaches only the person
+    you send it to.</p>
+
+    <p>The site is hosted on Vercel, and like any web server its edge records
+    requests as they arrive: IP address, time, the address requested, the
+    browser's user-agent string. That is what serving a page and absorbing
+    abuse requires. We do not build profiles from those logs, do not use them
+    for advertising, and do not combine them with anything else. Vercel handles
+    them as our hosting provider under its own privacy terms.</p>
+  </section>
+
+  <section class="block">
+    <h2>What you type into the planner</h2>
+    <p>The origin and destination, the departure date, the passport
+    nationality, the pace and the choice of beds are all read by code running
+    on your own device and are used to pick which legs, which visa notes and
+    which prices to show you. None of it is transmitted, because there is no
+    endpoint to transmit it to — the planner is a static document. The passport
+    field in particular exists only to decide which border notes apply to you,
+    and never leaves the device.</p>
+  </section>
+
+  <section class="block">
+    <h2>Links to other people</h2>
+    <p>Operator booking sites, Seat61 and Google Maps are ordinary links. Your
+    browser tells those sites what it tells every site you visit; we pass them
+    nothing about you.</p>
+    <p>Two links are affiliate links, marked as such in the page's own markup
+    with <code>rel="sponsored"</code>: accommodation search on Booking.com, and
+    travel insurance from SafetyWing. If you follow one, that company can tell
+    the referral came from Overland SEA, and if you go on to buy something they
+    may pay us a commission. We are not told who you are, what you booked or
+    what you paid — a commission report is a number, not a name. Nothing about
+    the itinerary changes if you ignore them, and it costs you nothing either
+    way.</p>
+  </section>
+
+  <section class="block">
+    <h2>Things we do not do</h2>
+    <ul class="warns">
+      <li>Sell, rent or share personal data. There is none to sell.</li>
+      <li>Build a profile of you, on this site or across others.</li>
+      <li>Show you advertising, or let anyone else show you advertising here.</li>
+      <li>Track you between the app and the website. They do not know about
+      each other.</li>
+      <li>Email you. There is no mailing list and no box to join one.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <h2>Children</h2>
+    <p>This is a travel planner, not directed at children. It collects nothing
+    from anybody, which includes collecting nothing from them.</p>
+  </section>
+
+  <section class="block">
+    <h2>Your rights, and the honest version of them</h2>
+    <p>Data protection law — the GDPR, the UK GDPR, the CCPA and their
+    equivalents — gives you the right to ask what a company holds about you, to
+    have it corrected, and to have it deleted. We hold nothing about you, so
+    there is nothing for such a request to return. That is not a way of
+    declining: it is what "collects nothing" means when you follow it to the
+    end.</p>
+    <p>The two settings on your device are yours and are removed by uninstalling
+    the app, clearing its data in Android's app settings, or clearing site data
+    for slowasia.com in your browser.</p>
+  </section>
+
+  <section class="block">
+    <h2>Changes</h2>
+    <p>If the app ever gains the ability to send something — it has no plans
+    to, and gaining one would mean adding a permission you would see at
+    install time — this page changes before that release ships, and the date
+    below changes with it. There is no mailing list, so this page is the
+    notice.</p>
+    <p>Last updated ${PRIVACY_UPDATED}.</p>
+  </section>
+
+  <section class="block">
+    <h2>Contact</h2>
+    <p>Questions about any of this, including anything above you would like
+    shown rather than asserted: <a href="mailto:privacy@slowasia.com">privacy@slowasia.com</a>.</p>
+  </section>`
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_ORIGIN was not set at build time -->'}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="Privacy">
+<meta property="og:description" content="${esc(desc)}">
+${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
+<style>${css}</style>
+</head>
+<body class="doc">
+<header class="topbar">
+  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
+    <span class="brandtext">Overland<b>SEA</b></span></a>
+  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+</header>
+
+<main class="docwrap">
+  <article>
+    <h1>Privacy</h1>
+    <p class="lede">Overland SEA collects nothing about you. Here is what that
+    means in each place the name appears, and where the edges of the claim
+    are.</p>
+    <p class="facts">
+      <b>No</b> accounts · <b>No</b> analytics · <b>No</b> cookies ·
+      <b>No</b> internet permission in the app
+    </p>
+
+    <div class="panel doc-panel">${body}</div>
+  </article>
+</main>
+
+${DOCFOOT}
 </body>
 </html>
 `
@@ -254,6 +477,8 @@ for (const r of built) {
   writeFileSync(join(OUT, `${r.slug}.html`), page({ r, plan: r.plan, pages: built, css }))
 }
 
+writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
+
 /* robots.txt — the Sitemap line needs an absolute URL, so it only appears
  * when we actually know the host. */
 writeFileSync(
@@ -266,7 +491,10 @@ if (!ORIGIN) {
   // advertising URLs on it long after this build stopped claiming them.
   rmSync(join(OUT, 'sitemap.xml'), { force: true })
 } else {
-  const urls = ['', ...built.map(r => r.slug)]
+  // Privacy last and lowest: it belongs in the sitemap because it is a real
+  // page a crawler should be able to find, not because anyone searches for it.
+  const urls = ['', ...built.map(r => r.slug), 'privacy']
+  const priority = u => (u === '' ? '1.0' : u === 'privacy' ? '0.3' : '0.8')
   writeFileSync(
     join(OUT, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -276,14 +504,14 @@ if (!ORIGIN) {
           u =>
             `  <url><loc>${ORIGIN}/${u}</loc>` +
             `<changefreq>monthly</changefreq>` +
-            `<priority>${u === '' ? '1.0' : '0.8'}</priority></url>`
+            `<priority>${priority(u)}</priority></url>`
         )
         .join('\n') +
       `\n</urlset>\n`
   )
 }
 
-console.log(`pages              ${built.length} route pages -> public/`)
+console.log(`pages              ${built.length} route pages + privacy -> public/`)
 if (failed.length) for (const [slug, why] of failed) console.log(`   skipped ${slug}: ${why}`)
 console.log(
   ORIGIN

@@ -2116,6 +2116,16 @@ function check(label, condition, detail = '') {
     check('the app opens in day mode',
       (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light')
 
+    /* Play wants the policy on the listing; a reader wants it in the app.
+       Absolute, because inside the package a root-relative link resolves
+       against the internal asset host and lands on nothing. */
+    const policy = await page.evaluate(() =>
+      [...document.querySelectorAll('#panel a')]
+        .map(a => a.getAttribute('href'))
+        .filter(h => /privacy/.test(h)))
+    check('the app links out to the privacy policy',
+      policy.length === 1 && policy[0] === 'https://slowasia.com/privacy', policy.join(' '))
+
     /* The written-up routes are separate pages on the site. Inside one file
        every one of those links is a dead end, so they are not offered. */
     const deadEnds = await page.evaluate(() =>
@@ -2173,6 +2183,84 @@ function check(label, condition, detail = '') {
     check('while pulling down from the top still lowers it', gestures.downTaken)
 
     await page.screenshot({ path: join(outDir, '23-app.png') })
+    await context.close()
+  }
+}
+
+/* ------------------------------------------------- the privacy policy */
+
+/* A privacy policy is a set of claims about the code, and the code is what
+ * changes. Everything the page asserts that can be checked is checked here,
+ * so adding a permission, an SDK, an analytics tag or a third storage key
+ * fails the build instead of quietly turning the page into a false statement.
+ * That is the whole reason the page was written in checkable terms. */
+{
+  const file = join(root, 'public/privacy.html')
+  if (!existsSync(file)) {
+    check('the privacy policy is built', false, 'run tools/build-pages.mjs')
+  } else {
+    const html = readFileSync(file, 'utf8')
+    const manifest = readFileSync(join(root, 'android/app/src/main/AndroidManifest.xml'), 'utf8')
+    const gradle = readFileSync(join(root, 'android/app/build.gradle.kts'), 'utf8')
+
+    /* The load-bearing claim. Everything else on the page is a promise about
+       conduct; this one is enforced by the operating system, and it is only
+       true while the line is absent from the manifest. */
+    check('the app still has no internet permission, as the policy says',
+      !/android\.permission\.INTERNET/.test(manifest))
+    check('and the policy still says it',
+      /android\.permission\.INTERNET/.test(html) && /no internet permission/i.test(html))
+
+    /* "There is no third-party SDK in the build." Everything declared has to
+       be Google's own or the language's. */
+    const deps = [...gradle.matchAll(/implementation\((?:platform\()?"([^"]+)"/g)].map(m => m[1])
+    const ours = deps.filter(d => !/^(androidx\.|com\.google\.android\.|org\.jetbrains\.kotlin)/.test(d))
+    check('no third-party SDK has appeared in the app', ours.length === 0,
+      deps.length ? deps.join(', ') : 'none declared')
+
+    /* "Two settings." Named on the page, so a third would make it wrong. */
+    const keys = [...new Set(
+      [...readFileSync(join(root, 'src/app.js'), 'utf8').matchAll(/'(overlandsea:[a-z-]+)'/g)]
+        .map(m => m[1])
+    )].sort()
+    check('the app still stores exactly the two settings the policy names',
+      keys.join(' ') === 'overlandsea:folded overlandsea:theme', keys.join(' ') || 'none')
+
+    /* "No analytics, no tag manager, no advertising pixel." The deployed page
+       loads one script, its own, and that is asserted elsewhere — here it is
+       the absence of the usual names, in every built artefact. */
+    const anywhere = ['index.html', 'app.js', 'dist/app.html']
+      .filter(p => existsSync(join(root, p)))
+      .map(p => readFileSync(join(root, p), 'utf8'))
+      .join('\n')
+    const trackers = ['googletagmanager', 'google-analytics', 'gtag(', 'connect.facebook',
+      'plausible.io', 'segment.com', 'sentry.io', 'hotjar']
+      .filter(t => anywhere.includes(t))
+    check('nothing that measures readers has been added', trackers.length === 0,
+      trackers.join(', '))
+
+    const { page, context } = await newPage({ viewport: { width: 900, height: 1200 } })
+    await page.goto('file://' + file)
+
+    // "The site sets no cookies of any kind."
+    check('the site sets no cookies',
+      (await page.evaluate(() => document.cookie)) === '' &&
+        (await context.cookies()).length === 0)
+
+    check('the policy is a readable document, not a wall',
+      (await page.locator('.docwrap h2').count()) >= 8,
+      `${await page.locator('.docwrap h2').count()} sections`)
+    check('and it is reachable from the foot of every page',
+      (await page.locator('.docfoot a[href="/privacy"]').count()) === 1)
+    check('with a working way to ask about it',
+      (await page.locator('a[href^="mailto:"]').count()) >= 1)
+    // Long permission strings on a narrow screen are the obvious way for this
+    // page to break, and it is the one page nobody will look at again.
+    await page.setViewportSize({ width: 360, height: 780 })
+    check('the policy fits a narrow phone',
+      (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0)
+
+    await page.screenshot({ path: join(outDir, '24-privacy.png') })
     await context.close()
   }
 }

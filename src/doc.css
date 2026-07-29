@@ -178,3 +178,18 @@ body.doc .banner img { display: block; width: 100%; height: 100%; object-fit: co
   .docwrap { padding: 1.75rem 1rem 3rem; }
   .more span { margin-left: 0; }
 }
+
+/* The privacy page names an Android permission and an HTML attribute, and
+   "it does not request android.permission.INTERNET" is only a checkable claim
+   if the string is set apart from the prose making it. Nothing else on the
+   site sets code, so the rule lives here rather than in app.css. */
+.doc code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.32em;
+  border-radius: var(--r-xs);
+  background: var(--raise);
+  border: 1px solid var(--panel-edge);
+  /* These strings are longer than a phone is wide. */
+  overflow-wrap: anywhere;
+}
