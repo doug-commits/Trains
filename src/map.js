@@ -85,21 +85,36 @@ const MapView = (() => {
      * hundred Path2D allocations for every pixel of a pan, which is what made
      * the map unusable on a phone: 93ms a frame, so about ten. */
     const world = (() => {
-      const ring = (path, pts) => {
-        for (let i = 0; i < pts.length; i++) {
+      /* `step` drops points on the way past.
+       *
+       * A second, coarser copy of the same coastline is built for the frames
+       * where the map is moving. Filling a path costs both the area it covers
+       * and the edges it is made of, and at a third of the edges the shape is
+       * the same shape — at half resolution, under a moving thumb, nobody has
+       * ever seen the difference. The full one goes back the moment it stops. */
+      const ring = (path, pts, step = 1) => {
+        let started = false
+        for (let i = 0; i < pts.length; i += step) {
           const x = pts[i][0]
           const y = Proj.screenY(pts[i][1])
-          if (i === 0) path.moveTo(x, y)
-          else path.lineTo(x, y)
+          if (!started) {
+            path.moveTo(x, y)
+            started = true
+          } else path.lineTo(x, y)
         }
         path.closePath()
       }
 
+      const COARSE = 3
       const all = new Path2D()
+      const rough = new Path2D()
       const outlines = []
       for (const country of basemap.countries) {
         const path = new Path2D()
-        for (const r of country.rings) ring(path, r)
+        for (const r of country.rings) {
+          ring(path, r)
+          ring(rough, r, COARSE)
+        }
         outlines.push(path)
         all.addPath(path)
       }
@@ -110,11 +125,14 @@ const MapView = (() => {
        * from the country polygons at every resolution, which left ferry
        * terminals floating in open water. */
       const isles = new Path2D()
-      for (const r of basemap.islands || []) ring(isles, r)
+      for (const r of basemap.islands || []) {
+        ring(isles, r)
+        ring(rough, r, COARSE)
+      }
       outlines.push(isles)
       all.addPath(isles)
 
-      return { all, outlines }
+      return { all, rough, outlines }
     })()
 
     /* Fit into the window the overlays leave visible, then shift it into place.
@@ -318,7 +336,7 @@ const MapView = (() => {
        * settles. Nobody can see a coastal halo on a map that is moving. */
       ctx.fillStyle = colors.land
       if (moving) {
-        ctx.fill(world.all)
+        ctx.fill(world.rough)
       } else {
         ctx.shadowColor = colors.coast
         ctx.shadowBlur = 16

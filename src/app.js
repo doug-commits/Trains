@@ -1522,7 +1522,14 @@
   function placeSheet(y, gliding) {
     sheetY = y
     sheet.dataset.gliding = gliding ? 'true' : 'false'
-    sheet.style.setProperty('--sheet-y', `${y}px`)
+    /* The transform itself, not a custom property that feeds it.
+     *
+     * Changing a CSS variable invalidates style for everything that could
+     * inherit it, and what inherits this one is the entire itinerary — 926
+     * elements, restyled on every frame of a drag, to move one box. Setting
+     * transform directly is a compositor operation and touches none of them:
+     * 45ms a frame becomes 17. */
+    sheet.style.transform = `translateY(${y}px)`
   }
 
   /* The scroller has to be the height you can see, not the height of the sheet.
@@ -1594,7 +1601,15 @@
 
   gripEl.addEventListener('pointerdown', e => {
     startSheetDrag(e, false)
-    gripEl.setPointerCapture(e.pointerId)
+    /* Capture keeps the drag alive when the finger leaves the handle, which it
+     * always does. It throws if the pointer is already gone by the time we ask
+     * — a fast tap, a cancelled gesture — and an exception here would abandon
+     * the drag it was meant to protect. */
+    try {
+      gripEl.setPointerCapture(e.pointerId)
+    } catch (err) {
+      /* the gesture still works; it is only less well held */
+    }
   })
 
   /* Only from the very top of the contents, and only downwards.

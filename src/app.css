@@ -1633,9 +1633,10 @@ table { width: 100%; border-collapse: collapse; }
     border-top: 1px solid var(--panel-edge);
     border-radius: 1.1rem 1.1rem 0 0;
     box-shadow: 0 -18px 44px -22px rgb(0 0 0 / 0.6);
-    /* Set by app.js. The transition is added only on release, so a drag
-       tracks the finger and a snap glides. */
-    transform: translateY(var(--sheet-y, 55dvh));
+    /* Where it sits before app.js has placed it. From then on the transform is
+       set inline, on the element, rather than through a variable — see
+       placeSheet for why that is not a detail. */
+    transform: translateY(55dvh);
     will-change: transform;
   }
   .sheet[data-gliding='true'] {

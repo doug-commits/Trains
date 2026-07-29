@@ -1530,6 +1530,48 @@ const MAPBOX_HOST = /^https:\/\/(api|[a-d]\.tiles)\.mapbox\.com\//
   })
   check('a two-finger pan keeps up with the finger', frame < 120, `${frame}ms a frame`)
 
+  /* The sheet is what a hand is on while it reads directions, so it is the
+     one that has to be perfect. It was 45ms a frame at four times throttle,
+     because the drag moved the sheet by writing a CSS custom property — and
+     changing a variable restyles everything that could inherit it, which here
+     is the whole itinerary. Setting the transform on the element instead is a
+     compositor operation and touches nothing else. */
+  const dragFrame = await page.evaluate(async () => {
+    const g = document.querySelector('#grip')
+    const r = g.getBoundingClientRect()
+    const x = r.left + r.width / 2
+    const y0 = r.top + r.height / 2
+    const ev = (t, y, target) => target.dispatchEvent(new PointerEvent(t, {
+      pointerId: 4, pointerType: 'touch', bubbles: true, cancelable: true,
+      clientX: x, clientY: y,
+    }))
+    ev('pointerdown', y0, g)
+    const gaps = []
+    let last = performance.now()
+    for (let i = 0; i < 30; i++) {
+      ev('pointermove', y0 - (i % 15) * 14, window)
+      await new Promise(r => requestAnimationFrame(r))
+      const now = performance.now()
+      gaps.push(now - last)
+      last = now
+    }
+    ev('pointerup', y0, window)
+    const s = gaps.slice(4).sort((a, b) => a - b)
+    return Math.round(s[Math.floor(s.length / 2)])
+  })
+  check('and the sheet tracks the thumb that drags it', dragFrame < 34,
+    `${dragFrame}ms a frame`)
+
+  /* Which is only true while the transform is set on the element. A variable
+     put back here would pass the timing above on a fast machine and be 45ms on
+     a phone, so the mechanism is asserted too. */
+  const drivenBy = await page.evaluate(() => ({
+    inline: /translateY/.test(document.querySelector('#sheet').style.transform || ''),
+    variable: (document.querySelector('#sheet').style.getPropertyValue('--sheet-y') || '') !== '',
+  }))
+  check('because the transform is on the element, not in a variable',
+    drivenBy.inline && !drivenBy.variable)
+
   await page.screenshot({ path: join(outDir, '21-phone.png') })
   await context.close()
 }
