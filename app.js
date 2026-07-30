@@ -1660,6 +1660,72 @@ const GUIDES = [
   { from: 'bkk_aphiwat', to: 'vte_khamsavath', slug: 'bangkok-to-vientiane-by-train',
     h1: 'Bangkok to Vientiane by train',
     intent: 'Across the Friendship Bridge, and the gauge break waiting on the other side.' },
+
+  /* Added later, and chosen the same way: corridors with a materially different
+   * answer behind them, not the reverse of a page that already exists. A page
+   * for "Singapore to Bangkok" would be the Bangkok page read upwards — the
+   * same legs, the same crossings, the same prose — and two of those is one
+   * page and one liability.
+   *
+   * Single-leg international corridors are missing on purpose. "Ho Chi Minh
+   * City to Phnom Penh" is one bus and one frontier, so almost everything worth
+   * saying about it is about Bavet — and that now has a page of its own, which
+   * is the better answer to the query rather than a thinner second copy of it. */
+
+  { from: 'saigon', to: 'bkk_aphiwat', slug: 'ho-chi-minh-city-to-bangkok-overland',
+    h1: 'Ho Chi Minh City to Bangkok overland',
+    intent: 'Two frontiers, no through train, and a week if you do it properly.' },
+  { from: 'singapore', to: 'jakarta', slug: 'singapore-to-jakarta-without-flying',
+    h1: 'Singapore to Jakarta without flying',
+    intent: 'An hour in the air, or five days across the Riau islands and the length of Sumatra.' },
+  { from: 'klsentral', to: 'bkk_aphiwat', slug: 'kuala-lumpur-to-bangkok-by-train',
+    h1: 'Kuala Lumpur to Bangkok by train',
+    intent: 'The spine northbound — two trains, one frontier, and a clock that changes at it.' },
+  { from: 'bkk_aphiwat', to: 'georgetown', slug: 'bangkok-to-penang-by-train',
+    h1: 'Bangkok to Penang by train',
+    intent: 'The old visa-run route, and why the train still stops short of the island.' },
+  { from: 'bkk_aphiwat', to: 'kunming', slug: 'bangkok-to-kunming-by-train',
+    h1: 'Bangkok to Kunming by train',
+    intent: 'Almost all of it on rails since 2021 — and the crossing that turns people back.' },
+  { from: 'bkk_aphiwat', to: 'luangprabang', slug: 'bangkok-to-luang-prabang-overland',
+    h1: 'Bangkok to Luang Prabang overland',
+    intent: 'The sleeper north, the Friendship Bridge, and 90 minutes on the new railway.' },
+  { from: 'vte_khamsavath', to: 'kunming', slug: 'vientiane-to-kunming-by-train',
+    h1: 'Vientiane to Kunming by train',
+    intent: 'The newest railway in the region, and the hardest ticket in it to buy.' },
+  { from: 'jakarta', to: 'denpasar', slug: 'jakarta-to-bali-by-train-and-ferry',
+    h1: 'Jakarta to Bali by train and ferry',
+    intent: 'The length of Java on rails, then the strait — no border, and no flight.' },
+  { from: 'surabaya', to: 'denpasar', slug: 'surabaya-to-bali-by-train-and-ferry',
+    h1: 'Surabaya to Bali by train and ferry',
+    intent: 'The short end of the Java run, and the ferry nobody books in advance.' },
+  { from: 'manila', to: 'cebu', slug: 'manila-to-cebu-by-ferry',
+    h1: 'Manila to Cebu by ferry',
+    intent: 'Twenty-odd hours on a ship for the price of a checked bag.' },
+
+  /* The far corners. Each of these is the only written-up journey that uses a
+   * particular frontier, which is why they are here: a crossing page with no
+   * journey behind it is a briefing nobody can act on, and the six below carry
+   * Belawan, Dumai, Chong Mek, Chau Doc, Sungai Tujoh and Sungai Kolok. */
+
+  { from: 'singapore', to: 'medan', slug: 'singapore-to-medan-overland',
+    h1: 'Singapore to Medan overland',
+    intent: 'Up the peninsula and across the strait to Sumatra, on the old ferry route.' },
+  { from: 'klsentral', to: 'pekanbaru', slug: 'kuala-lumpur-to-pekanbaru-overland',
+    h1: 'Kuala Lumpur to Pekanbaru overland',
+    intent: 'The Melaka ferry to Dumai, and the road into central Sumatra.' },
+  { from: 'bkk_aphiwat', to: 'pakse', slug: 'bangkok-to-pakse-overland',
+    h1: 'Bangkok to Pakse overland',
+    intent: 'The eastern sleeper to Ubon, then Chong Mek — the quiet way into southern Laos.' },
+  { from: 'phnompenh', to: 'chaudoc', slug: 'phnom-penh-to-chau-doc-by-boat',
+    h1: 'Phnom Penh to Chau Doc by boat',
+    intent: 'One of the last passenger river crossings in the region, and how immigration works on water.' },
+  { from: 'kuching', to: 'kotakinabalu', slug: 'kuching-to-kota-kinabalu-overland',
+    h1: 'Kuching to Kota Kinabalu overland',
+    intent: 'The length of Borneo by road and sea, in and out of Brunei on the way.' },
+  { from: 'bkk_aphiwat', to: 'wakafbaharu', slug: 'bangkok-to-kota-bharu-by-train',
+    h1: 'Bangkok to Kota Bharu by train',
+    intent: 'The east-coast crossing at Sungai Kolok — and the security advice to read first.' },
 ]
 
 
@@ -5570,6 +5636,12 @@ const UI = (() => {
       </div>`
   }
 
+  /* The URL a crossing's own page lives at. Defined here rather than in the
+     page generator because both need it — the generator to write the file, and
+     the list below to link to it — and a slug rule that exists in two places
+     is a set of 404s waiting for someone to edit one of them. */
+  const borderSlug = id => `${id.replace(/_/g, '-')}-border-crossing`
+
   function idle(network, presets) {
     const cards = presets
       .map((p, i) => {
@@ -5634,6 +5706,23 @@ const UI = (() => {
       </section>`
           : ''
       }
+      ${
+        Object.keys(network.borders).length
+          ? `<section class="block block-web">
+        <h2>Border crossings, in detail</h2>
+        <p class="sub">Itineraries die at frontiers, not on track. Each of these has its own
+        page: where immigration physically is, whether you stay aboard, what your luggage
+        does, what cash the far side wants, and the specific trap.</p>
+        <ul class="guides">${Object.entries(network.borders)
+          .map(
+            ([id, b]) =>
+              `<li><a href="/${esc(borderSlug(id))}">${esc(b.name)}</a>` +
+              `<span>${esc(b.countries)} · about ${b.minutes} min</span></li>`
+          )
+          .join('')}</ul>
+      </section>`
+          : ''
+      }
       <section class="block">
         <h2>What people get wrong</h2>
         <p class="sub">Travellers arrive with these. All seven are load-bearing — each one has
@@ -5654,7 +5743,7 @@ const UI = (() => {
       </footer>`
   }
 
-  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL }
+  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL, borderSlug }
 })()
 
 

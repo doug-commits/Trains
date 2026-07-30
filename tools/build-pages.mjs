@@ -152,6 +152,26 @@ const DOCFOOT = `<footer class="docfoot">
   exists. <a href="/">Open the planner</a> · <a href="/privacy">Privacy</a>.</p>
 </footer>`
 
+/* The crossings a route passes through, linked out to their own pages.
+ *
+ * The itinerary already contains the full briefing for each one, so this is
+ * not there to inform — it is there because "Poipet border crossing" is a
+ * question people ask on its own, the answer has its own URL, and the pages
+ * that ought to point at it are exactly the ones whose journeys go through
+ * it. Built from the routed plan, so it cannot list a crossing the itinerary
+ * above does not actually make. */
+function crossingsOn(plan) {
+  const on = plan.borders.filter(x => NETWORK.borders[x.id] && legsAcross(x.id).length)
+  if (!on.length) return ''
+  return `<nav class="more" aria-label="Border crossings on this route">
+    <h2>The crossings on this route, in detail</h2><ul>` +
+    on
+      .map(x => `<li><a href="/${BORDER_SLUG(x.id)}">${esc(x.name)}</a>
+        <span>${esc(x.countries)} · about ${x.minutes} min</span></li>`)
+      .join('') +
+    `</ul></nav>`
+}
+
 function page({ r, plan, pages, css }) {
   const url = ORIGIN ? `${ORIGIN}/${r.slug}` : null
   const title = `${r.h1} — ${TITLE_SUFFIX}`
@@ -223,6 +243,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
     </p>
   </article>
 
+  ${crossingsOn(plan)}
   ${related(r, pages)}
 </main>
 
@@ -450,6 +471,247 @@ ${DOCFOOT}
 `
 }
 
+/* ------------------------------------------------------ border crossings */
+
+/* The one thing this site holds that nobody else has written down in a
+ * comparable form.
+ *
+ * "Is there a train through the Padang Besar border" and "Poipet scam" are
+ * asked constantly and answered mostly by forum posts from 2016 and by blogs
+ * that crossed once. The data behind these pages is the same briefing the
+ * planner puts inside an itinerary — where immigration physically is, whether
+ * you stay aboard, whether your luggage does, what the queue depends on, what
+ * cash the far side wants and what the specific trap is — and it is worth its
+ * own URL because that is the question people actually type.
+ *
+ * Not a template with the names swapped: every field is different per
+ * crossing, and the surrounding material is computed — which services cross
+ * here, who runs them, and which written-up journeys pass through. A crossing
+ * with nothing but its own name would be a thin page, so one is not emitted.
+ */
+
+const COUNTRY = {
+  th: 'Thailand', my: 'Malaysia', sg: 'Singapore', la: 'Laos', kh: 'Cambodia',
+  vn: 'Vietnam', id: 'Indonesia', mm: 'Myanmar', bn: 'Brunei', ph: 'Philippines',
+  cn: 'China',
+}
+
+// The planner's own rule, so the list it renders on the homepage and the files
+// written here cannot disagree about where a crossing lives.
+const BORDER_SLUG = UI.borderSlug
+
+/* Whichever legs actually cross, in both directions. A crossing with no
+ * service on it is a line on a map, not a journey. */
+const legsAcross = id => NETWORK.legs.filter(l => l.border === id)
+
+function borderPage({ id, b, uses, css }) {
+  const url = ORIGIN ? `${ORIGIN}/${BORDER_SLUG(id)}` : null
+  const [a, z] = String(b.countries).split('↔').map(s => s.trim())
+  const h1 = `${b.name}: the ${a} to ${z} border crossing`
+  const title = `${b.name} border crossing — ${TITLE_SUFFIX}`
+  const desc = (
+    `${b.name}, ${b.countries}. Where immigration is, whether you stay on board, ` +
+    `luggage, visas, cash on the far side and about ${b.minutes} minutes of ` +
+    `formalities — plus the trap that catches people here.`
+  ).slice(0, 300)
+
+  const crossing = legsAcross(id)
+  const station = sid => NETWORK.stations[sid] || { name: sid }
+  const opOf = k => NETWORK.operators[k] || { name: k }
+
+  const rows = [
+    ['Where', b.at],
+    ['On the train?', b.stayOnTrain],
+    ['Luggage', b.luggage],
+    ['Visa', b.visa],
+    ['Cash on the far side', b.cash],
+    ['Time cost', `About ${b.minutes} minutes of formalities`],
+  ]
+
+  const legRow = l => {
+    const op = opOf(l.op)
+    return `<tr>
+      <td><b>${esc(station(l.from).name)}</b> → <b>${esc(station(l.to).name)}</b>
+        ${l.service ? `<em>${esc(l.service)}</em>` : ''}</td>
+      <td>${esc(op.name)}</td>
+      <td class="num-col">${UI.hours(l.hours)}</td>
+      <td class="num-col">${UI.money(l.usd)}</td>
+    </tr>`
+  }
+
+  const table = (legs, caption) => `<div class="table-wrap"><table class="route">
+      <thead><tr><th>${caption}</th><th>Operator</th>
+        <th class="num-col">Time</th><th class="num-col">Fare</th></tr></thead>
+      <tbody>${legs.map(legRow).join('')}</tbody></table></div>`
+
+  /* Operators on the crossing itself: how to buy, and whether the ticket is
+     the hard part. On several of these it is — the frontier is trivial and the
+     seat is not. */
+  const opKeys = [...new Set(crossing.map(l => l.op))]
+  const booking = opKeys
+    .map(k => [k, opOf(k)])
+    .filter(([, op]) => op.bookNote || op.punctual)
+    .map(([, op]) => `<p><b>${esc(op.name)}.</b> ${esc(op.bookNote || '')}${
+      op.punctual ? ` Punctuality: ${esc(op.punctual)}.` : ''}</p>`)
+    .join('')
+
+  const scarce = NETWORK.scarcity
+    .filter(x => opKeys.includes(x.op))
+    .map(x => `<div class="callout"><h3>${esc(x.service || opOf(x.op).name)} sells out</h3>
+      <p>${esc(x.why)} <b>Booking window:</b> ${esc(x.window)}</p></div>`)
+    .join('')
+
+  /* An advisory attaches to the leg, not the frontier — the Sungai Kolok
+     crossing is unremarkable in itself and the provinces it sits in are not. */
+  const advisories = [...new Set(crossing.map(l => l.advisory).filter(Boolean))]
+    .map(k => `<div class="callout alert"><h3>Security advisory</h3>
+      <p>${esc(NETWORK.advisories[k])}</p></div>`)
+    .join('')
+
+  /* Each side of the frontier, and how you reach it. "How do I get to Padang
+     Besar" is the other half of the question and is nowhere on this site
+     otherwise — the itinerary pages answer it only for the journeys that
+     happen to be written up. */
+  const sides = [...new Set(crossing.flatMap(l => [l.from, l.to]))]
+    .map(sid => {
+      const st = station(sid)
+      const feeders = NETWORK.legs
+        .filter(l => (l.from === sid || l.to === sid) && l.border !== id)
+        // The long-distance services first: those are the ones you plan around.
+        .sort((x, y) => y.hours - x.hours)
+        .slice(0, 6)
+      return `<article class="crossing">
+        <header>
+          <h3>${esc(st.name)}</h3>
+          <span class="countries">${esc(COUNTRY[st.country] || st.country || '')}</span>
+        </header>
+        ${st.warn ? `<p class="trap"><b>Worth knowing.</b> ${esc(st.warn)}</p>` : ''}
+        ${feeders.length
+          ? table(feeders, 'Reached by')
+          : '<p>Nothing else on this network serves it directly.</p>'}
+      </article>`
+    })
+    .join('')
+
+  const journeys = uses.length
+    ? `<ul>${uses
+        .map(r => `<li><a href="/${r.slug}">${esc(r.h1)}</a> <span>${esc(r.summary)}</span></li>`)
+        .join('')}</ul>`
+    : `<p>No written-up journey on this site crosses here yet — but the planner
+       will route you through it.</p>`
+
+  const body = `
+  <section class="block">
+    <h2>How the crossing works</h2>
+    <article class="crossing${b.hard ? ' hard' : ''}">
+      <header>
+        <h3>${esc(b.name)}</h3>
+        <span class="countries">${esc(b.countries)}</span>
+      </header>
+      <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+      <p class="trap"><b>The trap.</b> ${esc(b.trap)}</p>
+    </article>
+    ${b.hard
+      ? `<p class="sub">This is one of the crossings marked hard on this network:
+         it defeats people often enough that the router treats it as a real
+         obstacle rather than a formality, and it usually defeats them on
+         documents rather than on logistics.</p>`
+      : ''}
+    ${b.verify
+      ? `<p class="sub">The position here moves. Confirm it against the operator
+         and your own government's current advice before you book anything that
+         depends on it.</p>`
+      : ''}
+    ${advisories}
+  </section>
+
+  <section class="block">
+    <h2>What crosses here</h2>
+    ${crossing.length
+      ? table(crossing, 'Service') +
+        `<p class="sub">Typical scheduled running time for the crossing leg itself,
+         which does not include the ${b.minutes} minutes of formalities above.
+         Allow for both when you are working out whether a connection holds.
+         Fares are indicative.</p>`
+      : '<p>Nothing scheduled crosses here on this network.</p>'}
+    ${booking}
+    ${scarce}
+  </section>
+
+  <section class="block">
+    <h2>Getting to each side</h2>
+    <p class="sub">The frontier is rarely the problem. Reaching it on a day when
+    something onward is still running usually is.</p>
+    ${sides}
+  </section>
+
+  <section class="block">
+    <h2>Journeys through ${esc(b.name)}</h2>
+    <p class="sub">Written up in full, each with this crossing in its proper place
+    in the itinerary rather than as a footnote.</p>
+    ${journeys}
+  </section>`
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_ORIGIN was not set at build time -->'}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="${esc(h1)}">
+<meta property="og:description" content="${esc(desc)}">
+${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
+<style>${css}</style>
+</head>
+<body class="doc">
+<header class="topbar">
+  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
+    <span class="brandtext">Overland<b>SEA</b></span></a>
+  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+</header>
+
+<main class="docwrap">
+  <article>
+    <h1>${esc(h1)}</h1>
+    <p class="lede">${esc(b.stayOnTrain.startsWith('No')
+      ? `You change here rather than crossing aboard, and you should budget about ${b.minutes} minutes for the formalities on top of the journey either side.`
+      : `About ${b.minutes} minutes of formalities between ${a} and ${z}, and this is one of the frontiers you can cross without abandoning your seat.`)}</p>
+    <p class="facts">
+      <b>${esc(b.countries)}</b> · about <b>${b.minutes}</b> minutes ·
+      <b>${crossing.length}</b> service${crossing.length === 1 ? '' : 's'} ·
+      <b>${uses.length}</b> written-up journey${uses.length === 1 ? '' : 's'}
+    </p>
+
+    <div class="panel doc-panel">${body}</div>
+
+    <p class="plan-cta">
+      <a class="cta" href="/">Plan a journey through it</a>
+      <span>Pick two places and the crossing appears in the itinerary, with the
+      buffer it needs.</span>
+    </p>
+  </article>
+
+  <nav class="more" aria-label="Other border crossings">
+    <h2>Every crossing on this network</h2>
+    <ul>${CROSSINGS.filter(c => c.id !== id)
+      .map(c => `<li><a href="/${BORDER_SLUG(c.id)}">${esc(c.b.name)}</a>
+        <span>${esc(c.b.countries)}</span></li>`)
+      .join('')}</ul>
+  </nav>
+</main>
+
+${DOCFOOT}
+</body>
+</html>
+`
+}
+
 /* ------------------------------------------------------------------- run */
 
 mkdirSync(OUT, { recursive: true })
@@ -477,7 +739,31 @@ for (const r of built) {
   writeFileSync(join(OUT, `${r.slug}.html`), page({ r, plan: r.plan, pages: built, css }))
 }
 
+/* A crossing earns a page if there is something to say beyond its name: a
+ * service that actually runs across it, and a trap worth warning about. Every
+ * one of the seventeen currently clears that, but the rule is the point — the
+ * moment a frontier is added to the network with a stub of a briefing, it
+ * should not quietly become a page. */
+const CROSSINGS = Object.entries(NETWORK.borders)
+  .filter(([id, b]) => b.trap && legsAcross(id).length)
+  .map(([id, b]) => ({
+    id,
+    b,
+    // Which written-up journeys pass through here. Read off the routed plans
+    // rather than a hand-kept list, so a new guide appears on the crossings it
+    // uses without anyone remembering to add it.
+    uses: built.filter(r => r.plan.borders.some(x => x.id === id)),
+  }))
+
+for (const c of CROSSINGS) {
+  writeFileSync(join(OUT, `${BORDER_SLUG(c.id)}.html`), borderPage({ ...c, css }))
+}
+
 writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
+
+// Declared out here only so the summary below can count what was written
+// rather than recomputing it and drifting — which it had, silently.
+let urls = []
 
 /* robots.txt — the Sitemap line needs an absolute URL, so it only appears
  * when we actually know the host. */
@@ -493,7 +779,12 @@ if (!ORIGIN) {
 } else {
   // Privacy last and lowest: it belongs in the sitemap because it is a real
   // page a crawler should be able to find, not because anyone searches for it.
-  const urls = ['', ...built.map(r => r.slug), 'privacy']
+  urls = [
+    '',
+    ...built.map(r => r.slug),
+    ...CROSSINGS.map(c => BORDER_SLUG(c.id)),
+    'privacy',
+  ]
   const priority = u => (u === '' ? '1.0' : u === 'privacy' ? '0.3' : '0.8')
   writeFileSync(
     join(OUT, 'sitemap.xml'),
@@ -511,10 +802,10 @@ if (!ORIGIN) {
   )
 }
 
-console.log(`pages              ${built.length} route pages + privacy -> public/`)
+console.log(`pages              ${built.length} route pages, ${CROSSINGS.length} crossings + privacy -> public/`)
 if (failed.length) for (const [slug, why] of failed) console.log(`   skipped ${slug}: ${why}`)
 console.log(
   ORIGIN
-    ? `sitemap            ${built.length + 1} urls at ${ORIGIN}/sitemap.xml`
+    ? `sitemap            ${urls.length} urls at ${ORIGIN}/sitemap.xml`
     : 'sitemap            skipped — set SITE_ORIGIN to emit canonical tags and a sitemap'
 )

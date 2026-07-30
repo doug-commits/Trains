@@ -788,6 +788,12 @@ const UI = (() => {
       </div>`
   }
 
+  /* The URL a crossing's own page lives at. Defined here rather than in the
+     page generator because both need it — the generator to write the file, and
+     the list below to link to it — and a slug rule that exists in two places
+     is a set of 404s waiting for someone to edit one of them. */
+  const borderSlug = id => `${id.replace(/_/g, '-')}-border-crossing`
+
   function idle(network, presets) {
     const cards = presets
       .map((p, i) => {
@@ -852,6 +858,23 @@ const UI = (() => {
       </section>`
           : ''
       }
+      ${
+        Object.keys(network.borders).length
+          ? `<section class="block block-web">
+        <h2>Border crossings, in detail</h2>
+        <p class="sub">Itineraries die at frontiers, not on track. Each of these has its own
+        page: where immigration physically is, whether you stay aboard, what your luggage
+        does, what cash the far side wants, and the specific trap.</p>
+        <ul class="guides">${Object.entries(network.borders)
+          .map(
+            ([id, b]) =>
+              `<li><a href="/${esc(borderSlug(id))}">${esc(b.name)}</a>` +
+              `<span>${esc(b.countries)} · about ${b.minutes} min</span></li>`
+          )
+          .join('')}</ul>
+      </section>`
+          : ''
+      }
       <section class="block">
         <h2>What people get wrong</h2>
         <p class="sub">Travellers arrive with these. All seven are load-bearing — each one has
@@ -872,5 +895,5 @@ const UI = (() => {
       </footer>`
   }
 
-  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL }
+  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL, borderSlug }
 })()

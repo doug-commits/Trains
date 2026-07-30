@@ -133,6 +133,20 @@ function check(label, condition, detail = '') {
   check('the sea has depth rather than one flat fill',
     new Set(water).size > 1, water.join('  '))
 
+  /* The homepage is where a crawler lands, and both sets of pages have to be
+     one hop from it. The route list has been there since those pages existed;
+     the crossings were not, and were reachable only from the routes that used
+     them — which left the eight nobody routes through two hops deep behind a
+     page that does not mention them. */
+  const hub = await page.evaluate(() =>
+    [...document.querySelectorAll('#panel a')].map(a => a.getAttribute('href')))
+  const crossingIds = Object.keys(NETWORK.borders)
+  const off = crossingIds.filter(id => !hub.includes(`/${id}-border-crossing`))
+  check('the homepage links every border crossing page', off.length === 0, off.join(', '))
+  check('and every route written up in full',
+    hub.filter(h => /^\/[a-z0-9-]+$/.test(h)).length >= crossingIds.length + 16,
+    `${hub.filter(h => /^\/[a-z0-9-]+$/.test(h)).length} links`)
+
   /* The launch screen belongs to the app. A website that draws a curtain over
      itself before showing anything is a website nobody waits for — and this
      one paints in well under the time the curtain would have been up for. */
@@ -1131,10 +1145,17 @@ function check(label, condition, detail = '') {
       ld.itinerary.itemListElement[0].position === 1,
     `${ld.itinerary.itemListElement.length} stops`)
 
-  // Crawl reachability: every page links to every other, so one landing page
-  // is enough to find the whole set.
+  /* Crawl reachability: every route page links to every other, so one landing
+     page is enough to find the whole set.
+
+     Route pages only. The crossing pages are a second, smaller mesh that links
+     to itself and is reached from the routes that use it — a full mesh across
+     both would put fifty links in the footer of every page, which is the point
+     at which a helpful index starts reading as a link farm. */
   const linked = new Set([...html.matchAll(/href="\/([a-z0-9-]+)"/g)].map(m => m[1]))
-  const slugs = pages.map(f => f.replace(/\.html$/, ''))
+  const slugs = pages
+    .map(f => f.replace(/\.html$/, ''))
+    .filter(s => !s.endsWith('-border-crossing') && s !== 'privacy')
   const missing = slugs.filter(s => s !== 'bangkok-to-singapore-by-train' && !linked.has(s))
   check('every other route is one hop away', missing.length === 0,
     missing.join(' ') || 'all reachable')
@@ -2262,6 +2283,102 @@ function check(label, condition, detail = '') {
 
     await page.screenshot({ path: join(outDir, '24-privacy.png') })
     await context.close()
+  }
+}
+
+/* ------------------------------------------------------------ the site */
+
+/* The published pages, as a set rather than one at a time.
+ *
+ * These are generated — a guide added to data/guides.js becomes a page, a
+ * crossing in the network becomes a page, and both get linked from the other.
+ * The failures that costs you are structural and silent: a link to a page the
+ * generator did not emit, a page nothing points at, a page missing from the
+ * sitemap. None of them show up when you open one page and look at it. */
+{
+  const dir = join(root, 'public')
+  if (!existsSync(join(dir, 'sitemap.xml'))) {
+    check('the site is built', false, 'run tools/build-pages.mjs')
+  } else {
+    const files = readdirSync(dir).filter(f => f.endsWith('.html'))
+    const slugs = new Set(files.map(f => f.replace(/\.html$/, '')))
+    const html = Object.fromEntries(
+      files.map(f => [f.replace(/\.html$/, ''), readFileSync(join(dir, f), 'utf8')])
+    )
+
+    const crossings = [...slugs].filter(s => s.endsWith('-border-crossing'))
+    const withLegs = Object.keys(NETWORK.borders)
+      .filter(id => NETWORK.borders[id].trap && NETWORK.legs.some(l => l.border === id))
+    check('every crossing worth a page has one',
+      crossings.length === withLegs.length, `${crossings.length} of ${withLegs.length}`)
+
+    /* An internal link to a page that was never emitted is the generator's
+       characteristic failure: the list it was built from and the list that
+       was written come from different places. */
+    const broken = []
+    for (const [slug, body] of Object.entries(html)) {
+      for (const m of body.matchAll(/href="\/([a-z0-9-]*)"/g)) {
+        if (m[1] !== '' && !slugs.has(m[1])) broken.push(`${slug} -> /${m[1]}`)
+      }
+    }
+    check('no page links to one that does not exist', broken.length === 0,
+      broken.slice(0, 3).join('; '))
+
+    /* And nothing is published that cannot be reached. An orphan page is one
+       Google finds in the sitemap, crawls, and reasonably concludes the site
+       does not care about. */
+    const linked = new Set()
+    for (const body of Object.values(html)) {
+      for (const m of body.matchAll(/href="\/([a-z0-9-]+)"/g)) linked.add(m[1])
+    }
+    const orphans = [...slugs].filter(s => !linked.has(s))
+    check('no page is orphaned', orphans.length === 0, orphans.join(', '))
+
+    // Every crossing page must be reachable from the journeys that use it,
+    // not only from its siblings — that is the link that carries any weight.
+    const fromRoutes = crossings.filter(c =>
+      Object.entries(html).some(([slug, body]) =>
+        !slug.endsWith('-border-crossing') && slug !== 'privacy' &&
+        body.includes(`href="/${c}"`)))
+    /* A crossing page earns its place by being the detail behind a journey
+       somebody can actually take, and that link is the only one pointing at it
+       that carries any topical weight. One unused frontier is tolerable — the
+       page says so plainly rather than pretending — but a drift towards a set
+       of pages that only cite each other is exactly the shape of a link farm,
+       so the slack is one. */
+    check('and crossings are linked from the routes that use them',
+      fromRoutes.length >= crossings.length - 1,
+      `${fromRoutes.length} of ${crossings.length}`)
+
+    const sitemap = readFileSync(join(dir, 'sitemap.xml'), 'utf8')
+    const listed = new Set(
+      [...sitemap.matchAll(/<loc>[^<]*?\/([a-z0-9-]*)<\/loc>/g)].map(m => m[1])
+    )
+    const unlisted = [...slugs].filter(s => !listed.has(s))
+    check('the sitemap lists every page that was built', unlisted.length === 0,
+      unlisted.join(', '))
+    const ghosts = [...listed].filter(s => s !== '' && !slugs.has(s))
+    check('and lists nothing that was not', ghosts.length === 0, ghosts.join(', '))
+
+    /* Thin pages are the real risk with a generator: it will happily emit a
+       hundred of them. Word counts are crude, but a page that drops under
+       this is one nobody wrote enough for. */
+    const thin = Object.entries(html)
+      .map(([slug, body]) => [slug, body.split('<main')[1]
+        .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').length])
+      .filter(([, words]) => words < 400)
+    check('no page is thin', thin.length === 0,
+      thin.map(([s, w]) => `${s}: ${w}w`).join(', '))
+
+    // Duplicate titles and descriptions are how a generated set gets treated
+    // as one page repeated.
+    const titles = Object.values(html).map(b => (b.match(/<title>([^<]*)<\/title>/) || [])[1])
+    check('every page has its own title',
+      new Set(titles).size === titles.length, `${new Set(titles).size} of ${titles.length}`)
+    const descs = Object.values(html)
+      .map(b => (b.match(/<meta name="description" content="([^"]*)"/) || [])[1])
+    check('and its own description',
+      new Set(descs).size === descs.length, `${new Set(descs).size} of ${descs.length}`)
   }
 }
 
