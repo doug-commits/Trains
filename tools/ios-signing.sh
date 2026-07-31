@@ -1,6 +1,14 @@
 #!/bin/sh
 # Apple signing, start to finish, on your machine.
 #
+# Already have an Apple Distribution certificate from another app? Reuse it —
+# it belongs to your account, not to that app. Skip to step 3 with:
+#
+#   IOS_P12=/path/to/existing.p12 ./tools/ios-signing.sh check new.mobileprovision
+#
+# The provisioning profile is the half that cannot be reused: it names one App
+# ID, and yours is a different one.
+#
 #   ./tools/ios-signing.sh csr            1. make a key and a request
 #   ./tools/ios-signing.sh p12 dist.cer   2. after Apple hands back a .cer
 #   ./tools/ios-signing.sh check *.mobileprovision   3. before you trust any of it
@@ -23,7 +31,13 @@ set -eu
 DIR="${IOS_SIGNING_DIR:-./ios-signing}"
 KEY="$DIR/distribution.key"
 CSR="$DIR/distribution.csr"
-P12="$DIR/distribution.p12"
+# Overridable, because a distribution certificate belongs to the account and
+# not to an app. If you already have one from another project, that is the one
+# to use — Apple caps you at three, and a second identity for the same team
+# buys nothing:
+#
+#   IOS_P12=~/keys/apple-dist.p12 ./tools/ios-signing.sh check profile.mobileprovision
+P12="${IOS_P12:-$DIR/distribution.p12}"
 BUNDLE_ID="com.slowasia.overland"
 
 # GNU wraps base64 at 76 columns and BSD does not have -w at all. A wrapped
@@ -205,8 +219,14 @@ check)
   PROFILE="${2:-}"
   [ -n "$PROFILE" ] || { echo "usage: $0 check <profile.mobileprovision>" >&2; exit 2; }
   [ -f "$PROFILE" ] || { echo "no such file: $PROFILE" >&2; exit 2; }
-  [ -f "$P12" ] || { echo "no $P12 — run '$0 p12' first" >&2; exit 2; }
+  [ -f "$P12" ] || {
+    echo "no $P12" >&2
+    echo "Either run '$0 p12 <cer>' to make one, or point at a certificate you" >&2
+    echo "already have: IOS_P12=/path/to/existing.p12 $0 check $PROFILE" >&2
+    exit 2
+  }
 
+  mkdir -p "$DIR"
   PLIST="$DIR/profile.plist"
   unwrap_profile "$PROFILE" > "$PLIST"
   [ -s "$PLIST" ] || { echo "Could not read $PROFILE — is it really a profile?" >&2; exit 1; }
@@ -297,7 +317,10 @@ check)
 secrets)
   PROFILE="${2:-}"
   [ -n "$PROFILE" ] || { echo "usage: $0 secrets <profile.mobileprovision>" >&2; exit 2; }
-  [ -f "$P12" ] || { echo "no $P12 — run '$0 p12' first" >&2; exit 2; }
+  [ -f "$P12" ] || {
+    echo "no $P12 — run '$0 p12 <cer>', or set IOS_P12 to one you already have" >&2
+    exit 2
+  }
 
   OUT="$DIR/secrets"
   mkdir -p "$OUT"

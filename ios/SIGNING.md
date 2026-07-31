@@ -38,6 +38,16 @@ message that does not mention this page.
 
 ## 2. Certificate
 
+**If you already have an Apple Distribution certificate from another app, use
+it and skip this whole step.** A distribution certificate belongs to the
+account, not to an app — one signs everything your team ships. Apple caps you
+at three, and a second identity for the same team buys nothing except another
+thing to renew. The `.p12` and its password you already have in that project's
+CI are the same two secrets this one wants.
+
+What you cannot reuse is the provisioning profile: it names one App ID, and
+yours is a different one. Step 3 is not optional.
+
 Apple signs a request, it does not send you a key. So you make a key and a
 certificate signing request first, and upload only the request.
 
@@ -89,7 +99,13 @@ wants `-legacy` too.
 
 Or skip all of the above and run `./tools/ios-signing.sh`, which does these
 steps in order, refuses a certificate that does not match your key, and checks
-the profile against both before you upload anything.
+the profile against both before you upload anything. Bringing an existing
+certificate, it takes that instead:
+
+```sh
+IOS_P12=/path/to/existing.p12 ./tools/ios-signing.sh check new.mobileprovision
+IOS_P12=/path/to/existing.p12 ./tools/ios-signing.sh secrets new.mobileprovision
+```
 
 ## 3. Provisioning profile
 
@@ -105,6 +121,19 @@ the profile against both before you upload anything.
 The name genuinely does not matter: the workflow reads it back out of the
 downloaded profile rather than being told, so it cannot disagree with what you
 typed. Download the `.mobileprovision`.
+
+## What carries over from another app
+
+| | Reusable? | |
+| --- | --- | --- |
+| Apple Distribution certificate (`.p12`) | **Yes** | Belongs to the account. One signs everything. |
+| App Store Connect API key (`.p8`) | **Yes** | Account-level, for uploading. |
+| Team ID | **Yes** | One per account. |
+| App ID / identifier | **No** | Must be `com.slowasia.overland`, explicitly registered. |
+| Provisioning profile | **No** | Binds one App ID to one set of certificates. |
+
+So with an existing app in the same account, the work is: register the
+identifier, make one profile, and reuse everything else.
 
 ## 4. Team ID
 
