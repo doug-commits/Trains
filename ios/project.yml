@@ -24,6 +24,12 @@ options:
     iOS: '15.0'
   createIntermediateGroups: true
   groupSortPosition: top
+  # Pinned, because XcodeGen writes whatever format its own version prefers and
+  # that is not a decision this project wants to inherit. 2.45 emits 77, which
+  # is Xcode 16's, and Xcode 15 refuses to open it with an error that names a
+  # number and not a cause. 56 is readable by Xcode 14 upwards, including every
+  # newer one, so the project no longer cares which image CI happens to boot.
+  objectVersion: 56
 
 configFiles:
   Debug: Version.xcconfig

@@ -47,7 +47,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
 
     # The `secrets` context is not available in a step-level `if`, so the one
     # decision this job makes — signed or not — is lifted into `env`, where it
@@ -75,9 +75,17 @@ jobs:
       - name: Build the page and stage it into the app
         run: node tools/build-ios.mjs
 
+      # Named, not "whichever came with the image". The failure when these
+      # disagree is `objectVersion (77)` and a suggestion to adjust the project
+      # format, which says nothing about the actual cause — so the versions of
+      # both halves go in the log before either is used.
       - name: Generate the Xcode project
         run: |
+          set -euo pipefail
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          xcodebuild -version
           brew install xcodegen
+          xcodegen --version
           cd ios && xcodegen generate
 
       # A keychain of its own, unlocked for this job only. Importing into the
@@ -120,13 +128,17 @@ jobs:
         if: env.SIGNED != '1'
         run: |
           set -euo pipefail
+          # Piped through a prettifier when there is one, and not otherwise.
+          # The first version of this ran the whole build again on failure so a
+          # missing xcbeautify would not break it, which meant every real
+          # compile error was reported twice and took twice as long to reach.
+          if command -v xcbeautify >/dev/null; then FILTER=xcbeautify; else FILTER=cat; fi
+          set -o pipefail
           xcodebuild -project ios/Overland.xcodeproj -scheme Overland \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
-            build | xcbeautify || xcodebuild -project ios/Overland.xcodeproj \
-            -scheme Overland -destination 'generic/platform=iOS Simulator' \
-            -configuration Release CODE_SIGNING_ALLOWED=NO build
+            build | "$FILTER"
 
       - name: Archive
         if: env.SIGNED == '1'
