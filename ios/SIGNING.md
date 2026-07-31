@@ -52,7 +52,7 @@ happening — OpenSSL does the same job in two commands:
 ```sh
 openssl genrsa -out ios_distribution.key 2048
 openssl req -new -key ios_distribution.key -out ios_distribution.csr \
-  -subj "/emailAddress=doug@mukbangshow.ae, CN=Overland SEA, C=AE"
+  -subj "/emailAddress=doug@mukbangshow.ae/CN=Overland SEA/C=AE"
 ```
 
 Keep `ios_distribution.key`. It is the half Apple never sees and cannot reissue
@@ -83,7 +83,13 @@ openssl pkcs12 -export -legacy \
 
 `-legacy` matters on OpenSSL 3: without it the file is encrypted with a cipher
 the macOS `security` tool cannot read, and the import fails on the runner with
-"MAC verification failed", which reads exactly like a wrong password.
+"MAC verification failed", which reads exactly like a wrong password. The same
+flag is needed to *read* the file back, so any later `openssl pkcs12 -in` on it
+wants `-legacy` too.
+
+Or skip all of the above and run `./tools/ios-signing.sh`, which does these
+steps in order, refuses a certificate that does not match your key, and checks
+the profile against both before you upload anything.
 
 ## 3. Provisioning profile
 

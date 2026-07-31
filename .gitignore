@@ -20,3 +20,11 @@ ios/Overland.xcodeproj/
 ios/Overland/Resources/www/
 ios/Version.xcconfig
 ios/build/
+
+# Apple signing material, if tools/ios-signing.sh is ever run inside the
+# checkout. The private key must never reach a commit — this is a backstop, not
+# a plan: the script defaults to ./ios-signing and you should run it elsewhere.
+ios-signing/
+*.p12
+*.mobileprovision
+*.certSigningRequest
