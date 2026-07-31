@@ -2469,7 +2469,8 @@ function check(label, condition, detail = '') {
 
   const files = has('ios/appstore') ? readdirSync(join(root, 'ios/appstore')) : []
   for (const [label, prefix, w, h] of [
-    ['iPhone 6.9"', 'ios-iphone', 1320, 2868],
+    ['iPhone 6.9"', 'ios-iphone-69', 1320, 2868],
+    ['iPhone 6.5"', 'ios-iphone-65', 1242, 2688],
     ['iPad 13"', 'ios-ipad', 2064, 2752],
   ]) {
     const shots = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -2504,6 +2505,15 @@ function check(label, condition, detail = '') {
 
   check('the review note answers the minimum-functionality guideline',
     /4\.2/.test(listing) && /Airplane Mode/i.test(listing))
+
+  /* Every screenshot slot the listing claims to fill has to have files behind
+     it, and every set of files has to be claimed. A folder full of PNGs nobody
+     documented is how the wrong set gets uploaded to the wrong slot. */
+  const prefixes = [...new Set(files.filter(f => f.endsWith('.png'))
+    .map(f => f.replace(/-\d+-[a-z]+\.png$/, '')))]
+  const undocumented = prefixes.filter(p => !listing.includes(p))
+  check('the listing accounts for every set of screenshots in the folder',
+    undocumented.length === 0, undocumented.join(', '))
 
   /* Both apps are described by one privacy page, and the sentence that is true
      of Android is not true of iOS. The page has to say which is which. */

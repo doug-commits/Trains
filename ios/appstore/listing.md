@@ -141,13 +141,26 @@ the app uses no encryption at all, not even HTTPS, because it makes no requests.
 
 | Slot | Files | Size |
 | --- | --- | --- |
-| iPhone 6.9" | `ios-iphone-1-map.png` … `ios-iphone-8-dark.png` | 1320×2868 |
+| iPhone 6.9" | `ios-iphone-69-1-map.png` … `-8-dark.png` | 1320×2868 |
+| iPhone 6.5" | `ios-iphone-65-1-map.png` … `-8-dark.png` | 1242×2688 |
 | iPad 13" | `ios-ipad-1-map.png` … `ios-ipad-8-dark.png` | 2064×2752 |
 
-Both required; Apple derives the smaller sizes from these unless you override
-them. Rendered by `node tools/store-assets.mjs` from the running app, the same
-pass that produces the Play sets, so the two stores cannot end up showing
-different products.
+Rendered by `node tools/store-assets.mjs` from the running app, the same pass
+that produces the Play sets, so the two stores cannot end up showing different
+products.
+
+Both iPhone sizes are rendered rather than one being resized into the other.
+They are different aspect ratios — 2.31:1 against 2.16:1 — and a screenshot
+stretched or letterboxed between them shows it at the size the store displays
+them.
+
+**Eight, not the ten Apple allows.** Ten is a ceiling, not a target: the first
+three are what appear in search results, the rest are swiped by people already
+reading the page, and the eight below are the eight things worth saying. Play
+caps its own slots at eight, so holding here also keeps one set of screenshots
+rather than two that drift. If you want the last two slots filled, "Day by day"
+and "Booking sequence" are the strongest sections not currently shown — say so
+and they become numbers 9 and 10 everywhere at once.
 
 The iPad set is the wide layout — map across the frame with the itinerary in a
 column beside it — because at 1032 points that is genuinely what an iPad shows.
@@ -164,6 +177,50 @@ Order, and why: the first two or three are what appear in search results.
 6. **costs** — the total, and the honest comparison against flying
 7. **sea** — Bangkok to Bali, rail and ferry end to end
 8. **dark** — night mode, on the landing screen
+
+## App previews (the three video slots)
+
+**Leave them empty for the first submission.** They are optional, and an empty
+preview slot costs nothing while a bad one costs a review cycle.
+
+The reason is worth stating rather than hiding: everything else in this folder
+is rendered from the real app by a script, and a preview cannot be. Apple wants
+a screen recording of the app running, and the app runs on iOS — which needs
+macOS to build and a device or simulator to record. What could be produced here
+instead is a capture of the same HTML in a desktop browser: no iOS status bar,
+a different rendering engine, different scroll physics. That is not the product,
+and a preview that is not the product is exactly what App Review looks for.
+
+The good news is that the real thing takes about ten minutes once there is a
+TestFlight build on a phone, and needs nothing but the phone:
+
+1. Settings → Control Centre → add **Screen Recording**.
+2. Open the app, start the recording from Control Centre, do one of the runs
+   below, stop.
+3. Photos → trim to length. App Store Connect wants **15–30 seconds**, and it
+   takes the file straight from an iPhone at the right resolution — a 6.9-inch
+   phone produces the 6.9-inch preview, and Apple scales it down to 6.5.
+
+Three runs, if you want all three slots. Each is one continuous take with no
+editing beyond the trim:
+
+**1. "It answers the question" (about 20 seconds).** Open on the map. Type
+"Bangkok" in From, "Singapore" in To. Let the route draw. Pull the sheet up to
+half so the four numbers show — 3 days, 5 legs, 2 borders, $114. Pause on them.
+
+**2. "The part nobody else has" (about 25 seconds).** Start from the planned
+route with the sheet open. Scroll through the legs so the operators and fares
+pass. Keep scrolling into Border crossings and stop on Padang Besar with the
+two-clock trap on screen. That paragraph is the single most convincing thing in
+the app; let it sit for four or five seconds so it can be read.
+
+**3. "It works with no signal" (about 15 seconds).** Start with Control Centre
+open and Airplane Mode visibly switched on. Close it, open the app, plan
+Bangkok to Bali, scroll the itinerary. Nothing loads, because nothing needs to.
+This is the same argument as the review note, made in a way that needs no
+reading — and it is the one competitors cannot copy.
+
+Record in portrait, with Do Not Disturb on so no banner lands mid-take.
 
 ## Icon
 

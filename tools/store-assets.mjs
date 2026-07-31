@@ -99,8 +99,21 @@ const DEVICES = {
    * the listing. At 1032 CSS pixels this is over the breakpoint, so it gets the
    * wide layout — map across the frame with the itinerary in a column beside
    * it — which is genuinely what an iPad shows. */
+  /* iphone65 — 414×896 at 3 is 1242×2688, an iPhone 11 Pro Max. App Store
+     Connect still offers this slot beside the 6.9-inch one and will not scale
+     one into the other, so it gets its own pass rather than a resize: a
+     screenshot stretched between two aspect ratios shows it. */
+  iphone65: {
+    prefix: 'ios-iphone-65',
+    store: 'appstore',
+    layout: 'sheet',
+    viewport: { width: 414, height: 896 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+  },
   iphone69: {
-    prefix: 'ios-iphone',
+    prefix: 'ios-iphone-69',
     store: 'appstore',
     layout: 'sheet',
     viewport: { width: 440, height: 956 },
