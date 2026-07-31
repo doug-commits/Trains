@@ -107,9 +107,12 @@ Also at slowasia.com.
 ## URLs and metadata
 
 - **Privacy policy:** `https://slowasia.com/privacy`
-- **Support URL:** `https://slowasia.com/privacy` — Apple requires a support URL
-  and will reject a placeholder. The privacy page carries a contact address, so
-  it satisfies the requirement honestly until there is a page worth pointing at.
+- **Support URL:** `https://slowasia.com/support` — a real page, not the
+  privacy policy wearing a hat. Apple checks this one, and reasonably: a
+  support URL is a promise that somebody is at the other end of it. It carries
+  the contact address and answers the questions that arrive most often,
+  including the two that sound like faults and are not — no departure times,
+  and "there is no way through".
 - **Marketing URL:** `https://slowasia.com`
 - **Primary category:** Travel
 - **Secondary category:** Navigation

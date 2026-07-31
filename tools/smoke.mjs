@@ -147,6 +147,19 @@ function check(label, condition, detail = '') {
     hub.filter(h => /^\/[a-z0-9-]+$/.test(h)).length >= crossingIds.length + 16,
     `${hub.filter(h => /^\/[a-z0-9-]+$/.test(h)).length} links`)
 
+  /* A support page that does not give you a way to ask for support is exactly
+     what Apple is looking for when it checks that URL. */
+  {
+    const sp = readFileSync(join(root, 'public/support.html'), 'utf8')
+    check('the support page offers a way to reach a person',
+      /mailto:[^"]+@[^"]+/.test(sp))
+    check('and answers the questions that sound like faults',
+      /departure time/i.test(sp) && /out of date/i.test(sp) &&
+        /no way through/i.test(sp))
+    check('and dates the network rather than implying it is current',
+      sp.includes(NETWORK.reviewed), NETWORK.reviewed)
+  }
+
   /* The launch screen belongs to the app. A website that draws a curtain over
      itself before showing anything is a website nobody waits for — and this
      one paints in well under the time the curtain would have been up for. */
@@ -2514,6 +2527,18 @@ function check(label, condition, detail = '') {
   const undocumented = prefixes.filter(p => !listing.includes(p))
   check('the listing accounts for every set of screenshots in the folder',
     undocumented.length === 0, undocumented.join(', '))
+
+  /* Apple rejects a support URL that is a placeholder or obviously another
+     page reused, and the listing has to point at one that exists. */
+  const supportUrl = (listing.match(/\*\*Support URL:\*\* `([^`]+)`/) || [])[1]
+  check('the listing names a support URL', !!supportUrl, supportUrl)
+  if (supportUrl) {
+    const slug = supportUrl.replace(/^https?:\/\/[^/]+\//, '')
+    check('and the page behind it is built',
+      existsSync(join(root, `public/${slug}.html`)), slug)
+    check('and it is not the privacy policy under another name',
+      slug !== 'privacy', slug)
+  }
 
   /* Both apps are described by one privacy page, and the sentence that is true
      of Android is not true of iOS. The page has to say which is which. */

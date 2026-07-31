@@ -149,7 +149,8 @@ function related(current, pages) {
 const DOCFOOT = `<footer class="docfoot">
   <p>Overland SEA plans journeys that stay on rails as far as the rails go,
   put a boat where the land ends, and use a road vehicle only where neither
-  exists. <a href="/">Open the planner</a> · <a href="/privacy">Privacy</a>.</p>
+  exists. <a href="/">Open the planner</a> · <a href="/support">Support</a> ·
+  <a href="/privacy">Privacy</a>.</p>
 </footer>`
 
 /* The crossings a route passes through, linked out to their own pages.
@@ -245,6 +246,181 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 
   ${crossingsOn(plan)}
   ${related(r, pages)}
+</main>
+
+${DOCFOOT}
+</body>
+</html>
+`
+}
+
+/* -------------------------------------------------------------- support */
+
+/* Both stores want a support URL, and Apple will reject a placeholder or a
+ * page that is obviously the privacy policy wearing a hat. Which is fair: a
+ * support URL is a promise that somebody is at the other end of it.
+ *
+ * It is also the page that ought to exist anyway. This app answers questions
+ * about a network that changes, and the two things a reader most often wants
+ * — "why will it not tell me the departure time" and "this leg is wrong, who
+ * do I tell" — have real answers that are nowhere else on the site. Half of
+ * what follows is written specifically to turn a one-star review into an
+ * email, which is the cheapest trade in the store.
+ *
+ * The reviewed date comes from the network rather than being typed, so the
+ * page cannot claim the data is fresher than it is.
+ */
+function supportPage(css) {
+  const url = ORIGIN ? `${ORIGIN}/support` : null
+  const title = `Support — ${TITLE_SUFFIX}`
+  const desc =
+    'Help with Overland SEA: why it gives frequencies rather than departure ' +
+    'times, how to report a leg that has changed, how current the network is, ' +
+    'and how to get in touch.'
+  const EMAIL = 'doug@mukbangshow.ae'
+
+  const faqs = [
+    ['It will not give me a departure time',
+     `Deliberately, and it is the hardest thing to explain about the app.
+      SRT, KTMB, the Laos–China Railway, Vietnam Railways and KAI publish
+      nothing in a common format, and several of them change a timetable
+      without announcing it. A departure time carried inside an app is a
+      remembered time, and a remembered time is the fastest way to miss a
+      train.
+      <br><br>What you get instead is the thing that actually decides whether
+      a plan survives: how often each service runs. A missed connection on a
+      train that goes eight times a day costs an hour. On one that runs twice
+      a week it costs three days. Take the legs to the operator's own booking
+      page — linked on each one — and read the real clock there.`],
+
+    ['Something is out of date, or plainly wrong',
+     `Please tell me. This is a hand-built network and the corrections that
+      arrive from people who have just made the journey are worth more than
+      anything I can check from a desk.
+      <br><br>The most useful report says which two stations, what the app
+      claimed, what you found, and roughly when you were there. A photograph
+      of a departure board or a ticket settles almost anything.
+      <a href="mailto:${EMAIL}">${EMAIL}</a>.`],
+
+    ['How current is this?',
+     `The network was last reviewed <b>${esc(NETWORK.reviewed)}</b>, and the app
+      shows that date at the foot of every itinerary rather than hiding it.
+      <br><br>Every leg also carries how much it should be trusted.
+      <b>Structural</b> means a physical or administrative fact — where a
+      station is, which gauge, who stamps passports where — and those are
+      stable for years. <b>Reported</b> means it agrees across the operator's
+      own pages and the usual reliable sources. <b>Verify</b> means volatile or
+      known to suspend, and those are the ones to confirm before you build a
+      plan around them.`],
+
+    ['Does it work without a signal?',
+     `Entirely. The network, the map, the routing and every border briefing are
+      inside the app; nothing is fetched while you use it. It works in flight
+      mode at a frontier post, which is the situation it was built for.
+      <br><br>The only things that need a connection are the outbound links —
+      an operator's booking page, or a location in a maps app — and those open
+      in your browser rather than in the app.`],
+
+    ['Can I buy tickets in it?',
+     `No, and it will not try to. Each leg links to whoever actually sells that
+      ticket, which is usually the operator's own site. Where an operator
+      genuinely cannot be booked from abroad, an aggregator is offered instead
+      — and it is labelled as one.`],
+
+    ['The prices look wrong',
+     `They are indicative, and the app says so on every itinerary. Fares in the
+      region move with fuel, season and class, and several operators price the
+      same seat differently depending on where you buy it. Use the totals to
+      compare one journey against another and against a flight; use the
+      operator's site for what you will actually pay.`],
+
+    ['It says there is no way through',
+     `That is an answer rather than a failure. Myanmar has no through rail to
+      Thailand. Vietnam's network touches no neighbour's. Indonesia is
+      reachable only by sea. When the honest answer is that a journey cannot be
+      made overland, the app says so and tells you where the gap is, instead of
+      inventing a leg to fill it.`],
+
+    ['The app and the website are not identical',
+     `Correct, in two ways. The app leaves out the photographs, because the
+      library is most of the download and the drawn artwork is the same
+      artwork the site falls back to anyway. And it leaves out the links to
+      the written-up route pages, which are separate documents on the website
+      and would be dead ends inside a single bundled file. Every itinerary the
+      two produce is the same itinerary — it is the same program.`],
+  ]
+
+  const body = `
+  <section class="block">
+    <h2>Getting in touch</h2>
+    <p>One address, read by a person:
+    <a href="mailto:${EMAIL}">${EMAIL}</a>. There is no ticket system and no
+    form — it is a small project, and an email reaches me faster than either
+    would.</p>
+    <p>Corrections to the network are the most welcome kind of mail there is.
+    If you have just crossed a border or ridden a leg and found it different
+    from what the app said, that is worth more than any amount of desk
+    research.</p>
+  </section>
+
+  <section class="block">
+    <h2>Questions that come up</h2>
+    ${faqs
+      .map(
+        ([q, a]) => `<article class="crossing">
+          <header><h3>${esc(q)}</h3></header>
+          <p>${a}</p>
+        </article>`
+      )
+      .join('')}
+  </section>
+
+  <section class="block">
+    <h2>Privacy</h2>
+    <p>Nothing is collected — no account, no analytics, no advertising, and on
+    Android no permission to reach the network at all. The
+    <a href="/privacy">privacy policy</a> sets out exactly what that means on
+    each platform, including the places the claim is weaker than it sounds.</p>
+  </section>`
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_ORIGIN was not set at build time -->'}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="Support">
+<meta property="og:description" content="${esc(desc)}">
+${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
+<style>${css}</style>
+</head>
+<body class="doc">
+<header class="topbar">
+  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
+    <span class="brandtext">Overland<b>SEA</b></span></a>
+  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+</header>
+
+<main class="docwrap">
+  <article>
+    <h1>Support</h1>
+    <p class="lede">Help with the app and the planner, and the answers to the
+    questions that arrive most often — including the two that sound like faults
+    and are not.</p>
+    <p class="facts">
+      Network reviewed <b>${esc(NETWORK.reviewed)}</b> ·
+      <b>${Object.keys(NETWORK.stations).length}</b> stations ·
+      <b>${Object.keys(NETWORK.borders).length}</b> crossings
+    </p>
+
+    <div class="panel doc-panel">${body}</div>
+  </article>
 </main>
 
 ${DOCFOOT}
@@ -791,6 +967,7 @@ for (const c of CROSSINGS) {
   writeFileSync(join(OUT, `${BORDER_SLUG(c.id)}.html`), borderPage({ ...c, css }))
 }
 
+writeFileSync(join(OUT, 'support.html'), supportPage(css))
 writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
 
 // Declared out here only so the summary below can count what was written
@@ -815,9 +992,10 @@ if (!ORIGIN) {
     '',
     ...built.map(r => r.slug),
     ...CROSSINGS.map(c => BORDER_SLUG(c.id)),
+    'support',
     'privacy',
   ]
-  const priority = u => (u === '' ? '1.0' : u === 'privacy' ? '0.3' : '0.8')
+  const priority = u => (u === '' ? '1.0' : u === 'privacy' || u === 'support' ? '0.3' : '0.8')
   writeFileSync(
     join(OUT, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -834,7 +1012,7 @@ if (!ORIGIN) {
   )
 }
 
-console.log(`pages              ${built.length} route pages, ${CROSSINGS.length} crossings + privacy -> public/`)
+console.log(`pages              ${built.length} route pages, ${CROSSINGS.length} crossings, support + privacy -> public/`)
 if (failed.length) for (const [slug, why] of failed) console.log(`   skipped ${slug}: ${why}`)
 console.log(
   ORIGIN
