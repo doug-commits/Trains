@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover, or every env(safe-area-inset-*) rule in the stylesheet
+     returns zero and quietly does nothing. The layout already accounts for a
+     notch and a home indicator; this is what lets it see them. On a browser
+     with neither it is a no-op. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Southeast Asia overland by train and ferry — Overland SEA</title>
 <meta name="description" content="Plan a Southeast Asian journey that stays on rails as far as the rails go, bridges the gaps by sea, and tells you what happens at every border.">
 <link rel="canonical" href="https://slowasia.com/">

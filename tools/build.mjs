@@ -269,7 +269,11 @@ const htmlDoc = (photoSet, app, body) => `<!doctype html>
 <html lang="en"${app ? ' data-app="true"' : ''}>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover, or every env(safe-area-inset-*) rule in the stylesheet
+     returns zero and quietly does nothing. The layout already accounts for a
+     notch and a home indicator; this is what lets it see them. On a browser
+     with neither it is a no-op. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${TITLE}</title>
 <meta name="description" content="${DESCRIPTION}">
 ${app ? '' : headMeta()}

@@ -2382,6 +2382,141 @@ function check(label, condition, detail = '') {
   }
 }
 
+/* ----------------------------------------------------------- the iOS app */
+
+/* Nothing here compiles a line of Swift.
+ *
+ * Xcode only exists on macOS and this does not run there, so the iOS build is
+ * checked by CI and not by this file — which means everything that CAN be
+ * checked from here should be, because the alternative is finding it out on a
+ * macOS runner ten minutes at a time. What is checkable is the shape: that the
+ * project spec, the plist, the sources and the icon agree with each other and
+ * with the claims the privacy policy makes on the app's behalf. */
+{
+  const has = p => existsSync(join(root, p))
+  const src = p => (has(p) ? readFileSync(join(root, p), 'utf8') : '')
+
+  check('the iOS project exists',
+    has('ios/project.yml') && has('ios/Overland/Info.plist') &&
+      has('ios/Overland/Sources/PlannerViewController.swift'))
+
+  const plist = src('ios/Overland/Info.plist')
+  const project = src('ios/project.yml')
+  const bundleId = (project.match(/PRODUCT_BUNDLE_IDENTIFIER:\s*(\S+)/) || [])[1]
+
+  /* The workflow names the bundle id in its export options, and a build signed
+     for one identifier and exported for another fails late, on a macOS runner,
+     with a message about provisioning that does not mention either. */
+  const workflow = src('.github/workflows/ios.yml')
+  check('the workflow exports the identifier the project builds',
+    !!bundleId && workflow.includes(bundleId), bundleId)
+
+  /* Both stores reject a repeated build number, so both are derived from the
+     same clock. If these ever stop matching, one of the two apps starts
+     failing at upload for a reason that looks like nothing. */
+  const androidTicks = src('tools/build-android.mjs').match(/Date\.now\(\) - EPOCH\) \/ (\d+)/)
+  const iosTicks = src('tools/build-ios.mjs').match(/Date\.now\(\) - EPOCH\) \/ (\d+)/)
+  check('both stores get build numbers from the same clock',
+    androidTicks && iosTicks && androidTicks[1] === iosTicks[1],
+    `${androidTicks?.[1]} vs ${iosTicks?.[1]}`)
+
+  /* The plist reads these by name from the xcconfig that build-ios.mjs writes.
+     Hard-code either and the version silently stops moving. */
+  check('the version is stamped rather than written in',
+    /\$\(MARKETING_VERSION\)/.test(plist) && /\$\(CURRENT_PROJECT_VERSION\)/.test(plist))
+
+  /* Every one of these is a way to ask for something the privacy policy says
+     the app does not do. A usage description appearing here without a matching
+     change to that page means one of the two is lying. */
+  const asks = ['NSLocationWhenInUseUsageDescription', 'NSCameraUsageDescription',
+    'NSContactsUsageDescription', 'NSPhotoLibraryUsageDescription',
+    'NSMicrophoneUsageDescription', 'NSUserTrackingUsageDescription']
+    .filter(k => plist.includes(k))
+  check('the iOS app asks for no permissions, as the policy says', asks.length === 0,
+    asks.join(', '))
+
+  /* The claim the policy actually makes for iOS. Android's is enforced by the
+     kernel and this one is not, so the code that enforces it has to be there
+     for the sentence to be true. */
+  const vc = src('ios/Overland/Sources/PlannerViewController.swift')
+  check('and blocks every remote load in the web view',
+    /compileContentRuleList/.test(vc) && /"type":\s*"block"/.test(vc))
+  check('and hands outside links to Safari rather than opening them inside',
+    /UIApplication\.shared\.open/.test(vc) && /createWebViewWith/.test(vc))
+
+  /* Every outbound link in the itinerary carries target="_blank", and a web
+     view with no UI delegate does nothing at all with those — the tap
+     registers and no booking page opens, which looks like the app working. */
+  check('with the delegate that makes target=_blank work at all',
+    /WKUIDelegate/.test(vc) && /uiDelegate\s*=\s*self/.test(vc))
+
+  /* file:// gets an opaque origin in WKWebView and an opaque origin has no
+     localStorage — the theme and the fold would be forgotten on every launch
+     with no error to explain it. Same reason Android serves over https. */
+  check('and serves the bundle from a real origin, not file://',
+    /setURLSchemeHandler/.test(vc) && !/loadFileURL/.test(vc))
+
+  const icon = 'ios/Overland/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png'
+  if (!has(icon)) {
+    check('the App Store icon exists', false, icon)
+  } else {
+    const b = readFileSync(join(root, icon))
+    // Apple rejects an icon with an alpha channel. PNG colour type 6 is RGBA.
+    check('the App Store icon is 1024×1024 with no alpha',
+      b.readUInt32BE(16) === 1024 && b.readUInt32BE(20) === 1024 && b[25] !== 6,
+      `${b.readUInt32BE(16)}×${b.readUInt32BE(20)}, colour type ${b[25]}`)
+  }
+
+  const files = has('ios/appstore') ? readdirSync(join(root, 'ios/appstore')) : []
+  for (const [label, prefix, w, h] of [
+    ['iPhone 6.9"', 'ios-iphone', 1320, 2868],
+    ['iPad 13"', 'ios-ipad', 2064, 2752],
+  ]) {
+    const shots = [1, 2, 3, 4, 5, 6, 7, 8]
+      .map(n => files.find(f => f.startsWith(`${prefix}-${n}-`)))
+    check(`there are eight ${label} screenshots`, shots.every(Boolean),
+      `${shots.filter(Boolean).length} of 8`)
+    const wrong = shots.filter(Boolean).map(f => {
+      const b = readFileSync(join(root, 'ios/appstore', f))
+      return [f, b.readUInt32BE(16), b.readUInt32BE(20)]
+    }).filter(([, gw, gh]) => gw !== w || gh !== h)
+    check(`and every ${label} one is ${w}×${h}`, wrong.length === 0,
+      wrong.map(([f, gw, gh]) => `${f}: ${gw}×${gh}`).join(', '))
+  }
+
+  const listing = src('ios/appstore/listing.md')
+  const blocks = [...listing.matchAll(/```\n([\s\S]*?)\n```/g)].map(m => m[1])
+  const [name, subtitle, promo, keywords, description] = blocks
+  for (const [label, text, max] of [
+    ['name', name, 30], ['subtitle', subtitle, 30], ['promotional text', promo, 170],
+    ['keywords', keywords, 100], ['description', description, 4000],
+  ]) {
+    check(`the App Store ${label} fits Apple's ${max}`, text && text.length <= max,
+      `${text?.length} chars`)
+  }
+  // Apple indexes the name and subtitle already; a keyword repeated from
+  // either is budget spent on nothing.
+  const named = new Set(`${name} ${subtitle}`.toLowerCase().split(/[^a-z]+/).filter(Boolean))
+  const wasted = keywords.split(',').filter(k => named.has(k.toLowerCase()))
+  check('and no keyword repeats the name or subtitle', wasted.length === 0, wasted.join(', '))
+  check('and the keyword list has no spaces to waste',
+    !/,\s/.test(keywords))
+
+  check('the review note answers the minimum-functionality guideline',
+    /4\.2/.test(listing) && /Airplane Mode/i.test(listing))
+
+  /* Both apps are described by one privacy page, and the sentence that is true
+     of Android is not true of iOS. The page has to say which is which. */
+  if (existsSync(join(root, 'public/privacy.html'))) {
+    const policy = readFileSync(join(root, 'public/privacy.html'), 'utf8')
+    check('the privacy policy covers the iOS app separately',
+      /iPhone and iPad app/i.test(policy) &&
+        /no permission to withhold|has no equivalent/i.test(policy))
+    check('and does not claim iOS withholds a permission it cannot',
+      !/iOS[^.]*no internet permission/i.test(policy))
+  }
+}
+
 /* ------------------------------------------------------- the store listing */
 
 /* The listing quotes the network back at people — how many stations, how many

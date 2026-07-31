@@ -11,3 +11,12 @@ android/app/build/
 android/.gradle/
 android/local.properties
 android/version.properties
+
+# iOS. The project is generated from ios/project.yml by XcodeGen, the page is
+# staged by tools/build-ios.mjs, and the version is stamped from the clock.
+# Committing any of the three would mean the repository carries a second copy
+# of something already in it, and the copy is the one that goes stale.
+ios/Overland.xcodeproj/
+ios/Overland/Resources/www/
+ios/Version.xcconfig
+ios/build/

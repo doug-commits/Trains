@@ -23,8 +23,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = join(root, 'android/play')
-mkdirSync(out, { recursive: true })
+/* Each store keeps its own assets beside its own listing text. One shared
+ * folder was fine while there was one store; with two it becomes a place where
+ * you have to already know which files Apple wants. */
+const OUT = { play: join(root, 'android/play'), appstore: join(root, 'ios/appstore') }
+for (const dir of Object.values(OUT)) mkdirSync(dir, { recursive: true })
+const out = OUT.play  // the feature graphic is Play's alone
 
 const app = join(root, 'dist/app.html')
 const site = join(root, 'index.html')
@@ -57,6 +61,7 @@ const browser = await chromium.launch()
 const DEVICES = {
   phone: {
     prefix: 'screenshot',
+    store: 'play',
     layout: 'sheet',
     viewport: { width: 432, height: 768 },
     deviceScaleFactor: 2.5,
@@ -65,6 +70,7 @@ const DEVICES = {
   },
   tablet7: {
     prefix: 'tablet7',
+    store: 'play',
     layout: 'sheet',
     viewport: { width: 600, height: 960 },
     deviceScaleFactor: 2,
@@ -73,8 +79,40 @@ const DEVICES = {
   },
   tablet10: {
     prefix: 'tablet10',
+    store: 'play',
     layout: 'panel',
     viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 2,
+    isMobile: false,
+    hasTouch: true,
+  },
+
+  /* Apple asks for its own two, at its own sizes, and will not take Play's.
+   *
+   * iphone69 — 440×956 at 3 is 1320×2868, the 6.9-inch display, which is the
+   * one size App Store Connect requires; everything smaller is derived from it
+   * unless you override it. Under the 60rem breakpoint, so the sheet layout,
+   * same as every phone.
+   *
+   * ipad13 — 1032×1376 at 2 is 2064×2752, the 13-inch iPad, the other required
+   * size. Portrait, because that is the orientation Apple's own frame uses in
+   * the listing. At 1032 CSS pixels this is over the breakpoint, so it gets the
+   * wide layout — map across the frame with the itinerary in a column beside
+   * it — which is genuinely what an iPad shows. */
+  iphone69: {
+    prefix: 'ios-iphone',
+    store: 'appstore',
+    layout: 'sheet',
+    viewport: { width: 440, height: 956 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+  },
+  ipad13: {
+    prefix: 'ios-ipad',
+    store: 'appstore',
+    layout: 'panel',
+    viewport: { width: 1032, height: 1376 },
     deviceScaleFactor: 2,
     isMobile: false,
     hasTouch: true,
@@ -82,7 +120,7 @@ const DEVICES = {
 }
 
 async function screen(device, colorScheme = 'light') {
-  const { prefix, layout, ...opts } = DEVICES[device]
+  const { prefix, layout, store, ...opts } = DEVICES[device]
   const context = await browser.newContext({ ...opts, colorScheme })
   const page = await context.newPage()
   page.on('pageerror', e => console.error(`  pageerror (${device}):`, e.message))
@@ -98,7 +136,9 @@ const ready = page =>
 const open = (page, hash = '') => page.goto('file://' + app + hash)
 
 const shot = (page, device, name) =>
-  page.screenshot({ path: join(out, `${DEVICES[device].prefix}-${name}.png`) })
+  page.screenshot({
+    path: join(OUT[DEVICES[device].store], `${DEVICES[device].prefix}-${name}.png`),
+  })
 
 const shots = Object.fromEntries(Object.keys(DEVICES).map(d => [d, []]))
 
@@ -382,8 +422,9 @@ const mapPng = await (async () => {
 
 await browser.close()
 
-for (const [device, { prefix, viewport, deviceScaleFactor }] of Object.entries(DEVICES)) {
+for (const [device, { prefix, store, viewport, deviceScaleFactor }] of Object.entries(DEVICES)) {
   const px = `${viewport.width * deviceScaleFactor}×${viewport.height * deviceScaleFactor}`
-  console.log(`${device.padEnd(18)} ${shots[device].length} screenshots at ${px} -> android/play/${prefix}-*.png`)
+  const dir = store === 'play' ? 'android/play' : 'ios/appstore'
+  console.log(`${device.padEnd(18)} ${shots[device].length} at ${px} -> ${dir}/${prefix}-*.png`)
 }
 console.log('feature graphic    1024×500 -> android/play/feature-graphic.png')

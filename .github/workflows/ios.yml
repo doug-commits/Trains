@@ -1,0 +1,220 @@
+# Builds the iOS app, and uploads it to TestFlight when it can.
+#
+# This runs in CI for a harder reason than the Android job does. That one could
+# in principle be built anywhere; this one cannot be built anywhere but macOS,
+# because Xcode only exists there. GitHub rents macOS by the minute, so the
+# answer to "do I need a Mac to ship an iPhone app" is no — but something does,
+# and this is it.
+#
+# Note that macOS minutes bill at ten times Linux ones on a private repository.
+# A build here is a few minutes, so this is cents rather than dollars, but it
+# is not free the way the Android job is.
+#
+# Signing: set the secrets below and the archive comes out signed and
+# uploadable. Leave them unset and the job still runs, still compiles
+# everything, and still fails loudly on a genuine mistake in the Swift or the
+# project — it just stops before producing an .ipa nobody could install. That
+# is deliberate: an unsigned iOS build is not a sideloadable artefact the way
+# an unsigned APK is, so pretending to produce one would help nobody.
+#
+#   IOS_CERT_P12_BASE64      base64 of your Apple Distribution .p12
+#   IOS_CERT_PASSWORD        the password you set when exporting it
+#   IOS_PROFILE_BASE64       base64 of the App Store provisioning profile
+#   IOS_TEAM_ID              ten characters, from developer.apple.com
+#
+# And, to upload to TestFlight rather than just producing a file:
+#
+#   APPSTORE_KEY_ID          App Store Connect API key
+#   APPSTORE_ISSUER_ID
+#   APPSTORE_KEY_BASE64      base64 of the .p8 you downloaded once
+#
+# Every one of those is created in your own Apple account and pasted into the
+# repository's secrets. Nothing in this repository generates a signing identity
+# and nothing should: a key somebody else made for you is a key somebody else
+# has got.
+
+name: iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload to TestFlight when signed'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    # The `secrets` context is not available in a step-level `if`, so the one
+    # decision this job makes — signed or not — is lifted into `env`, where it
+    # is allowed, and tested from there.
+    env:
+      CERT_B64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+      CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+      PROFILE_B64: ${{ secrets.IOS_PROFILE_BASE64 }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_KEY_B64: ${{ secrets.APPSTORE_KEY_BASE64 }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Builds its own page: dist/app.html, with no photographs and none of the
+      # website-only sections, then stages it into ios/Overland/Resources/www.
+      # Refuses to stage a truncated bundle, so a broken page fails here rather
+      # than opening to a blank screen on a phone.
+      - name: Build the page and stage it into the app
+        run: node tools/build-ios.mjs
+
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      # A keychain of its own, unlocked for this job only. Importing into the
+      # runner's login keychain works until the day two jobs share a runner.
+      - name: Install the signing identity
+        if: env.CERT_B64 != ''
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          PASSWORD=$(uuidgen)
+          security create-keychain -p "$PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
+
+          printf '%s' "$CERT_B64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          printf '%s' "$PROFILE_B64" | base64 -d > "$RUNNER_TEMP/profile.mobileprovision"
+          # The filename has to be the profile's own UUID or Xcode will not find
+          # it, and the UUID is inside the signed plist rather than the name.
+          UUID=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" \
+            | plutil -extract UUID raw -o - -)
+          NAME=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" \
+            | plutil -extract Name raw -o - -)
+          cp "$RUNNER_TEMP/profile.mobileprovision" \
+            ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "SIGNED=1" >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      # Unsigned: compile everything and stop. This still catches every mistake
+      # in the Swift, the project spec, the Info.plist and the asset catalog —
+      # which is most of what can be wrong — without pretending to produce
+      # something installable.
+      - name: Compile
+        if: env.SIGNED != '1'
+        run: |
+          set -euo pipefail
+          xcodebuild -project ios/Overland.xcodeproj -scheme Overland \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            build | xcbeautify || xcodebuild -project ios/Overland.xcodeproj \
+            -scheme Overland -destination 'generic/platform=iOS Simulator' \
+            -configuration Release CODE_SIGNING_ALLOWED=NO build
+
+      - name: Archive
+        if: env.SIGNED == '1'
+        run: |
+          set -euo pipefail
+          xcodebuild -project ios/Overland.xcodeproj -scheme Overland \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Overland.xcarchive" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            archive
+
+      - name: Export the .ipa
+        if: env.SIGNED == '1'
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$IOS_TEAM_ID</string>
+            <key>uploadSymbols</key><true/>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>com.slowasia.overland</key><string>$PROFILE_NAME</string></dict>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Overland.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+      # Proves the signature rather than assuming it, the way the Android job
+      # does with apksigner. If a certificate was supplied and the result does
+      # not verify, the job fails here and nothing is uploaded — handing over a
+      # build App Store Connect will reject helps nobody.
+      - name: Verify the signature
+        if: env.SIGNED == '1'
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/Overland.xcarchive/Products/Applications/Overland.app"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          {
+            echo "### Signature"
+            echo '```'
+            codesign -dv --verbose=4 "$APP" 2>&1 | grep -E 'Authority|TeamIdentifier|Identifier'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to TestFlight
+        if: env.SIGNED == '1' && env.APPSTORE_KEY_B64 != '' && inputs.upload
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$APPSTORE_KEY_B64" | base64 -d \
+            > ~/.appstoreconnect/private_keys/AuthKey_"$APPSTORE_KEY_ID".p8
+          xcrun altool --upload-app -f "$RUNNER_TEMP/export"/*.ipa -t ios \
+            --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+          rm -f ~/.appstoreconnect/private_keys/*.p8
+
+      - name: Say what came out
+        if: always()
+        run: |
+          {
+            echo "### iOS build"
+            echo
+            if [ "${SIGNED:-}" = "1" ]; then
+              echo "Signed with the distribution certificate. The .ipa is ready for"
+              echo "App Store Connect."
+            else
+              echo "**Unsigned** — no certificate secrets are set, so this compiled"
+              echo "but produced nothing installable. Unlike Android, iOS has no"
+              echo "sideloadable equivalent: an app has to be signed by an account"
+              echo "before a device will run it."
+            fi
+            echo
+            ls "$RUNNER_TEMP/export"/*.ipa 2>/dev/null \
+              | while read -r f; do
+                  printf -- '- `%s` — %s\n' "$(basename "$f")" "$(du -h "$f" | cut -f1)"
+                done || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: env.SIGNED == '1'
+        with:
+          name: overland-sea-ios
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error

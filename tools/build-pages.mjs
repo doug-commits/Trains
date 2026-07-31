@@ -265,7 +265,7 @@ ${DOCFOOT}
  *
  * Dates are written out rather than taken from the clock: a policy whose
  * effective date silently moves on every deploy is a policy nobody can cite. */
-const PRIVACY_UPDATED = '29 July 2026'
+const PRIVACY_UPDATED = '31 July 2026'
 
 function privacyPage(css) {
   const url = ORIGIN ? `${ORIGIN}/privacy` : null
@@ -323,6 +323,36 @@ function privacyPage(css) {
     build that channel and cannot see into it. What reaches us is the aggregate
     view in the Play Console — stack traces and device models, with no identity
     attached to them.</p>
+  </section>
+
+  <section class="block">
+    <h2>The iPhone and iPad app</h2>
+
+    <p>Same program, same bundled data, same two settings on the device, same
+    absence of accounts, analytics, advertising identifiers and third-party
+    code. What differs is one sentence of the guarantee above, and it differs
+    enough to be worth spelling out rather than quietly reusing.</p>
+
+    <div class="callout">
+      <h3>iOS has no permission to withhold</h3>
+      <p>Android lets an app decline the network outright, and the operating
+      system then enforces it. iOS has no equivalent: an app either has network
+      access or the platform assumes it might. So the promise here is one level
+      down and narrower. The app makes no network calls of its own, and the web
+      view it is built around runs under a WebKit content rule that refuses
+      every load except from the app's own bundle — a tracking pixel or a
+      remote font that somehow got into the page could not fetch, and neither
+      could anything injected into it. That is enforced by WebKit rather than
+      by the kernel. It is a good guarantee and it is not the same guarantee,
+      and you should hold it as the weaker one.</p>
+    </div>
+
+    <p>Everything else reads across. Nothing is collected. Tapping an operator's
+    booking site hands the address to Safari and the app stops being involved.
+    And as on Android there is a channel that is not ours: if you have left
+    Apple's analytics sharing on, iOS may send Apple crash reports for any app
+    on the device. What we can see of that is aggregate stack traces in App
+    Store Connect, with no identity attached.</p>
   </section>
 
   <section class="block">
@@ -412,11 +442,13 @@ function privacyPage(css) {
 
   <section class="block">
     <h2>Changes</h2>
-    <p>If the app ever gains the ability to send something — it has no plans
-    to, and gaining one would mean adding a permission you would see at
-    install time — this page changes before that release ships, and the date
-    below changes with it. There is no mailing list, so this page is the
-    notice.</p>
+    <p>If either app ever gains the ability to send something — neither has
+    any plans to — this page changes before that release ships, and the date
+    below changes with it. On Android you would also see it: the permission
+    appears at install time. On iOS you would not, which is the practical
+    consequence of the difference described above and another reason to state
+    it here rather than leave it implied. There is no mailing list, so this
+    page is the notice.</p>
     <p>Last updated ${PRIVACY_UPDATED}.</p>
   </section>
 
@@ -454,11 +486,11 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
   <article>
     <h1>Privacy</h1>
     <p class="lede">Overland SEA collects nothing about you. Here is what that
-    means in each place the name appears, and where the edges of the claim
-    are.</p>
+    means in each of the three places the name appears — the Android app, the
+    iPhone app and the website — and where the edges of the claim are.</p>
     <p class="facts">
       <b>No</b> accounts · <b>No</b> analytics · <b>No</b> cookies ·
-      <b>No</b> internet permission in the app
+      <b>No</b> network access asked for, on either app
     </p>
 
     <div class="panel doc-panel">${body}</div>
