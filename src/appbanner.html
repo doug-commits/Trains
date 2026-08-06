@@ -1,0 +1,68 @@
+<!-- Asked once, on Android, and not again after a no.
+
+     A strip rather than an overlay, and deliberately. Google demotes a mobile
+     page that covers its own content with an app promotion, and is right to:
+     the reader came for the page, not for us. This takes a line at the top and
+     gives it back the moment it is dismissed.
+
+     The pitch is the true one. The app is the same program with the network
+     already inside it, so what installing buys is not features — it is that
+     the phone stops needing a signal, which matters most at exactly the moment
+     there is none: a border post, a sleeper somewhere north of Nong Khai. "Get
+     our app" on its own is a sentence people have learned to close unread. -->
+<script>
+  /* During parse, ahead of the stylesheet, so the strip is either there in the
+     first frame or never there at all. One that appears a moment after the
+     page settles moves the whole layout under a thumb already on its way down
+     — which is how a banner gets tapped by accident and resented. */
+  (function () {
+    var el = document.documentElement
+    /* Not iPadOS-style spoofing to worry about here: Android says Android.
+       The app itself is excluded twice over — the build marks the document,
+       and the shell it runs in defines OverlandShell — because offering to
+       install the app you are already inside is the kind of thing that gets a
+       screenshot taken of it. */
+    var ask =
+      /Android/.test(navigator.userAgent) &&
+      !el.dataset.app &&
+      typeof OverlandShell === 'undefined'
+    /* Storage is asked separately and allowed to fail. In private mode the
+       answer cannot be remembered, and being asked again is a smaller wrong
+       than never being told the app exists. */
+    try {
+      if (localStorage.getItem('overlandsea:app') === 'no') ask = false
+    } catch (e) {}
+    if (ask) el.dataset.android = '1'
+  })()
+</script>
+<aside class="appbanner" aria-label="Android app">
+  <span class="mark" aria-hidden="true"></span>
+  <p class="appbanner-say">
+    <b>Plan with no signal.</b>
+    <span>The Android app works offline.</span>
+  </p>
+  <a
+    class="appbanner-go"
+    href="https://play.google.com/store/apps/details?id=com.overlandsoutheastasia"
+  >Install</a>
+  <button type="button" class="appbanner-no" aria-label="Not now, and do not ask again">
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M6 6l8 8M14 6l-8 8" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round"/>
+    </svg>
+  </button>
+</aside>
+<script>
+  /* Wired here rather than from the program, because the guide pages carry
+     this strip too and they do not load the program at all. */
+  (function () {
+    var no = document.querySelector('.appbanner-no')
+    if (!no) return
+    no.addEventListener('click', function () {
+      document.documentElement.removeAttribute('data-android')
+      try {
+        localStorage.setItem('overlandsea:app', 'no')
+      } catch (e) {}
+    })
+  })()
+</script>

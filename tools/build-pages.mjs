@@ -217,6 +217,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 <style>${css}</style>
 </head>
 <body class="doc">
+${APPBANNER}
 <header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
@@ -401,6 +402,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 <style>${css}</style>
 </head>
 <body class="doc">
+${APPBANNER}
 <header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
@@ -652,6 +654,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 <style>${css}</style>
 </head>
 <body class="doc">
+${APPBANNER}
 <header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
@@ -878,6 +881,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 <style>${css}</style>
 </head>
 <body class="doc">
+${APPBANNER}
 <header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
@@ -924,6 +928,11 @@ ${DOCFOOT}
 
 mkdirSync(OUT, { recursive: true })
 const css = read('src/app.css') + '\n' + read('src/doc.css')
+
+/* The same strip the planner carries, and these pages are where it matters
+ * more: a guide page is where a search lands, and someone reading how the
+ * Nong Khai crossing works on a phone is exactly who wants it offline. */
+const APPBANNER = read('src/appbanner.html')
 
 const built = []
 const failed = []

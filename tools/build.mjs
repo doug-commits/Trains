@@ -214,7 +214,14 @@ const basemap = asJson('data/basemap.json')
 const rails = asJson('data/rails.json')
 const fonts = read('src/fonts.css')
 const css = read('src/app.css')
-const shell = read('src/shell.html')
+/* The strip that offers the Android app, spliced into the shell rather than
+ * written into it, because the guide pages want the same markup and neither of
+ * them should be the one that owns it.
+ *
+ * It goes into the app's own build too, and does nothing there: the script
+ * that reveals it checks the document mark this build sets. Cheaper than a
+ * second shell, and it means the two documents cannot drift. */
+const shell = read('src/shell.html').replace('<!--APPBANNER-->', read('src/appbanner.html'))
 
 /* Affiliate ids come from the environment, never from the repo. An empty id
  * still produces a working link — it just earns nothing — so a clone without

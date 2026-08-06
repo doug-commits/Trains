@@ -196,7 +196,7 @@ body {
 }
 .brand:hover { background: var(--raise); }
 
-.brand .mark {
+.mark {
   width: 1.6rem;
   height: 0.6rem;
   flex: none;
@@ -1651,9 +1651,28 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 
   /* Floating over the map rather than sitting above it — there is no column
      left for it to sit in. */
-  .topbar {
+  /* On the planner the strip goes fixed as well, because from here down
+     nothing on that page is in flow: the top bar floats over a full-bleed map.
+     So the strip takes the top and everything that measured from the top of
+     the viewport measures from the bottom of the strip instead. --banner-h is
+     0 when there is no strip, which is every reader who is not on Android and
+     every one who said no, so these calcs are identities in the ordinary case.
+
+     Scoped by the child selector rather than by a body class: the guide pages
+     put the strip straight in the document, above a top bar that scrolls with
+     everything else, and fixing it there would park it over their own header.
+     Only the planner's copy lives inside .app. */
+  .app > .appbanner {
     position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
+    z-index: 46;
+  }
+
+  .topbar {
+    position: fixed;
+    top: var(--banner-h);
     left: 0;
     right: 0;
     z-index: 40;
@@ -1677,7 +1696,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
     left: max(0.6rem, env(safe-area-inset-left));
     right: max(0.6rem, env(safe-area-inset-right));
     bottom: auto;
-    top: calc(var(--topbar-h) + env(safe-area-inset-top) + 0.5rem);
+    top: calc(var(--banner-h) + var(--topbar-h) + env(safe-area-inset-top) + 0.5rem);
     flex-wrap: wrap;
     gap: 0.5rem;
     z-index: 20;
@@ -2411,3 +2430,93 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   }
   .intro.is-gone { transform: none; }
 }
+
+/* ------------------------------------------------------ the app banner */
+
+/* Hidden by default and shown by an attribute the parse-time script sets, so
+   the decision is made before the first frame. The reverse — visible by
+   default, hidden by script — flashes the strip at every reader on every
+   platform, which is worse than not asking.
+
+   The height is a variable because the phone layout does not stack: there the
+   top bar floats over a full-bleed map and the strip has to move it, and the
+   map's own legend with it. Zero everywhere else, so those calcs are unchanged
+   when there is no strip. */
+:root { --banner-h: 0rem; }
+
+.appbanner { display: none; }
+
+[data-android] {
+  --banner-h: 3.1rem;
+}
+
+[data-android] .appbanner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.7rem;
+  height: var(--banner-h);
+  padding-left: max(0.85rem, env(safe-area-inset-left));
+  padding-right: max(0.6rem, env(safe-area-inset-right));
+  background: var(--raise);
+  border-bottom: 1px solid var(--panel-edge);
+  z-index: 45;
+}
+
+/* The launcher mark, small — the same two rails and two waves the icon and the
+   intro use, so the strip is recognisably offering this app and not an ad. */
+/* The brand's own mark, not a second one drawn small. The first version was
+   the launcher icon shrunk to a square, and at 23px the vertical rail with two
+   waves under it read as an exclamation mark in a box — which is the one thing
+   a strip at the top of a page must not look like. */
+.appbanner .mark { margin-left: 0.1rem; }
+
+.appbanner-say {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--ink-soft);
+}
+.appbanner-say b { display: block; color: var(--ink); font-weight: 600; }
+/* The second line is the reason and the first is the promise, so on a narrow
+   phone the reason is what goes rather than the promise being truncated. */
+.appbanner-say span { display: block; }
+@media (max-width: 22rem) {
+  .appbanner-say span { display: none; }
+}
+
+.appbanner-go {
+  flex: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--r-sm);
+  background: var(--rail);
+  color: var(--sea);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.appbanner-no {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44px. A dismiss smaller than a thumb is a dismiss that opens the Play
+     Store by accident, which is the one failure this strip must not have. */
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-right: -0.35rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.appbanner-no svg { width: 1.15rem; height: 1.15rem; }
+.appbanner-no:hover { color: var(--ink); background: var(--panel-edge); }

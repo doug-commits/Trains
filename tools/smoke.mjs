@@ -28,7 +28,7 @@ const problems = []
 
 const browser = await chromium.launch()
 
-async function newPage(opts = {}) {
+async function newPage({ ignore, ...opts } = {}) {
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1000 },
     deviceScaleFactor: 2,
@@ -37,7 +37,11 @@ async function newPage(opts = {}) {
   })
   const page = await context.newPage()
   page.on('console', m => {
-    if (m.type() === 'error') problems.push(`console.error: ${m.text()}`)
+    if (m.type() !== 'error') return
+    // Narrow and stated at the call site, never a blanket mute: the point of
+    // collecting these is that nobody has to read the log.
+    if (ignore && ignore.test(m.text())) return
+    problems.push(`console.error: ${m.text()}`)
   })
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
   return { page, context }
@@ -2738,6 +2742,117 @@ function check(label, condition, detail = '') {
     check('all three sets show the same eight things',
       sets.every(set => set.join(' ') === sets[0].join(' ')),
       sets.map(set => set.length).join('/'))
+  }
+}
+
+/* -------------------------------------------- the strip that offers the app */
+
+/* The one piece of the site that is an advertisement, which is exactly why it
+ * gets checked hardest: for who it is shown to, for what happens to a no, and
+ * for whether it covers anything. Google demotes a mobile page that hides its
+ * own content behind an app promotion, and it should. */
+{
+  const ANDROID =
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 ' +
+    '(KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
+  const IPHONE =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 ' +
+    '(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+  const phone = ua => ({
+    userAgent: ua, viewport: { width: 412, height: 915 },
+    deviceScaleFactor: 3, isMobile: true, hasTouch: true,
+  })
+
+  const strip = async (at, opts) => {
+    const { page, context } = await newPage(opts)
+    await page.goto(at)
+    await page.waitForTimeout(400)
+    const seen = await page.evaluate(() => {
+      const el = document.querySelector('.appbanner')
+      if (!el || getComputedStyle(el).display === 'none') return null
+      const bar = document.querySelector('.topbar')
+      const no = el.querySelector('.appbanner-no').getBoundingClientRect()
+      return {
+        box: el.getBoundingClientRect().toJSON(),
+        topbar: bar ? bar.getBoundingClientRect().toJSON() : null,
+        href: el.querySelector('.appbanner-go').getAttribute('href'),
+        dismiss: [no.width, no.height],
+      }
+    })
+    return { page, context, seen }
+  }
+
+  /* Not shown where there is nothing to install, and — the one that would be
+     embarrassing — not shown inside the app it is offering. */
+  for (const [what, at, opts] of [
+    ['an iPhone', url, phone(IPHONE)],
+    ['a desktop browser', url, {}],
+    ['the app itself', 'file://' + join(root, 'dist/app.html'), phone(ANDROID)],
+  ]) {
+    const { context, seen } = await strip(at, opts)
+    check(`the install strip stays out of the way on ${what}`, seen === null,
+      seen ? 'it is showing' : '')
+    await context.close()
+  }
+
+  {
+    const { page, context, seen } = await strip(url, phone(ANDROID))
+    check('and offers itself on an Android phone', !!seen)
+    if (seen) {
+      check('and points at the app that is actually published',
+        seen.href === 'https://play.google.com/store/apps/details?id=com.overlandsoutheastasia',
+        seen.href)
+      /* Fixed over a full-bleed map, so nothing here is stacked by the
+         document — the top bar is moved by a variable, and a wrong one puts
+         the strip over the brand. */
+      check('and sits above the top bar rather than over it',
+        seen.topbar && seen.box.bottom <= seen.topbar.top + 0.5,
+        `strip ends ${seen.box.bottom.toFixed(0)}, bar starts ${seen.topbar?.top.toFixed(0)}`)
+      /* A dismiss smaller than a thumb is a dismiss that opens the Play Store
+         by accident — the one failure this strip must not have. */
+      check('with a no big enough to hit', Math.min(...seen.dismiss) >= 44,
+        seen.dismiss.map(n => n.toFixed(0)).join('×'))
+
+      /* Full open clears the top bar today; it has to still clear it with the
+         strip above, or the sheet swallows both. */
+      const clears = await page.evaluate(() => {
+        const el = document.querySelector('.appbanner')
+        return Math.round(window.innerHeight * 0.06) + el.offsetHeight
+          >= el.getBoundingClientRect().bottom
+      })
+      check('and the itinerary at full height stops below it', clears)
+
+      await page.locator('.appbanner-no').tap()
+      await page.waitForTimeout(150)
+      const gone = await page.evaluate(() =>
+        getComputedStyle(document.querySelector('.appbanner')).display === 'none')
+      check('a no takes it away', gone)
+      await page.reload()
+      await page.waitForTimeout(400)
+      const stillGone = await page.evaluate(() =>
+        getComputedStyle(document.querySelector('.appbanner')).display === 'none')
+      check('and it is not asked again', stillGone)
+    }
+    await context.close()
+  }
+
+  /* The guide pages carry it too, and they are where it matters more: a guide
+     page is where a search lands. They stack in the document rather than
+     floating, so the same rule would park it over their own header. */
+  {
+    const guide = readdirSync(join(root, 'public')).find(f => f.endsWith('.html'))
+    /* Its photographs are referenced from the site root, which is right on the
+       site and unreachable over file://. Everything this block looks at is
+       above the first photograph. */
+    const { context, seen } = await strip('file://' + join(root, 'public', guide),
+      { ...phone(ANDROID), ignore: /ERR_FILE_NOT_FOUND/ })
+    check('the guide pages carry it as well', !!seen, guide)
+    if (seen) {
+      check('and there it pushes the header down instead of covering it',
+        seen.topbar && seen.box.bottom <= seen.topbar.top + 0.5,
+        `strip ends ${seen.box.bottom.toFixed(0)}, header starts ${seen.topbar?.top.toFixed(0)}`)
+    }
+    await context.close()
   }
 }
 

@@ -7255,9 +7255,18 @@ const UI = (() => {
   const PEEK = 118 // enough for the grip and the first field
 
   const onPhone = () => !window.matchMedia('(min-width: 60.0625rem)').matches
+  /* Zero unless the install strip is showing, and measured rather than assumed
+     because it is a strip of text that wraps on a narrow enough phone. Full
+     open stops below the top bar; the strip sits above the top bar, so without
+     this the sheet at full would cover both. */
+  const bannerH = () => $('.appbanner')?.offsetHeight || 0
   const snapPoints = () => {
     const h = window.innerHeight
-    return { full: Math.round(h * 0.06), half: Math.round(h * 0.55), peek: h - PEEK }
+    return {
+      full: Math.round(h * 0.06) + bannerH(),
+      half: Math.round(h * 0.55),
+      peek: h - PEEK,
+    }
   }
   const nearestSnap = (y, bias = 0) => {
     const pts = snapPoints()
