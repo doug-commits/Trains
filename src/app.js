@@ -592,7 +592,21 @@
   }
 
   tooltip.addEventListener('pointerenter', cancelHide)
-  tooltip.addEventListener('pointerleave', hideTip)
+
+  /* Hover dismissal, and only hover dismissal.
+   *
+   * A touch pointer stops existing the instant the finger lifts, so the
+   * browser fires pointerleave immediately after pointerup — before the click.
+   * Hiding here took the popup out of the layout in that gap, so the click was
+   * never dispatched at all: the buttons and the Google Maps links did
+   * nothing, on every tap, while working perfectly with a mouse.
+   *
+   * A finger dismisses the popup by tapping somewhere else, which the canvas
+   * already handles. */
+  tooltip.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'touch') return
+    hideTip()
+  })
 
   tooltip.addEventListener('click', e => {
     const btn = e.target.closest('.tip-go')
@@ -1282,6 +1296,30 @@
       else localStorage.setItem(THEME_KEY, mode)
     } catch {
       /* nothing to persist to; the choice still holds for this visit */
+    }
+
+    tellTheShell()
+  }
+
+  /* Android 16 makes edge-to-edge mandatory, so the status bar and the gesture
+   * bar are now part of this page's visual field rather than a frame around
+   * it. The activity paints those strips itself and has no way to know the
+   * reader just changed theme in here — a page load is the only signal it
+   * gets, and pressing the toggle is not one.
+   *
+   * So the page says. A WebMessageListener rather than a JavascriptInterface:
+   * it is scoped to this document's own origin, so nothing else can reach it,
+   * and it exists only where the shell installed it. On the website and on
+   * iOS this is a no-op. */
+  function tellTheShell() {
+    if (typeof OverlandShell === 'undefined') return
+    try {
+      const sea = getComputedStyle(document.documentElement)
+        .getPropertyValue('--sea')
+        .trim()
+      if (sea) OverlandShell.postMessage(sea)
+    } catch (e) {
+      /* the shell is optional; the page is the product */
     }
   }
 

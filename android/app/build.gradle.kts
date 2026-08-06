@@ -25,7 +25,7 @@ android {
    * after the first upload — so it is set by whatever was typed into Play
    * Console, not by what would have been tidier here. */
   namespace = "com.slowasia.overland"
-  compileSdk = 35
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.overlandsoutheastasia"
@@ -34,7 +34,12 @@ android {
      * cannot render the canvas map or the CSS this page is built on, so it
      * would install and then look broken. */
     minSdk = 26
-    targetSdk = 35
+    /* Android 16. Play will not accept an update targeting lower after
+     * 31 August 2026, and the rule is rolling — a year behind the newest
+     * release, every year. Raising it is not a setting: targeting 36 makes
+     * edge-to-edge mandatory with no opt-out, which is why MainActivity now
+     * applies window insets itself. */
+    targetSdk = 36
     versionCode = version.getProperty("versionCode", "1").toInt()
     versionName = version.getProperty("versionName", "1.0.0")
   }

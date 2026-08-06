@@ -2,8 +2,6 @@
 <resources>
   <style name="Theme.Overland" parent="Theme.AppCompat.DayNight.NoActionBar">
     <item name="android:windowBackground">@color/sea_light</item>
-    <item name="android:statusBarColor">@color/sea_light</item>
-    <item name="android:navigationBarColor">@color/sea_light</item>
     <item name="android:windowLightStatusBar">true</item>
   </style>
 </resources>

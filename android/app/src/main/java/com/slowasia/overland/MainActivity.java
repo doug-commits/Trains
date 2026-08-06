@@ -2,9 +2,11 @@ package com.slowasia.overland;
 
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -15,7 +17,16 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebViewAssetLoader;
+
+import java.util.Collections;
 
 /**
  * One activity, one WebView, one bundled page.
@@ -38,6 +49,12 @@ public class MainActivity extends AppCompatActivity {
   private static final String HOME = "https://" + DOMAIN + "/assets/index.html";
 
   private WebView web;
+
+  /* The WebView sits inside this, and this carries the window insets as
+     padding. Painting the strips behind the status and gesture bars is the
+     root's job rather than the WebView's, because the WebView has to end
+     where the page ends. */
+  private FrameLayout root;
 
   @Override
   protected void onCreate(Bundle state) {
@@ -76,6 +93,15 @@ public class MainActivity extends AppCompatActivity {
        * network to fall back on and no server-side log to inspect — whatever
        * went wrong went wrong on someone's phone in a place with no signal.
        */
+      /* The page reports its own colour on every theme change, but the first
+         one happens before the listener above can be talked to. */
+      @Override
+      public void onPageFinished(WebView view, String url) {
+        view.evaluateJavascript(
+            "getComputedStyle(document.documentElement).getPropertyValue('--sea')",
+            value -> paintBars(value));
+      }
+
       @Override
       public void onReceivedError(WebView view, WebResourceRequest request,
                                   WebResourceError error) {
@@ -116,7 +142,46 @@ public class MainActivity extends AppCompatActivity {
       }
     });
 
-    setContentView(web);
+    root = new FrameLayout(this);
+    root.addView(web);
+    setContentView(root);
+
+    /* Android 16 makes edge-to-edge mandatory and removed the opt-out, so the
+     * window now extends under the status bar and the gesture bar whether or
+     * not it wants to. Declared here rather than left to the platform so that
+     * every version behaves the same way: without it, an Android 14 phone
+     * insets the window and an Android 16 phone does not, and the layout has
+     * to be right in both.
+     *
+     * The insets become padding on the root, which is what keeps the top bar
+     * out from under the clock and the sheet's handle off the gesture bar.
+     * Doing it here rather than in CSS because Android's WebView reports only
+     * display cutouts through env(safe-area-inset-*) — the system bars are not
+     * in that number, so the stylesheet cannot see them. */
+    WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+    ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
+      Insets bars = windowInsets.getInsets(
+          WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+      Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+      // The keyboard, when it is up, replaces the gesture bar rather than
+      // stacking with it — so the larger of the two, not the sum.
+      v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+      return WindowInsetsCompat.CONSUMED;
+    });
+
+    /* And a channel for the page to say what colour it is now.
+     *
+     * Origin-scoped to the asset host, so only the bundled document can reach
+     * it — which is the difference between this and addJavascriptInterface,
+     * and the reason it is acceptable in an app that otherwise exposes nothing
+     * to its own web view. */
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+      WebViewCompat.addWebMessageListener(
+          web, "OverlandShell", Collections.singleton("https://" + DOMAIN),
+          (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+            if (isMainFrame) paintBars(message.getData());
+          });
+    }
 
     /* The planner keeps its route in the URL hash, so WebView history is a
      * real trail through the app: back walks out of an itinerary to where you
@@ -138,6 +203,33 @@ public class MainActivity extends AppCompatActivity {
     } else {
       web.loadUrl(HOME);
     }
+  }
+
+  /* Fill the strips behind the system bars with whatever the page's sea is,
+   * and flip the clock and the gesture bar to whichever of black or white can
+   * be read against it.
+   *
+   * Without this the bars keep the colour the XML theme gave them, which
+   * follows the system's dark mode rather than the reader's choice in the app
+   * — and since the app opens light even on a dark phone, that mismatch was
+   * visible on the very first frame. */
+  private void paintBars(String reported) {
+    if (reported == null) return;
+    String hex = reported.replace("\"", "").trim();
+    if (!hex.startsWith("#") || hex.length() < 7) return;
+    int colour;
+    try {
+      colour = Color.parseColor(hex.substring(0, 7));
+    } catch (IllegalArgumentException e) {
+      return;   // not a colour we can use; leave the theme's own
+    }
+    root.setBackgroundColor(colour);
+    double luminance = (0.299 * Color.red(colour)
+                      + 0.587 * Color.green(colour)
+                      + 0.114 * Color.blue(colour)) / 255.0;
+    WindowInsetsControllerCompat bars = WindowCompat.getInsetsController(getWindow(), web);
+    bars.setAppearanceLightStatusBars(luminance > 0.5);
+    bars.setAppearanceLightNavigationBars(luminance > 0.5);
   }
 
   @Override

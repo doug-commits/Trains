@@ -2005,6 +2005,59 @@ function check(label, condition, detail = '') {
   await page.waitForTimeout(300)
   check('one finger moves the map left and right', (await sig()) !== before)
 
+  /* The station popup, tapped rather than clicked.
+   *
+   * Everything about this worked with a mouse and nothing about it worked with
+   * a finger: a touch pointer ceases to exist at pointerup, so pointerleave
+   * arrives before the click, and dismissing the popup there removed the
+   * button from the layout in the gap between the two. The click was never
+   * dispatched. Both the routing buttons and the Google Maps links did
+   * nothing, silently, on every tap. */
+  {
+    /* Whichever station is currently somewhere a thumb can actually reach —
+       the checks above have panned and zoomed, and hard-coding a city means
+       tapping open sea and blaming the popup. Below the legend, above the
+       sheet, clear of both edges. */
+    // Coordinates come from the data file: the page keeps the network inside a
+    // closure and exposes only the map.
+    const at = await page.evaluate(points => {
+      const r = document.querySelector('#map').getBoundingClientRect()
+      const sheetTop = document.querySelector('#sheet').getBoundingClientRect().top
+      const legend = document.querySelector('.mapfoot')
+      const legendBottom = legend ? legend.getBoundingClientRect().bottom : 0
+      for (const [id, lon, lat] of points) {
+        const pt = window.OverlandMap.locate(lon, lat)
+        if (!pt) continue
+        const x = r.left + pt.x
+        const y = r.top + pt.y
+        if (x > 60 && x < r.right - 60 && y > legendBottom + 30 && y < sheetTop - 40) {
+          return { x, y, id }
+        }
+      }
+      return null
+    }, Object.entries(NETWORK.stations).map(([id, st]) => [id, st.lon, st.lat]))
+    if (!at) {
+      check('a tapped station offers the popup', false, 'no station in reach')
+    } else {
+      await page.touchscreen.tap(at.x, at.y)
+      await page.waitForTimeout(350)
+      const btn = await page.evaluate(() => {
+        const b = document.querySelector('#tip .tip-go')
+        if (!b || document.querySelector('#tip').hidden) return null
+        const r = b.getBoundingClientRect()
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2, label: b.textContent.trim() }
+      })
+      check('a tapped station offers the popup', !!btn, btn ? btn.label : 'no popup')
+      if (btn) {
+        await page.touchscreen.tap(btn.x, btn.y)
+        await page.waitForTimeout(500)
+        const chosen = await page.evaluate(() => document.querySelector('#from').value)
+        check('and tapping its button actually routes from there', !!chosen,
+          chosen || 'nothing happened')
+      }
+    }
+  }
+
   const afterX = await sig()
   await swipe(0, 120)
   await page.waitForTimeout(300)
@@ -2447,6 +2500,29 @@ function check(label, condition, detail = '') {
     .filter(k => plist.includes(k))
   check('the iOS app asks for no permissions, as the policy says', asks.length === 0,
     asks.join(', '))
+
+  /* Play refuses an update whose target is more than a year behind the newest
+     Android, and moves the line every year. The number lives in the gradle
+     file and nothing else reads it, so it goes stale in silence and announces
+     itself as a rejected upload months later. */
+  const gradleApp = src('android/app/build.gradle.kts')
+  const target = Number((gradleApp.match(/targetSdk = (\d+)/) || [])[1])
+  const compile = Number((gradleApp.match(/compileSdk = (\d+)/) || [])[1])
+  check('the Android target is one Play still accepts', target >= 36, `targetSdk ${target}`)
+  check('and it is compiled against at least what it targets',
+    compile >= target, `compileSdk ${compile}`)
+
+  /* From targetSdk 35 the platform ignores the bar colours, and from 36 there
+     is no opting out of edge-to-edge — so a build that sets them and handles
+     no insets draws its own top bar underneath the clock. */
+  const activity = src('android/app/src/main/java/com/slowasia/overland/MainActivity.java')
+  check('and it insets itself for the bars it now draws under',
+    /setOnApplyWindowInsetsListener/.test(activity) &&
+      /setDecorFitsSystemWindows/.test(activity))
+  const themes = src('android/app/src/main/res/values/themes.xml') +
+    src('android/app/src/main/res/values-night/themes.xml')
+  check('without setting bar colours the platform stopped reading',
+    !/statusBarColor|navigationBarColor/.test(themes))
 
   /* The claim the policy actually makes for iOS. Android's is enforced by the
      kernel and this one is not, so the code that enforces it has to be there
