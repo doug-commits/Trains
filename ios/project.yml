@@ -64,9 +64,13 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: '1,2'   # iPhone and iPad, as on Android
         SUPPORTS_MACCATALYST: NO
-        # Signed in CI from secrets. Locally this leaves you able to build for
-        # the simulator without an account.
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: ''
-        DEVELOPMENT_TEAM: ''
-        PROVISIONING_PROFILE_SPECIFIER: ''
+        # Automatic, so that opening this in Xcode and hitting Archive works
+        # the way Xcode expects: pick your team once in Signing & Capabilities
+        # and it handles the rest.
+        #
+        # CI does not use it. The workflow passes CODE_SIGN_STYLE=Manual along
+        # with the identity, team and profile on the xcodebuild command line,
+        # and command-line settings beat the project — so the automatic path
+        # here costs the automated build nothing and saves the manual one an
+        # afternoon of fighting empty strings.
+        CODE_SIGN_STYLE: Automatic

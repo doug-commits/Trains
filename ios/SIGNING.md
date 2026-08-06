@@ -175,6 +175,58 @@ with **Upload to TestFlight** ticked.
 
 ---
 
+## Getting the build to Apple
+
+Three routes. They differ only in where the build happens and what does the
+uploading.
+
+### A. Build it in Xcode yourself
+
+If you have a Mac with Xcode and your certificates already in its keychain,
+this is the shortest path and needs none of the secrets above.
+
+```sh
+brew install xcodegen        # once
+node tools/build-ios.mjs     # stages the page, stamps the version
+cd ios && xcodegen generate
+open Overland.xcodeproj
+```
+
+In Xcode: select the target, **Signing & Capabilities**, pick your team once
+(the project is set to automatic signing so it will sort out the rest). Set the
+destination to **Any iOS Device (arm64)** — Archive is greyed out while a
+simulator is selected, which is the most common five minutes lost here. Then
+**Product → Archive**, and in the Organizer that opens, **Distribute App → App
+Store Connect → Upload**.
+
+`node tools/build-ios.mjs` is not optional. It is what puts the planner inside
+the app; without it you get a shell that opens to an error page saying exactly
+that.
+
+### B. Build in CI, upload with Xcode
+
+Set the four signing secrets and run the workflow. It produces two artifacts:
+
+- `overland-sea-ios` — the `.ipa`
+- `overland-sea-ios-xcarchive` — the archive
+
+For the Organizer flow, take the **archive**. Unzip it into
+`~/Library/Developer/Xcode/Archives/2026-07-31/` (any dated folder; create one
+if there is none) and it appears under **Window → Organizer → Archives**, where
+Distribute App works as normal.
+
+Xcode cannot open an `.ipa`. Application Loader, which could, was removed in
+Xcode 11 — so for the `.ipa` specifically the tool is **Transporter**, free on
+the Mac App Store: sign in, drag it in, Deliver.
+
+### C. Build in CI, upload from CI
+
+Add the three `APPSTORE_*` secrets and run the workflow with **Upload to
+TestFlight** ticked. Nothing touches your machine. This is the one to move to
+once the first submission has gone through and you are shipping updates.
+
+---
+
 ## One thing that is not on this page
 
 A build cannot be uploaded until an app record exists to receive it. That is in

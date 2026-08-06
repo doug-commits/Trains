@@ -248,3 +248,19 @@ jobs:
           name: overland-sea-ios
           path: ${{ runner.temp }}/export/*.ipa
           if-no-files-found: error
+
+      # The archive as well as the .ipa, because they go to different places.
+      #
+      # Xcode's Organizer uploads archives, not .ipa files — Application
+      # Loader, which took an .ipa, was removed in Xcode 11. So an .ipa needs
+      # Transporter or altool, and anyone who wants the Organizer flow they
+      # already know needs this instead: drop it in
+      # ~/Library/Developer/Xcode/Archives/<any date folder>/ and it appears
+      # under Window → Organizer, ready to Distribute App.
+      - name: Upload the archive too, for Xcode's Organizer
+        if: env.SIGNED == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: overland-sea-ios-xcarchive
+          path: ${{ runner.temp }}/Overland.xcarchive
+          if-no-files-found: error
