@@ -12,12 +12,14 @@ final class PlannerViewController: UIViewController {
 
     private var web: WKWebView!
     private let assets = BundleAssets()
+    private let bridge = ShellBridge()
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(assets, forURLScheme: BundleAssets.scheme)
+        installShellBridge(into: config.userContentController)
         config.websiteDataStore = .default()          // persistent localStorage
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = .all
@@ -93,17 +95,64 @@ final class PlannerViewController: UIViewController {
         didSet { setNeedsStatusBarAppearanceUpdate() }
     }
 
+    /// Asked once, on load. After that the page volunteers it — see below.
     private func matchStatusBarToPage() {
         web.evaluateJavaScript(
             "getComputedStyle(document.documentElement).getPropertyValue('--sea')"
         ) { [weak self] value, _ in
-            guard let hex = (value as? String)?.trimmingCharacters(in: .whitespaces),
-                  hex.hasPrefix("#"), hex.count >= 7,
-                  let n = Int(hex.dropFirst().prefix(6), radix: 16) else { return }
-            let r = Double((n >> 16) & 0xff), g = Double((n >> 8) & 0xff), b = Double(n & 0xff)
-            let luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-            self?.statusBar = luminance > 0.5 ? .darkContent : .lightContent
+            self?.matchStatusBar(to: value as? String)
         }
+    }
+
+    fileprivate func matchStatusBar(to reported: String?) {
+        guard let hex = reported?.trimmingCharacters(in: .whitespaces),
+              hex.hasPrefix("#"), hex.count >= 7,
+              let n = Int(hex.dropFirst().prefix(6), radix: 16) else { return }
+        let r = Double((n >> 16) & 0xff), g = Double((n >> 8) & 0xff), b = Double(n & 0xff)
+        let luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        statusBar = luminance > 0.5 ? .darkContent : .lightContent
+        // The strip behind the bar and around the safe area is the view's, not
+        // the page's, and the page cannot paint it. Left at the dark default it
+        // shows as a black band above a light map.
+        view.backgroundColor = UIColor(red: CGFloat(r) / 255,
+                                       green: CGFloat(g) / 255,
+                                       blue: CGFloat(b) / 255, alpha: 1)
+    }
+
+    /// The page calls `OverlandShell.postMessage(colour)` whenever the theme
+    /// changes. On Android that name is a `WebMessageListener`; here it is a
+    /// script message handler with a three-line shim in front of it, so the page
+    /// has one shell API and neither platform gets a special case.
+    ///
+    /// Without this the status bar was decided once, at `didFinish`, and pressing
+    /// the theme toggle left dark text on a dark bar until the app was relaunched
+    /// — which the Info.plist already claimed was handled, and was not.
+    private func installShellBridge(into controller: WKUserContentController) {
+        bridge.owner = self
+        controller.add(bridge, name: "OverlandShell")
+        controller.addUserScript(WKUserScript(
+            source: """
+            window.OverlandShell = {
+              postMessage: function (m) {
+                window.webkit.messageHandlers.OverlandShell.postMessage(String(m))
+              }
+            }
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+    }
+}
+
+/// Separate, and weak on the way back, because `WKUserContentController` retains
+/// its handlers: registering the view controller directly makes a cycle through
+/// the configuration that nothing ever breaks.
+private final class ShellBridge: NSObject, WKScriptMessageHandler {
+    weak var owner: PlannerViewController?
+
+    func userContentController(_ controller: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        owner?.matchStatusBar(to: message.body as? String)
     }
 }
 

@@ -2545,6 +2545,21 @@ function check(label, condition, detail = '') {
   check('and serves the bundle from a real origin, not file://',
     /setURLSchemeHandler/.test(vc) && !/loadFileURL/.test(vc))
 
+  /* The other half of the theme fix. Android hears about a theme change over a
+     WebMessageListener; iOS hears about it over a script message handler, and
+     the page calls one name on both. Without the shim the page's OverlandShell
+     is undefined here, tellTheShell() returns early, and the status bar keeps
+     whatever it decided at load — which the Info.plist claims it does not. */
+  check('and repaints the status bar when the reader changes theme, not only on load',
+    /addUserScript/.test(vc) && /window\.OverlandShell/.test(vc) &&
+      /WKScriptMessageHandler/.test(vc) && /name:\s*"OverlandShell"/.test(vc))
+
+  /* WKUserContentController retains its handlers, and the handler retaining the
+     view controller closes a loop through the configuration that nothing opens.
+     Registering `self` is the obvious way to write this and it leaks. */
+  check('without the retain cycle that registering self would make',
+    !/controller\.add\(self,/.test(vc) && /weak var owner/.test(vc))
+
   const icon = 'ios/Overland/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png'
   if (!has(icon)) {
     check('the App Store icon exists', false, icon)
