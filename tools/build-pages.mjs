@@ -21,7 +21,7 @@
  * entirely, which is the right answer when the host is genuinely unknown.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,6 +32,23 @@ const read = p => readFileSync(join(root, p), 'utf8')
 // emit nothing absolute", and an empty string is falsy. With `||` that
 // instruction silently became the production domain.
 const ORIGIN = (process.env.SITE_ORIGIN ?? 'https://slowasia.com').replace(/\/$/, '')
+
+/* The fingerprint of the certificate Play signs the app with — not the upload
+ * key, and not in this repository: it is printed in the Play Console under
+ * Setup → App integrity. In the environment, like the affiliate ids, because
+ * it belongs to the account rather than to a checkout.
+ *
+ * Checked here, before a single page is written, because the alternative is
+ * finding out at the end of a build that is otherwise finished. */
+const PLAY_SHA256 = (process.env.PLAY_SHA256 || '').trim().toUpperCase()
+if (PLAY_SHA256 && !/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(PLAY_SHA256)) {
+  console.error(
+    `assetlinks         PLAY_SHA256 is not a SHA-256 fingerprint: ${PLAY_SHA256}\n` +
+      '                   expected 32 hex pairs joined by colons, as the Play' +
+      ' Console prints it'
+  )
+  process.exit(1)
+}
 
 /* Photographs by absolute path rather than inlined. These pages are served
  * from a host that also serves data/photos, and a static page has no reason to
@@ -211,6 +228,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(r.h1)}">
 <meta name="twitter:description" content="${esc(desc)}">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <script type="application/ld+json">${jsonLd(r, plan, url)}</script>
@@ -397,6 +415,7 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="Support">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
@@ -649,6 +668,7 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="Privacy">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
@@ -876,6 +896,7 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="${esc(h1)}">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
@@ -979,6 +1000,107 @@ for (const c of CROSSINGS) {
 writeFileSync(join(OUT, 'support.html'), supportPage(css))
 writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
 
+/* ------------------------------------------------ the app, from the site */
+
+/* Two files that exist for one question: is the Android app already on this
+ * phone? Without them the install strip asks everybody, including the people
+ * who already said yes — which is the fastest way to make a useful offer feel
+ * like an advertisement.
+ *
+ * navigator.getInstalledRelatedApps() answers it, and only answers it when the
+ * site and the app each vouch for the other. This is the site's half:
+ *
+ *   site.webmanifest          names the app the site claims as its own
+ *   .well-known/assetlinks.json   names the app allowed to claim the site
+ *
+ * The app's half is in android/app/src/main/res/values/strings.xml. Both
+ * halves, or the browser reports nothing and the strip simply carries on
+ * asking — which is the failure this degrades to, and it is the harmless one. */
+
+const PLAY_PACKAGE = 'com.overlandsoutheastasia'
+
+writeFileSync(
+  join(OUT, 'site.webmanifest'),
+  JSON.stringify(
+    {
+      name: SITE_NAME,
+      short_name: 'Overland SEA',
+      description: 'Rail-first journey planning across Southeast Asia.',
+      start_url: '/',
+      /* Not "standalone". A manifest is being added here to answer one
+         question, not to turn the site into an installable web app: there is
+         no service worker, so an installed copy would be a browser window with
+         the address bar taken away and no offline story — which is the app's
+         whole point and would be a worse version of it. */
+      display: 'browser',
+      theme_color: '#0a191f',
+      background_color: '#0a191f',
+      icons: [
+        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      ],
+      related_applications: [
+        {
+          platform: 'play',
+          id: PLAY_PACKAGE,
+          url: `https://play.google.com/store/apps/details?id=${PLAY_PACKAGE}`,
+        },
+      ],
+      // Says which one to offer if a browser ever offers either. It is the
+      // native app: it holds the whole network offline and the site cannot.
+      prefer_related_applications: true,
+    },
+    null,
+    2
+  ) + '\n'
+)
+
+cpSync(join(root, 'web/icon-192.png'), join(OUT, 'icon-192.png'))
+cpSync(join(root, 'web/icon-512.png'), join(OUT, 'icon-512.png'))
+
+/* The fingerprint is of the certificate Play signs the app with, which is not
+ * the upload key and is not in this repository — it is printed in the Play
+ * Console under App integrity. It goes in the environment, like the affiliate
+ * ids, because it is per-account rather than per-checkout.
+ *
+ * Unset, no file is written. Google caches a rejected assetlinks.json, so a
+ * placeholder would be worse than an absence: the absence degrades to "the
+ * strip asks everybody", and a wrong fingerprint degrades to the same thing
+ * plus a cache to wait out. Malformed is a build failure rather than a warning
+ * for exactly that reason — it is not a mistake worth deploying. */
+const wellKnown = join(OUT, '.well-known')
+let assetLinks = 'not written — PLAY_SHA256 is not set'
+if (PLAY_SHA256) {
+  mkdirSync(wellKnown, { recursive: true })
+  writeFileSync(
+    join(wellKnown, 'assetlinks.json'),
+    JSON.stringify(
+      [
+        {
+          /* Only this one relation. `handle_all_urls` is what App Links use to
+             let an app open the site's URLs instead of the browser, and this
+             app has no intent filter that claims them — so nothing about
+             tapping a slowasia.com link changes. The statement is here to be
+             the association, not to redirect anyone. */
+          relation: ['delegate_permission/common.handle_all_urls'],
+          target: {
+            namespace: 'android_app',
+            package_name: PLAY_PACKAGE,
+            sha256_cert_fingerprints: [PLAY_SHA256],
+          },
+        },
+      ],
+      null,
+      2
+    ) + '\n'
+  )
+  assetLinks = `${PLAY_PACKAGE} ${PLAY_SHA256.slice(0, 11)}…`
+} else {
+  // A stale one from a build that did have the fingerprint would keep
+  // vouching for a signing key this build cannot confirm.
+  rmSync(wellKnown, { recursive: true, force: true })
+}
+
 // Declared out here only so the summary below can count what was written
 // rather than recomputing it and drifting — which it had, silently.
 let urls = []
@@ -1028,3 +1150,5 @@ console.log(
     ? `sitemap            ${urls.length} urls at ${ORIGIN}/sitemap.xml`
     : 'sitemap            skipped — set SITE_ORIGIN to emit canonical tags and a sitemap'
 )
+console.log(`manifest           site.webmanifest, related app ${PLAY_PACKAGE}`)
+console.log(`assetlinks         ${assetLinks}`)

@@ -18,6 +18,13 @@
       android:hardwareAccelerated="true"
       android:theme="@style/Theme.Overland">
 
+    <!-- See the string itself for what this does and, more importantly, what
+         it does not: it associates the app with slowasia.com so the site can
+         tell whether the app is installed, and it claims no URLs. -->
+    <meta-data
+        android:name="asset_statements"
+        android:resource="@string/asset_statements" />
+
     <activity
         android:name=".MainActivity"
         android:exported="true"

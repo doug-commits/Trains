@@ -26,6 +26,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const TARGETS = [
   { size: 512, out: 'android/play/icon-512.png', label: 'Play listing' },
+  /* The web manifest's, and committed rather than built on the deploy: Vercel
+   * runs the two page builders and nothing that needs a browser, so anything
+   * drawn by Chromium has to already be in the repository by then. */
+  { size: 192, out: 'web/icon-192.png', label: 'web manifest' },
+  { size: 512, out: 'web/icon-512.png', label: 'web manifest' },
   {
     size: 1024,
     out: 'ios/Overland/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png',

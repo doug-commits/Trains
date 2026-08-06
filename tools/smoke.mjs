@@ -36,12 +36,27 @@ async function newPage({ ignore, ...opts } = {}) {
     ...opts,
   })
   const page = await context.newPage()
+  /* Chromium will not fetch a web manifest from a file:// document at all —
+     the origin is opaque, so the request is cross-origin by definition. These
+     pages are opened off disk rather than served, so every one of them logs it
+     and the log is where real errors are supposed to stand out.
+     Suppressed by name, and the anonymous ERR_FAILED that follows only when
+     the named one came first, so nothing else wearing that message is hidden.
+     Over https, which is the only place the manifest does anything, none of
+     this happens. */
+  let manifestBlocked = false
   page.on('console', m => {
     if (m.type() !== 'error') return
+    const text = m.text()
+    if (/site\.webmanifest/.test(text)) {
+      manifestBlocked = true
+      return
+    }
+    if (manifestBlocked && /Failed to load resource: net::ERR_FAILED/.test(text)) return
     // Narrow and stated at the call site, never a blanket mute: the point of
     // collecting these is that nobody has to read the log.
-    if (ignore && ignore.test(m.text())) return
-    problems.push(`console.error: ${m.text()}`)
+    if (ignore && ignore.test(text)) return
+    problems.push(`console.error: ${text}`)
   })
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
   return { page, context }
@@ -2834,6 +2849,79 @@ function check(label, condition, detail = '') {
       check('and it is not asked again', stillGone)
     }
     await context.close()
+  }
+
+  /* ---------------------------------------------- asking only once, ever */
+
+  /* The strip must not ask someone who already installed it. That answer comes
+     from navigator.getInstalledRelatedApps(), which the browser only answers
+     when the site names the app and the app names the site back — so the two
+     halves are checked as well as the behaviour. */
+
+  const PACKAGE = 'com.overlandsoutheastasia'
+  const src = p => readFileSync(join(root, p), 'utf8')
+
+  {
+    const manifest = JSON.parse(src('public/site.webmanifest'))
+    const related = manifest.related_applications || []
+    check('the manifest names the app the site claims',
+      related.some(a => a.platform === 'play' && a.id === PACKAGE),
+      JSON.stringify(related))
+    /* Three files have to agree on one string, and they are in three
+       languages. A rename that misses one gives a strip that offers an app
+       nobody can install, or an install check that never fires. */
+    const gradle = src('android/app/build.gradle.kts')
+    check('and it is the id the app is actually published under',
+      new RegExp(`applicationId\\s*=\\s*"${PACKAGE}"`).test(gradle) &&
+        src('src/appbanner.html').includes(`id=${PACKAGE}`))
+    /* Deliberately not an installable web app: there is no service worker, so
+       an installed copy would be a browser with the address bar removed and no
+       offline story — which is the whole of what the real app offers. */
+    check('and does not offer the site as a web app instead',
+      manifest.display === 'browser' && manifest.prefer_related_applications === true)
+    check('and the pages link it', /rel="manifest"/.test(src('index.html')) &&
+      /rel="manifest"/.test(src(join('public', readdirSync(join(root, 'public'))
+        .find(f => f.endsWith('.html'))))))
+  }
+
+  {
+    const strings = src('android/app/src/main/res/values/strings.xml')
+    const manifest = src('android/app/src/main/AndroidManifest.xml')
+    check('and the app names the site back',
+      /asset_statements/.test(strings) && /slowasia\.com/.test(strings) &&
+        /android:name="asset_statements"/.test(manifest))
+    /* An association, not a claim on the URLs. autoVerify here would take
+       every slowasia.com link on the phone away from the browser and open it
+       in the app — which is a different feature nobody asked for. */
+    check('without taking the site\'s links away from the browser',
+      !/autoVerify/.test(manifest) && !/android\.intent\.category\.BROWSABLE/.test(manifest))
+  }
+
+  {
+    const say = async (label, stub, expect) => {
+      const { page, context } = await newPage(phone(ANDROID))
+      await context.addInitScript(stub)
+      await page.goto(url)
+      await page.waitForTimeout(400)
+      const shown = await page.evaluate(() =>
+        getComputedStyle(document.querySelector('.appbanner')).display !== 'none')
+      check(label, shown === expect, shown ? 'showing' : 'hidden')
+      await context.close()
+    }
+    await say('and having the app already is a reason not to ask',
+      `navigator.getInstalledRelatedApps = () => Promise.resolve(
+         [{ platform: 'play', id: '${PACKAGE}' }])`, false)
+    /* Every way the question can fail to be answered ends the same way: keep
+       asking. A browser without the API, an association that does not verify,
+       somebody else's app — none of them are evidence that this one is
+       installed, and treating them as such hides the strip from everyone. */
+    await say('but a browser that cannot answer is not a yes',
+      'delete navigator.getInstalledRelatedApps', true)
+    await say('nor is an association that does not verify',
+      `navigator.getInstalledRelatedApps = () => Promise.reject(new Error('no'))`, true)
+    await say('nor is somebody else\'s app',
+      `navigator.getInstalledRelatedApps = () => Promise.resolve(
+         [{ platform: 'play', id: 'com.someone.else' }])`, true)
   }
 
   /* The guide pages carry it too, and they are where it matters more: a guide

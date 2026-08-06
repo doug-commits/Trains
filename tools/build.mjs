@@ -283,6 +283,7 @@ const htmlDoc = (photoSet, app, body) => `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${TITLE}</title>
 <meta name="description" content="${DESCRIPTION}">
+${app ? '' : '<!-- The site\'s half of "is the Android app already on this phone?" —\n     it names the app in related_applications, and the app names the site\n     back. Written by tools/build-pages.mjs, alongside the asset links. -->\n<link rel="manifest" href="/site.webmanifest">'}
 ${app ? '' : headMeta()}
 </head>
 <body>

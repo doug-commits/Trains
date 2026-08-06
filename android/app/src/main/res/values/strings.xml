@@ -2,4 +2,25 @@
 <resources>
   <string name="app_name">Overland SEA</string>
   <string name="no_browser">No app available to open that link</string>
+
+  <!-- The app's half of "is this app already on the phone?".
+
+       slowasia.com's manifest names this package in related_applications, and
+       this names the site back. navigator.getInstalledRelatedApps() will only
+       answer when both halves agree, which is the point: a page must not be
+       able to enumerate apps that have not claimed it.
+
+       This is a declaration of association and nothing more. It is not an
+       intent filter, so no slowasia.com link changes where it opens — the
+       browser keeps every one of them. The site's matching statement is at
+       /.well-known/assetlinks.json, written by tools/build-pages.mjs. -->
+  <string name="asset_statements" translatable="false">
+    [{
+      \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+      \"target\": {
+        \"namespace\": \"web\",
+        \"site\": \"https://slowasia.com\"
+      }
+    }]
+  </string>
 </resources>

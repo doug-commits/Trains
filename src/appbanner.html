@@ -28,10 +28,17 @@
       typeof OverlandShell === 'undefined'
     /* Storage is asked separately and allowed to fail. In private mode the
        answer cannot be remembered, and being asked again is a smaller wrong
-       than never being told the app exists. */
+       than never being told the app exists.
+
+       Two answers are remembered here and they are not the same thing. "no" is
+       the reader's, and permanent. "have" is the browser's, and provisional —
+       it is last visit's finding that the app was installed, kept only so that
+       this visit can act on it before painting. */
+    var said = null
     try {
-      if (localStorage.getItem('overlandsea:app') === 'no') ask = false
+      said = localStorage.getItem('overlandsea:app')
     } catch (e) {}
+    if (said === 'no' || said === 'have') ask = false
     if (ask) el.dataset.android = '1'
   })()
 </script>
@@ -56,13 +63,62 @@
   /* Wired here rather than from the program, because the guide pages carry
      this strip too and they do not load the program at all. */
   (function () {
-    var no = document.querySelector('.appbanner-no')
-    if (!no) return
-    no.addEventListener('click', function () {
-      document.documentElement.removeAttribute('data-android')
+    var el = document.documentElement
+    var remember = function (v) {
       try {
-        localStorage.setItem('overlandsea:app', 'no')
+        if (v) localStorage.setItem('overlandsea:app', v)
+        else localStorage.removeItem('overlandsea:app')
       } catch (e) {}
-    })
+    }
+
+    var no = document.querySelector('.appbanner-no')
+    if (no) {
+      no.addEventListener('click', function () {
+        el.removeAttribute('data-android')
+        remember('no')
+      })
+    }
+
+    /* Do not ask someone who already said yes.
+     *
+     * getInstalledRelatedApps reads the manifest's related_applications and
+     * checks it against what is actually on the phone — but only where the
+     * app has also named this site back, in its own asset statements. Both
+     * halves or nothing: it is a deliberately hard question to answer, because
+     * "which of my apps do you have" is not one a page should be able to ask
+     * about apps that are not its own.
+     *
+     * Chrome on Android, and nowhere else. Everywhere else this is absent and
+     * the line below is the whole of the handling.
+     *
+     * It is async, so it cannot run before the first frame, which is why the
+     * answer is written down: a reader who has the app sees the strip once and
+     * never again. Better than the alternative — waiting on a promise before
+     * painting anything, so that everyone who has not installed it looks at a
+     * blank top of the page while the browser decides. */
+    if (!navigator.getInstalledRelatedApps) return
+    navigator.getInstalledRelatedApps().then(
+      function (apps) {
+        var have = apps.some(function (a) {
+          return a.platform === 'play' && a.id === 'com.overlandsoutheastasia'
+        })
+        if (have) {
+          el.removeAttribute('data-android')
+          remember('have')
+          return
+        }
+        /* Uninstalled since. Forget the finding, but do not put the strip back
+           in front of a reader mid-page — it would jump the layout under them
+           for a message they were not waiting for. It returns on the next
+           page they open. */
+        try {
+          if (localStorage.getItem('overlandsea:app') === 'have') remember(null)
+        } catch (e) {}
+      },
+      function () {
+        /* Rejects where the manifest and the app do not agree, which is the
+           same outcome as not being installed: keep asking. */
+      }
+    )
   })()
 </script>

@@ -313,6 +313,29 @@ node tools/smoke.mjs      # drive it in a real browser, write screenshots
 The smoke test needs Playwright and fails on any console error, so run it before
 committing. Screenshots land in `shots/`.
 
+### Build-time environment
+
+Every one of these is optional and every one of them is absent in a fresh
+clone, which builds and behaves correctly without them.
+
+| Variable | What it changes |
+| --- | --- |
+| `SITE_ORIGIN` | Canonical tags and the sitemap. Defaults to the live domain; set it for a preview build, or empty to emit nothing absolute. |
+| `BOOKING_AID`, `SAFETYWING_REF` | Affiliate ids on outbound links. Unset, the links still work and earn nothing. |
+| `PLAY_SHA256` | Writes `/.well-known/assetlinks.json`, which is what lets the site tell whether the Android app is already installed and stop offering it. |
+
+`PLAY_SHA256` is the fingerprint of the certificate **Play** signs the app
+with — not the upload key, which is a different certificate and will not work.
+It is in the Play Console under **Setup → App integrity → App signing key
+certificate**, printed as 32 hex pairs joined by colons. A malformed one fails
+the build rather than being deployed: Google caches a rejected asset links
+file, so a wrong fingerprint costs more than a missing one. Missing, the
+install strip simply asks everybody, which is where it started.
+
+The app's matching half is `asset_statements` in
+`android/app/src/main/res/values/strings.xml`. Both halves are needed; neither
+does anything alone.
+
 ### Regenerating the data files
 
 Both outputs are committed, so you only need these when the inputs change.
