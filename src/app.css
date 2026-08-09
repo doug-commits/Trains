@@ -2602,6 +2602,8 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 .way-go {
   margin-top: auto;
   align-self: flex-start;
+  display: inline-block;
+  text-decoration: none;
   padding: 0.42rem 0.8rem;
   background: none;
   border: 1px solid var(--panel-edge);

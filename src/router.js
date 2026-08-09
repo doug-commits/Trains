@@ -58,16 +58,25 @@ const Router = (() => {
    * connector every sane routing uses. */
   const DETOUR_PENALTY = 4
 
-  /* Two routings sharing more than half their travelling time are the same
-   * answer twice, and offering both is worse than offering one.
+  /* How much travelling an alternative has to contain that the recommendation
+   * does not, before it is a different journey rather than a different train.
    *
-   * Half rather than something looser, because the near misses are the ones
-   * that read as padding: at 0.7 Singapore to Kuala Lumpur came back offering
-   * the identical journey routed through Seremban instead of Tampin, which is
-   * the failure mode this whole function exists to avoid. Tightening it drops
-   * the count across the written guides from 27 to 17 and loses none of the
-   * ones worth having. */
-  const MAX_SHARE = 0.5
+   * Measured in hours and not as a fraction, which was the first attempt and
+   * was wrong. By fraction the two cases are indistinguishable: Singapore to
+   * Kuala Lumpur routed via Seremban instead of Tampin is 47% new, and Bangkok
+   * to Singapore down the Jungle Railway instead of the west coast is 51%. One
+   * is padding and the other is the reason somebody makes the trip. In hours
+   * they are 2.2 and 18.3, and the difference is obvious — because what makes
+   * a journey different is how much of it is different, not what share of a
+   * short trip a short detour happens to be.
+   *
+   * Six is half a waking day of travelling. Below it the two routings are the
+   * same plan with a change of train somewhere in the middle. */
+  const MIN_UNIQUE_HOURS = 6
+
+  /* And a ceiling on sameness regardless, for the case where an alternative is
+   * genuinely long but almost entirely retraces the recommendation. */
+  const MAX_SHARE = 0.9
 
   /* And past this much worse than the recommendation, it is not an alternative
    * — it is a different holiday. Without a ceiling the search will always find
@@ -191,6 +200,15 @@ const Router = (() => {
     // [object Object] and every path of the same length collides.
     const key = r => r.stations.join('>')
 
+    /* Hours in `a` that `b` does not contain. The whole test of whether two
+       routings are different journeys. */
+    const uniqueHours = (a, b) => {
+      const setB = new Set(b.path.map(s => s.leg))
+      return a.path
+        .filter(s => !setB.has(s.leg))
+        .reduce((n, s) => n + (s.leg.hours || 0), 0)
+    }
+
     /* Shared travelling time as a fraction of the shorter of the two, not of
        either one in particular: a long way round that contains the whole of a
        short one is the short one plus a detour, and saying so needs the small
@@ -203,6 +221,8 @@ const Router = (() => {
       const floor = Math.min(hoursOf(a), hoursOf(b))
       return floor ? shared / floor : 1
     }
+
+    const different = (a, b) => uniqueHours(a, b) >= MIN_UNIQUE_HOURS && share(a, b) <= MAX_SHARE
 
     const penalty = new Map()
     const charge = r => {
@@ -221,8 +241,8 @@ const Router = (() => {
       charge(next)
       if (seen.has(key(next))) continue
       seen.add(key(next))
-      if (share(next, best) > MAX_SHARE) continue
-      if (kept.some(k => share(next, k) > MAX_SHARE)) continue
+      if (!different(next, best)) continue
+      if (kept.some(k => !different(next, k))) continue
       if (trueCost(next) / trueCost(best) > MAX_WORSE) continue
       kept.push(next)
     }

@@ -2052,16 +2052,25 @@ const Router = (() => {
    * connector every sane routing uses. */
   const DETOUR_PENALTY = 4
 
-  /* Two routings sharing more than half their travelling time are the same
-   * answer twice, and offering both is worse than offering one.
+  /* How much travelling an alternative has to contain that the recommendation
+   * does not, before it is a different journey rather than a different train.
    *
-   * Half rather than something looser, because the near misses are the ones
-   * that read as padding: at 0.7 Singapore to Kuala Lumpur came back offering
-   * the identical journey routed through Seremban instead of Tampin, which is
-   * the failure mode this whole function exists to avoid. Tightening it drops
-   * the count across the written guides from 27 to 17 and loses none of the
-   * ones worth having. */
-  const MAX_SHARE = 0.5
+   * Measured in hours and not as a fraction, which was the first attempt and
+   * was wrong. By fraction the two cases are indistinguishable: Singapore to
+   * Kuala Lumpur routed via Seremban instead of Tampin is 47% new, and Bangkok
+   * to Singapore down the Jungle Railway instead of the west coast is 51%. One
+   * is padding and the other is the reason somebody makes the trip. In hours
+   * they are 2.2 and 18.3, and the difference is obvious — because what makes
+   * a journey different is how much of it is different, not what share of a
+   * short trip a short detour happens to be.
+   *
+   * Six is half a waking day of travelling. Below it the two routings are the
+   * same plan with a change of train somewhere in the middle. */
+  const MIN_UNIQUE_HOURS = 6
+
+  /* And a ceiling on sameness regardless, for the case where an alternative is
+   * genuinely long but almost entirely retraces the recommendation. */
+  const MAX_SHARE = 0.9
 
   /* And past this much worse than the recommendation, it is not an alternative
    * — it is a different holiday. Without a ceiling the search will always find
@@ -2185,6 +2194,15 @@ const Router = (() => {
     // [object Object] and every path of the same length collides.
     const key = r => r.stations.join('>')
 
+    /* Hours in `a` that `b` does not contain. The whole test of whether two
+       routings are different journeys. */
+    const uniqueHours = (a, b) => {
+      const setB = new Set(b.path.map(s => s.leg))
+      return a.path
+        .filter(s => !setB.has(s.leg))
+        .reduce((n, s) => n + (s.leg.hours || 0), 0)
+    }
+
     /* Shared travelling time as a fraction of the shorter of the two, not of
        either one in particular: a long way round that contains the whole of a
        short one is the short one plus a detour, and saying so needs the small
@@ -2197,6 +2215,8 @@ const Router = (() => {
       const floor = Math.min(hoursOf(a), hoursOf(b))
       return floor ? shared / floor : 1
     }
+
+    const different = (a, b) => uniqueHours(a, b) >= MIN_UNIQUE_HOURS && share(a, b) <= MAX_SHARE
 
     const penalty = new Map()
     const charge = r => {
@@ -2215,8 +2235,8 @@ const Router = (() => {
       charge(next)
       if (seen.has(key(next))) continue
       seen.add(key(next))
-      if (share(next, best) > MAX_SHARE) continue
-      if (kept.some(k => share(next, k) > MAX_SHARE)) continue
+      if (!different(next, best)) continue
+      if (kept.some(k => !different(next, k))) continue
       if (trueCost(next) / trueCost(best) > MAX_WORSE) continue
       kept.push(next)
     }
@@ -5134,7 +5154,7 @@ const UI = (() => {
    * Only where one exists. Most corridors here have exactly one way through,
    * and inventing a second by moving a station would be padding.
    */
-  function waysSection(network, ways, plan) {
+  function waysSection(network, ways, plan, opts) {
     if (!ways || ways.length < 2) return ''
 
     /* What actually separates this routing from the recommended one.
@@ -5152,8 +5172,16 @@ const UI = (() => {
       const theirCountries = new Set(base.plan.countries)
       const fresh = mine.plan.countries.filter(c => !theirCountries.has(c))
 
-      const ours = new Set(base.plan.legs.map(e => e.leg))
-      const only = mine.plan.legs.filter(e => !ours.has(e.leg))
+      /* By the stations an entry touches, not by the leg object.
+       *
+       * A panel entry is a merged run of same-service legs, and where two
+       * routings diverge they merge differently — so comparing entries said
+       * every entry was unique. Bangkok to Singapore then advertised its
+       * Jungle Railway alternative as "15h rail Bangkok to Hat Yai", which
+       * both routings do, rather than as the east-coast line, which only one
+       * of them does. An entry is only this routing's if it reaches somewhere
+       * the recommendation never goes. */
+      const only = mine.plan.legs.filter(e => !seen.has(e.toId) || !seen.has(e.fromId))
       const longest = only.slice().sort((a, b) => b.leg.hours - a.leg.hours)[0]
 
       const bits = []
@@ -5242,7 +5270,9 @@ const UI = (() => {
             ${
               w.current
                 ? ''
-                : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
+                : opts.planHref
+                  ? `<a class="way-go" href="${esc(opts.planHref)}&amp;way=${w.index}">Open this one in the planner</a>`
+                  : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
             }
           </li>`
       })
@@ -5254,9 +5284,11 @@ const UI = (() => {
         <p class="sub">The recommendation is what this planner would do with no
         further information. These are the genuinely different journeys between
         the same two points — not the same route with a station moved, which is
-        why there are two of them and not ten. Choosing one rebuilds everything
-        below it: the map, the nights, the borders and the cost are all
-        downstream of which way you go.</p>
+        why there are two of them and not ten. ${
+          opts.planHref
+            ? 'This page is written around the recommended one; open another in the planner to get its own crossings, nights and costs.'
+            : 'Choosing one rebuilds everything below it: the map, the nights, the borders and the cost are all downstream of which way you go.'
+        }</p>
         <ul class="waylist">${cards}</ul>
       </section>`
   }
@@ -5917,7 +5949,7 @@ const UI = (() => {
           ? `<div class="callout"><h3>Stations that catch people out</h3><ul class="warns">${stationWarnings}</ul></div>`
           : ''
       }
-      ${waysSection(network, ways, plan)}
+      ${waysSection(network, ways, plan, opts)}
       ${routeTable(network, plan)}
       ${clockBlock(network, plan)}
       ${scheduleBlock(network, plan)}

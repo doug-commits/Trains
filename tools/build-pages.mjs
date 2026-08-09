@@ -202,14 +202,40 @@ function page({ r, plan, pages, css }) {
    * the page has its own h1 above it, so every heading the panel emits drops
    * one level — two h1s on a page is a broken outline, and the one a search
    * engine would pick is not the one that names the route. */
+  /* The other ways round, costed here the same as in the planner.
+   *
+   * These pages are most of what anyone reads — a search lands on one of them,
+   * not on the planner — so a feature that only existed behind the JavaScript
+   * was a feature most readers never saw. The difference is what a choice can
+   * do: this page is written around the recommended routing and cannot rewrite
+   * itself, so each alternative links into the planner with the routing already
+   * selected rather than offering a button nothing would answer. */
+  const ways = [
+    { plan, worseBy: 1, index: 0, current: true },
+    ...Router.alternatives(NETWORK, r.from, r.to, {}, 2).map((alt, i) => ({
+      plan: Plan.build(NETWORK, alt, {}),
+      worseBy: alt.worseBy,
+      index: i + 1,
+      current: false,
+    })),
+  ]
+
   const body = demote(
-    UI.itinerary(NETWORK, plan, r.from, r.to, {
-      railOnly: false,
-      date: '',
-      nationality: '',
-      stay: 'room',
-      labels: null,
-    })
+    UI.itinerary(
+      NETWORK,
+      plan,
+      r.from,
+      r.to,
+      {
+        railOnly: false,
+        date: '',
+        nationality: '',
+        stay: 'room',
+        labels: null,
+        planHref: `/#from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`,
+      },
+      ways
+    )
   )
 
   return `<!doctype html>

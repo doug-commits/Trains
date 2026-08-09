@@ -2827,6 +2827,32 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* The guide pages are most of what anyone reads — a search lands on one of
+   them, not on the planner — so an alternative that only exists behind the
+   JavaScript is one most readers never see. */
+{
+  const pages = readdirSync(join(root, 'public')).filter(f => f.endsWith('.html'))
+  const withWays = pages.filter(f =>
+    /Other ways round/.test(readFileSync(join(root, 'public', f), 'utf8')))
+  check('the guide pages carry the alternatives too', withWays.length > 0,
+    `${withWays.length} pages`)
+
+  /* Bangkok to Singapore down the east coast is the case that made the
+     difference test absolute rather than proportional. If it is missing, the
+     filter has gone back to measuring share. */
+  const bkk = readFileSync(join(root, 'public/bangkok-to-singapore-by-train.html'), 'utf8')
+  check('including the Jungle Railway against the west coast',
+    /Other ways round/.test(bkk) && /Jungle Railway|Wakaf|Gua Musang|Kuala Lipis/.test(bkk))
+
+  /* A static page cannot rebuild itself, so the choice has to be a link into
+     the planner with the routing already picked — not a button nothing is
+     listening for. */
+  const one = withWays.map(f => readFileSync(join(root, 'public', f), 'utf8')).find(h => /way-go/.test(h))
+  check('and offer it as a link into the planner rather than a dead button',
+    one && /class="way-go" href="\/#from=[^"]*&amp;way=\d"/.test(one) &&
+      !/<button[^>]*class="way-go"/.test(one))
+}
+
 /* ------------------------------------------------ what stops running, when */
 
 {

@@ -152,7 +152,7 @@ const UI = (() => {
    * Only where one exists. Most corridors here have exactly one way through,
    * and inventing a second by moving a station would be padding.
    */
-  function waysSection(network, ways, plan) {
+  function waysSection(network, ways, plan, opts) {
     if (!ways || ways.length < 2) return ''
 
     /* What actually separates this routing from the recommended one.
@@ -170,8 +170,16 @@ const UI = (() => {
       const theirCountries = new Set(base.plan.countries)
       const fresh = mine.plan.countries.filter(c => !theirCountries.has(c))
 
-      const ours = new Set(base.plan.legs.map(e => e.leg))
-      const only = mine.plan.legs.filter(e => !ours.has(e.leg))
+      /* By the stations an entry touches, not by the leg object.
+       *
+       * A panel entry is a merged run of same-service legs, and where two
+       * routings diverge they merge differently — so comparing entries said
+       * every entry was unique. Bangkok to Singapore then advertised its
+       * Jungle Railway alternative as "15h rail Bangkok to Hat Yai", which
+       * both routings do, rather than as the east-coast line, which only one
+       * of them does. An entry is only this routing's if it reaches somewhere
+       * the recommendation never goes. */
+      const only = mine.plan.legs.filter(e => !seen.has(e.toId) || !seen.has(e.fromId))
       const longest = only.slice().sort((a, b) => b.leg.hours - a.leg.hours)[0]
 
       const bits = []
@@ -260,7 +268,9 @@ const UI = (() => {
             ${
               w.current
                 ? ''
-                : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
+                : opts.planHref
+                  ? `<a class="way-go" href="${esc(opts.planHref)}&amp;way=${w.index}">Open this one in the planner</a>`
+                  : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
             }
           </li>`
       })
@@ -272,9 +282,11 @@ const UI = (() => {
         <p class="sub">The recommendation is what this planner would do with no
         further information. These are the genuinely different journeys between
         the same two points — not the same route with a station moved, which is
-        why there are two of them and not ten. Choosing one rebuilds everything
-        below it: the map, the nights, the borders and the cost are all
-        downstream of which way you go.</p>
+        why there are two of them and not ten. ${
+          opts.planHref
+            ? 'This page is written around the recommended one; open another in the planner to get its own crossings, nights and costs.'
+            : 'Choosing one rebuilds everything below it: the map, the nights, the borders and the cost are all downstream of which way you go.'
+        }</p>
         <ul class="waylist">${cards}</ul>
       </section>`
   }
@@ -935,7 +947,7 @@ const UI = (() => {
           ? `<div class="callout"><h3>Stations that catch people out</h3><ul class="warns">${stationWarnings}</ul></div>`
           : ''
       }
-      ${waysSection(network, ways, plan)}
+      ${waysSection(network, ways, plan, opts)}
       ${routeTable(network, plan)}
       ${clockBlock(network, plan)}
       ${scheduleBlock(network, plan)}
