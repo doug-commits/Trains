@@ -28,6 +28,47 @@ const problems = []
 
 const browser = await chromium.launch()
 
+/* Several checks below read the built app bundle and the built guide pages
+ * rather than the sources they came from, which is the point — a bundle is
+ * where a build mistake shows up. But it also means a stale one passes for the
+ * source it no longer matches, and passing for the wrong reason is worse than
+ * failing. So: refuse to run against an output older than its inputs.
+ *
+ * `npm test` builds all three first and never trips this. Running this file on
+ * its own after an edit will. */
+{
+  // This file is not an input to any of them, and counting it meant every edit
+  // to a check invalidated every build and demanded a rebuild that changed
+  // nothing.
+  const self = fileURLToPath(import.meta.url)
+  const newest = dirs =>
+    dirs.flatMap(d => readdirSync(join(root, d)).map(f => join(root, d, f)))
+      .filter(f => f !== self && statSync(f).isFile())
+      .reduce((n, f) => Math.max(n, statSync(f).mtimeMs), 0)
+
+  const sources = newest(['src', 'data', 'tools'])
+  for (const [what, built, how] of [
+    ['the website', 'index.html', 'node tools/build.mjs'],
+    ['the app bundle', 'dist/app.html', 'APP=1 node tools/build.mjs'],
+    ['the guide pages', 'public/sitemap.xml', 'node tools/build-pages.mjs'],
+  ]) {
+    const at = join(root, built)
+    if (!existsSync(at)) {
+      console.error(`\n${what} has not been built. Run: ${how}\n`)
+      process.exit(1)
+    }
+    if (statSync(at).mtimeMs < sources) {
+      console.error(
+        `\n${what} (${built}) is older than the sources it was built from, so the\n` +
+          `checks below would be testing something nobody is shipping.\n\n  ${how}\n\n` +
+          `or simply: npm test\n`
+      )
+      process.exit(1)
+    }
+  }
+}
+
+
 async function newPage({ ignore, ...opts } = {}) {
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1000 },
@@ -2851,6 +2892,50 @@ function check(label, condition, detail = '') {
   check('and offer it as a link into the planner rather than a dead button',
     one && /class="way-go" href="\/#from=[^"]*&amp;way=\d"/.test(one) &&
       !/<button[^>]*class="way-go"/.test(one))
+}
+
+/* And the app carries all of it.
+ *
+ * The app is the same program in a different package — same src/, same
+ * dist/app.js — so in principle this cannot diverge. In practice the app build
+ * drops the photographs and every website-only section, and "in principle it
+ * cannot" is how a section ends up missing from the half of the audience that
+ * installed it. Checked against the bundle Android and iOS actually ship. */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+  })
+  const bundle = 'file://' + join(root, 'dist/app.html')
+  await page.goto(bundle + '#from=singapore&to=denpasar')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(500)
+
+  check('the app is the app', await page.evaluate(() => document.documentElement.dataset.app === 'true'))
+  const cards = await page.evaluate(() => document.querySelectorAll('.way').length)
+  check('and offers the other ways round as well', cards >= 2, `${cards} cards`)
+  check('and says what stops running', await page.evaluate(() => !!document.querySelector('.clockblock')))
+
+  /* A button, not a link. The guide pages send a reader to the planner because
+     they cannot rebuild themselves; the app is the planner and must not send
+     anyone anywhere — it has no network to send them over. */
+  check('with a control the app can answer itself',
+    await page.evaluate(() => {
+      const el = document.querySelector('.way-go')
+      return !!el && el.tagName === 'BUTTON' && !el.getAttribute('href')
+    }))
+
+  // And it has to work under a finger, which is the only way anyone will use it.
+  const before = await page.evaluate(() => document.querySelectorAll('tr.leg').length)
+  await page.locator('.way-go').first().scrollIntoViewIfNeeded()
+  await page.locator('.way-go').first().tap()
+  await page.waitForTimeout(500)
+  const after = await page.evaluate(() => ({
+    legs: document.querySelectorAll('tr.leg').length,
+    on: document.querySelector('.way.on .way-head b')?.textContent.trim(),
+  }))
+  check('and a tap rebuilds the itinerary around it', after.legs !== before && /Alternative/.test(after.on || ''),
+    `${before} legs -> ${after.legs}, showing ${after.on}`)
+  await context.close()
 }
 
 /* ------------------------------------------------ what stops running, when */
