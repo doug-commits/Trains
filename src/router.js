@@ -51,7 +51,33 @@ const Router = (() => {
     return adj
   }
 
-  function edgeCost(network, leg, opts) {
+  /* How much a leg already used by a route found earlier is charged, when
+   * looking for a route that is genuinely different rather than the same one
+   * with a station swapped. Four is enough to push the search onto another
+   * corridor and not so much that it will cross a continent to avoid a
+   * connector every sane routing uses. */
+  const DETOUR_PENALTY = 4
+
+  /* Two routings sharing more than half their travelling time are the same
+   * answer twice, and offering both is worse than offering one.
+   *
+   * Half rather than something looser, because the near misses are the ones
+   * that read as padding: at 0.7 Singapore to Kuala Lumpur came back offering
+   * the identical journey routed through Seremban instead of Tampin, which is
+   * the failure mode this whole function exists to avoid. Tightening it drops
+   * the count across the written guides from 27 to 17 and loses none of the
+   * ones worth having. */
+  const MAX_SHARE = 0.5
+
+  /* And past this much worse than the recommendation, it is not an alternative
+   * — it is a different holiday. Without a ceiling the search will always find
+   * something, so Woodlands to Singapore, half an hour on the MRT, came back
+   * offering three days through Sumatra at twenty-five times the cost. Two
+   * and a bit is wide enough for the real ones: the Sumatran coach chain
+   * against the Jakarta ship is 1.6. */
+  const MAX_WORSE = 2.2
+
+  function edgeCost(network, leg, opts, penalty) {
     const weight =
       leg.mode === 'road' && leg.essential
         ? ESSENTIAL_ROAD_WEIGHT
@@ -65,14 +91,18 @@ const Router = (() => {
     if (leg.scenic && opts.preferScenic !== false) cost -= SCENIC_BONUS
     if (leg.confidence === 'verify') cost += 1.5 // prefer legs we can stand behind
 
-    return Math.max(0.1, cost)
+    cost = Math.max(0.1, cost)
+    // Applied last and to the finished figure, so a leg that was nearly free
+    // is still discouraged rather than staying nearly free.
+    if (penalty) cost *= penalty.get(leg) ?? 1
+    return cost
   }
 
   /**
    * @returns {{path: object[], stations: string[]} | null}
    *          path is an ordered list of {leg, from, to} in travel direction.
    */
-  function route(network, fromId, toId, opts = {}) {
+  function route(network, fromId, toId, opts = {}, penalty = null) {
     if (fromId === toId) return null
     if (!network.stations[fromId] || !network.stations[toId]) return null
 
@@ -101,7 +131,7 @@ const Router = (() => {
 
       for (const edge of adj.get(current) ?? []) {
         if (done.has(edge.to)) continue
-        const next = best + edgeCost(network, edge.leg, opts)
+        const next = best + edgeCost(network, edge.leg, opts, penalty)
         if (next < (dist.get(edge.to) ?? Infinity)) {
           dist.set(edge.to, next)
           prev.set(edge.to, { from: current, edge })
@@ -129,6 +159,84 @@ const Router = (() => {
     return { path, stations: [fromId, ...path.map(s => s.to)] }
   }
 
+  /* The other ways round.
+   *
+   * One answer is the right default — a planner that opens with four options is
+   * asking the reader to do the work it was built to do. But one answer is
+   * wrong whenever the reader knows something the cost function does not: that
+   * they have a week rather than four days, that the weekly boat sails
+   * tomorrow, that they have already seen Sumatra. The complaint that produced
+   * this was exactly that shape — a real ship the router had no edge for, and a
+   * reader who could see it was missing.
+   *
+   * Not Yen's algorithm, which is the textbook answer and the wrong one here:
+   * its k-shortest paths differ by a station at a time, so the second, third
+   * and fourth are the first with a stop moved. This charges every leg an
+   * earlier answer used, which pushes the search onto a different corridor
+   * instead, and then throws away anything that still overlaps too much. What
+   * comes back is two or three genuinely different journeys, or nothing —
+   * nothing being the honest answer when the map only offers one way.
+   *
+   * Each is costed as if it had never been penalised, so the figures shown
+   * against it are the real ones.
+   */
+  function alternatives(network, fromId, toId, opts = {}, want = 2) {
+    const best = route(network, fromId, toId, opts)
+    if (!best) return []
+
+    const trueCost = r =>
+      r.path.reduce((n, s) => n + edgeCost(network, s.leg, opts, null), 0)
+    const hoursOf = r => r.path.reduce((n, s) => n + (s.leg.hours || 0), 0)
+    // The stations, not the legs: joining leg objects gives a row of
+    // [object Object] and every path of the same length collides.
+    const key = r => r.stations.join('>')
+
+    /* Shared travelling time as a fraction of the shorter of the two, not of
+       either one in particular: a long way round that contains the whole of a
+       short one is the short one plus a detour, and saying so needs the small
+       denominator. */
+    const share = (a, b) => {
+      const setB = new Set(b.path.map(s => s.leg))
+      const shared = a.path
+        .filter(s => setB.has(s.leg))
+        .reduce((n, s) => n + (s.leg.hours || 0), 0)
+      const floor = Math.min(hoursOf(a), hoursOf(b))
+      return floor ? shared / floor : 1
+    }
+
+    const penalty = new Map()
+    const charge = r => {
+      for (const s of r.path) penalty.set(s.leg, (penalty.get(s.leg) ?? 1) * DETOUR_PENALTY)
+    }
+    charge(best)
+
+    const kept = []
+    const seen = new Set([key(best)])
+    /* Bounded rather than looping until it finds enough: on a corridor with
+       genuinely one way through, every round returns the same path and the
+       loop would never end. Twice what is wanted, plus one. */
+    for (let round = 0; round < want * 2 + 1 && kept.length < want; round++) {
+      const next = route(network, fromId, toId, opts, penalty)
+      if (!next || !next.path.length) break
+      charge(next)
+      if (seen.has(key(next))) continue
+      seen.add(key(next))
+      if (share(next, best) > MAX_SHARE) continue
+      if (kept.some(k => share(next, k) > MAX_SHARE)) continue
+      if (trueCost(next) / trueCost(best) > MAX_WORSE) continue
+      kept.push(next)
+    }
+
+    const baseline = trueCost(best)
+    return kept.map(r => ({
+      ...r,
+      // Ranked against the recommendation rather than each other, because the
+      // question a reader is asking is "what does this cost me over the one
+      // you picked?"
+      worseBy: trueCost(r) / baseline,
+    }))
+  }
+
   /** Which stations are reachable at all — used to explain a failed route. */
   function reachable(network, fromId, opts = {}) {
     const adj = buildAdjacency(network, opts)
@@ -146,5 +254,5 @@ const Router = (() => {
     return seen
   }
 
-  return { route, reachable, MODE_WEIGHT }
+  return { route, alternatives, reachable, MODE_WEIGHT }
 })()

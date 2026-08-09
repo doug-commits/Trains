@@ -60,7 +60,7 @@ Nothing is collected. No account, no sign-in, no analytics, no advertising, no t
 
 WHAT IT COVERS
 
-203 stations, piers and border posts across Thailand, Malaysia, Singapore, Laos, Cambodia, Vietnam, Indonesia, Myanmar, Brunei, the Philippines and southern China — 232 legs and 17 international crossings.
+203 stations, piers and border posts across Thailand, Malaysia, Singapore, Laos, Cambodia, Vietnam, Indonesia, Myanmar, Brunei, the Philippines and southern China — 234 legs and 17 international crossings.
 
 There is exactly one long continuous passenger rail spine in mainland Southeast Asia: Kunming to Vientiane, a taxi across Vientiane, then Nong Khai to Bangkok to Hat Yai to Padang Besar to Kuala Lumpur to JB Sentral to Singapore. Everything else is a branch or an island. Cambodia hangs off that spine at Aranyaprathet. Vietnam is a self-contained north-south line touching no neighbour's network. Indonesia is reachable only by sea. Myanmar is isolated. The app knows this, and will tell you when the honest answer is that there is no way through.
 

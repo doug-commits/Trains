@@ -70,6 +70,16 @@ const NETWORK = {
    * how the ticket is actually bought. Never invent a URL to fill the column: a
    * dead booking link is worse than an honest "buy it at the pier".
    */
+    /* The names behind the two-letter codes every station carries.
+     * Here rather than in each consumer, because the planner, the panel and
+     * the static page builder all needed them and all had their own copy —
+     * three lists that agreed until one of them did not. */
+    countryNames: {
+      cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
+      my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia',
+      ph: 'Philippines', mm: 'Myanmar',
+    },
+
   operators: {
     // --- rail
     lcr:   { name: 'Laos–China Railway', short: 'LCR', mono: 'LCR', livery: '#c8102e', ink: '#fff',
@@ -135,6 +145,10 @@ const NETWORK = {
     localferry:    { name: 'Local ferry', short: 'Local ferry', mono: 'FRY', livery: '#4b7c8c', ink: '#fff',
                      daily: { n: 'several', spread: 'through daylight hours — check the last departure when you arrive' }, punctual: 'weather', book: null, bookVia: 'counter',
                      bookNote: 'Bought at the pier. Turn up, check the last departure when you arrive, and do not be the one still on the dock.', note: '' },
+    pelni:         { name: 'Pelni', short: 'Pelni', mono: 'PELNI', livery: '#0b5c9e', ink: '#fff',
+                     daily: { n: '1–2 a week', spread: 'a scheduled shipping line, not a ferry — a sailing is a date, not a time of day' }, punctual: 'weather', book: 'https://www.pelni.co.id',
+                     bookNote: 'Books online and through the Pelni app, and sells at the port. Economy is a numbered berth in an open dormitory; the cabin classes are a few dollars more and worth it on anything overnight.',
+                     note: 'Indonesia\'s state shipping line. Its ships are what make the Sumatra coach chain optional — one boat replaces three days of buses.' },
     twogo:         { name: '2GO Travel', short: '2GO', mono: '2GO', livery: '#0a5ba8', ink: '#fff',
                      daily: { n: '1–3 a week', spread: 'a shipping line, not a ferry — check the sailing list first' }, punctual: 'weather', book: 'https://travel.2go.com.ph',
                      bookNote: 'The Philippines\' main long-haul shipping line, and genuinely bookable from abroad. Cabin classes are worth the small difference over the open tourist deck on anything overnight.',
@@ -684,6 +698,18 @@ const NETWORK = {
     { from: 'portklang', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Port Klang–Dumai international ferry', hours: 5.0, usd: 45, border: 'dumai', confidence: 'verify' },
     { from: 'georgetown', to: 'belawan', mode: 'ferry', op: 'riauferry', service: 'Penang–Belawan ferry', hours: 5.0, usd: 50, border: 'belawan', confidence: 'verify',
       note: 'Historically operated, intermittent. When running it shortcuts the whole peninsula.' },
+
+    // === Pelni: the ships that make Sumatra optional ====================
+    // The Riau ferries above are hops between islands. These are a shipping
+    // line: one boat, a day and a half at sea, and the whole of the Sumatran
+    // coach chain skipped. The trade is frequency — a sailing is a date, not a
+    // departure time, and missing one costs the better part of a week.
+    { from: 'batam', to: 'jakarta', mode: 'ferry', op: 'pelni', service: 'Pelni KM Kelud (Batu Ampar – Tanjung Priok)', hours: 32.0, usd: 28, sleeper: true, cls: 'Economy berth', scenic: true,
+      daily: { n: 'about weekly', spread: 'the Jakarta sailing is normally the Wednesday one; the rotation alternates via Tanjung Balai Karimun and Bintan' }, confidence: 'reported',
+      note: 'The reason not to cross Sumatra by coach. Batu Ampar to Tanjung Priok in about a day and a third, arriving in Jakarta itself rather than at the far end of three bus days. Economy is a berth in an open dormitory from around $26; a cabin is roughly $80. Book ahead around Idul Fitri, when this ship is how a good part of Sumatra goes home.' },
+    { from: 'batam', to: 'belawan', mode: 'ferry', op: 'pelni', service: 'Pelni KM Kelud (Batu Ampar – Belawan)', hours: 28.0, usd: 20, sleeper: true, cls: 'Economy berth',
+      daily: { n: '1–2 a week', spread: 'the Belawan sailing is normally the Sunday one' }, confidence: 'reported',
+      note: 'The same ship, northbound. Belawan is Medan\'s port and half an hour from the city, so this reaches north Sumatra without the fourteen-hour coach from Pekanbaru.' },
 
     // === Sumatra =======================================================
     { from: 'belawan', to: 'medan', mode: 'road', op: 'transfer', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },
@@ -2019,7 +2045,33 @@ const Router = (() => {
     return adj
   }
 
-  function edgeCost(network, leg, opts) {
+  /* How much a leg already used by a route found earlier is charged, when
+   * looking for a route that is genuinely different rather than the same one
+   * with a station swapped. Four is enough to push the search onto another
+   * corridor and not so much that it will cross a continent to avoid a
+   * connector every sane routing uses. */
+  const DETOUR_PENALTY = 4
+
+  /* Two routings sharing more than half their travelling time are the same
+   * answer twice, and offering both is worse than offering one.
+   *
+   * Half rather than something looser, because the near misses are the ones
+   * that read as padding: at 0.7 Singapore to Kuala Lumpur came back offering
+   * the identical journey routed through Seremban instead of Tampin, which is
+   * the failure mode this whole function exists to avoid. Tightening it drops
+   * the count across the written guides from 27 to 17 and loses none of the
+   * ones worth having. */
+  const MAX_SHARE = 0.5
+
+  /* And past this much worse than the recommendation, it is not an alternative
+   * — it is a different holiday. Without a ceiling the search will always find
+   * something, so Woodlands to Singapore, half an hour on the MRT, came back
+   * offering three days through Sumatra at twenty-five times the cost. Two
+   * and a bit is wide enough for the real ones: the Sumatran coach chain
+   * against the Jakarta ship is 1.6. */
+  const MAX_WORSE = 2.2
+
+  function edgeCost(network, leg, opts, penalty) {
     const weight =
       leg.mode === 'road' && leg.essential
         ? ESSENTIAL_ROAD_WEIGHT
@@ -2033,14 +2085,18 @@ const Router = (() => {
     if (leg.scenic && opts.preferScenic !== false) cost -= SCENIC_BONUS
     if (leg.confidence === 'verify') cost += 1.5 // prefer legs we can stand behind
 
-    return Math.max(0.1, cost)
+    cost = Math.max(0.1, cost)
+    // Applied last and to the finished figure, so a leg that was nearly free
+    // is still discouraged rather than staying nearly free.
+    if (penalty) cost *= penalty.get(leg) ?? 1
+    return cost
   }
 
   /**
    * @returns {{path: object[], stations: string[]} | null}
    *          path is an ordered list of {leg, from, to} in travel direction.
    */
-  function route(network, fromId, toId, opts = {}) {
+  function route(network, fromId, toId, opts = {}, penalty = null) {
     if (fromId === toId) return null
     if (!network.stations[fromId] || !network.stations[toId]) return null
 
@@ -2069,7 +2125,7 @@ const Router = (() => {
 
       for (const edge of adj.get(current) ?? []) {
         if (done.has(edge.to)) continue
-        const next = best + edgeCost(network, edge.leg, opts)
+        const next = best + edgeCost(network, edge.leg, opts, penalty)
         if (next < (dist.get(edge.to) ?? Infinity)) {
           dist.set(edge.to, next)
           prev.set(edge.to, { from: current, edge })
@@ -2097,6 +2153,84 @@ const Router = (() => {
     return { path, stations: [fromId, ...path.map(s => s.to)] }
   }
 
+  /* The other ways round.
+   *
+   * One answer is the right default — a planner that opens with four options is
+   * asking the reader to do the work it was built to do. But one answer is
+   * wrong whenever the reader knows something the cost function does not: that
+   * they have a week rather than four days, that the weekly boat sails
+   * tomorrow, that they have already seen Sumatra. The complaint that produced
+   * this was exactly that shape — a real ship the router had no edge for, and a
+   * reader who could see it was missing.
+   *
+   * Not Yen's algorithm, which is the textbook answer and the wrong one here:
+   * its k-shortest paths differ by a station at a time, so the second, third
+   * and fourth are the first with a stop moved. This charges every leg an
+   * earlier answer used, which pushes the search onto a different corridor
+   * instead, and then throws away anything that still overlaps too much. What
+   * comes back is two or three genuinely different journeys, or nothing —
+   * nothing being the honest answer when the map only offers one way.
+   *
+   * Each is costed as if it had never been penalised, so the figures shown
+   * against it are the real ones.
+   */
+  function alternatives(network, fromId, toId, opts = {}, want = 2) {
+    const best = route(network, fromId, toId, opts)
+    if (!best) return []
+
+    const trueCost = r =>
+      r.path.reduce((n, s) => n + edgeCost(network, s.leg, opts, null), 0)
+    const hoursOf = r => r.path.reduce((n, s) => n + (s.leg.hours || 0), 0)
+    // The stations, not the legs: joining leg objects gives a row of
+    // [object Object] and every path of the same length collides.
+    const key = r => r.stations.join('>')
+
+    /* Shared travelling time as a fraction of the shorter of the two, not of
+       either one in particular: a long way round that contains the whole of a
+       short one is the short one plus a detour, and saying so needs the small
+       denominator. */
+    const share = (a, b) => {
+      const setB = new Set(b.path.map(s => s.leg))
+      const shared = a.path
+        .filter(s => setB.has(s.leg))
+        .reduce((n, s) => n + (s.leg.hours || 0), 0)
+      const floor = Math.min(hoursOf(a), hoursOf(b))
+      return floor ? shared / floor : 1
+    }
+
+    const penalty = new Map()
+    const charge = r => {
+      for (const s of r.path) penalty.set(s.leg, (penalty.get(s.leg) ?? 1) * DETOUR_PENALTY)
+    }
+    charge(best)
+
+    const kept = []
+    const seen = new Set([key(best)])
+    /* Bounded rather than looping until it finds enough: on a corridor with
+       genuinely one way through, every round returns the same path and the
+       loop would never end. Twice what is wanted, plus one. */
+    for (let round = 0; round < want * 2 + 1 && kept.length < want; round++) {
+      const next = route(network, fromId, toId, opts, penalty)
+      if (!next || !next.path.length) break
+      charge(next)
+      if (seen.has(key(next))) continue
+      seen.add(key(next))
+      if (share(next, best) > MAX_SHARE) continue
+      if (kept.some(k => share(next, k) > MAX_SHARE)) continue
+      if (trueCost(next) / trueCost(best) > MAX_WORSE) continue
+      kept.push(next)
+    }
+
+    const baseline = trueCost(best)
+    return kept.map(r => ({
+      ...r,
+      // Ranked against the recommendation rather than each other, because the
+      // question a reader is asking is "what does this cost me over the one
+      // you picked?"
+      worseBy: trueCost(r) / baseline,
+    }))
+  }
+
   /** Which stations are reachable at all — used to explain a failed route. */
   function reachable(network, fromId, opts = {}) {
     const adj = buildAdjacency(network, opts)
@@ -2114,7 +2248,7 @@ const Router = (() => {
     return seen
   }
 
-  return { route, reachable, MODE_WEIGHT }
+  return { route, alternatives, reachable, MODE_WEIGHT }
 })()
 
 
@@ -4860,6 +4994,14 @@ const UI = (() => {
 
   const MODE_LABEL = { rail: 'Rail', ferry: 'Sea', road: 'Road' }
 
+  // Two of the eleven take a definite article and reading "Through Philippines"
+  // once is enough to want this.
+  const THE = new Set(['Philippines'])
+  const countryName = (network, code) => {
+    const name = network.countryNames?.[code] || code
+    return THE.has(name) ? `the ${name}` : name
+  }
+
   function hours(h) {
     if (h == null) return '—'
     if (h < 1) return `${Math.round(h * 60)}m`
@@ -4978,6 +5120,236 @@ const UI = (() => {
           `<div class="stat${kind ? ' is-' + kind : ''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`
       )
       .join('')}</div>`
+  }
+
+  /* The other ways round, and what each one trades.
+   *
+   * A router that shows one answer is asking to be trusted about a judgement
+   * it cannot make: whether you have the extra two days, whether you would
+   * rather be on a boat than a coach, whether you have already seen Sumatra.
+   * The cost function encodes a defensible default and nothing more, so where
+   * a genuinely different journey exists it goes on the page beside the
+   * recommendation with its own numbers.
+   *
+   * Only where one exists. Most corridors here have exactly one way through,
+   * and inventing a second by moving a station would be padding.
+   */
+  function waysSection(network, ways, plan) {
+    if (!ways || ways.length < 2) return ''
+
+    /* What actually separates this routing from the recommended one.
+     *
+     * The first version of this listed new operators and the first three
+     * unfamiliar stations, and for Singapore to Bali it produced "Urban metro
+     * and KTMB · via Singapore, Johor Bahru, Kluang and 14 more" — every word
+     * true and not one of them the point, which is that this one crosses
+     * Sumatra by coach instead of sailing to Jakarta. So: countries first,
+     * because a different country is the difference anyone would notice; then
+     * the single longest leg that is unique to this way, because that is what
+     * the day will actually feel like. */
+    const distinguish = (mine, base) => {
+      const seen = new Set(base.plan.stationIds)
+      const theirCountries = new Set(base.plan.countries)
+      const fresh = mine.plan.countries.filter(c => !theirCountries.has(c))
+
+      const ours = new Set(base.plan.legs.map(e => e.leg))
+      const only = mine.plan.legs.filter(e => !ours.has(e.leg))
+      const longest = only.slice().sort((a, b) => b.leg.hours - a.leg.hours)[0]
+
+      const bits = []
+      if (fresh.length) {
+        bits.push(`Through ${fresh.map(c => countryName(network, c)).join(' and ')}`)
+      } else {
+        /* Not the endpoints. Both routings start and finish in the same
+           place, and "Via Manila" on a journey out of Manila is the kind of
+           line that makes a reader stop trusting the rest of the page. */
+        /* By city, not by id. Manila has two stations on this map — the
+           terminus and the pier — so excluding the id let "Via Manila" back
+           onto a card for a journey that starts in Manila. */
+        const ids = mine.plan.stationIds
+        const ends = new Set(
+          [ids[0], ids[ids.length - 1]].map(id => network.stations[id]?.city)
+        )
+        const where = ids.filter(
+          id => !seen.has(id) && !ends.has(network.stations[id]?.city)
+        )
+        if (where.length) {
+          bits.push(`Via ${network.stations[where[0]]?.city || where[0]}`)
+        }
+      }
+      if (longest) {
+        bits.push(
+          `${hours(longest.leg.hours)} ${MODE_LABEL[longest.leg.mode].toLowerCase()} ` +
+            `${longest.fromCity} to ${longest.toCity}`
+        )
+      }
+      return bits.join(', ')
+    }
+
+    /* Against the recommendation, in the units a traveller feels — days, money
+     * and hours on a road — rather than the router's own cost, which is a
+     * weighting and not a thing anyone can check.
+     *
+     * Written as a phrase rather than signed numbers: "+3 days · +$150 · +18 h
+     * by road than the recommendation" parsed as a sum on first reading, and
+     * the sign on a saving is exactly the thing people misread. */
+    const versus = (mine, base) => {
+      const a = mine.plan.totals
+      const b = base.plan.totals
+      const out = []
+      const more = (n, one, many) =>
+        `${Math.abs(n)} ${Math.abs(n) === 1 ? one : many} ${n > 0 ? 'longer' : 'shorter'}`
+
+      const day = a.days - b.days
+      if (day) out.push(more(day, 'day', 'days'))
+      const usd = Math.round(a.totalUsd - b.totalUsd)
+      if (usd) out.push(`${money(Math.abs(usd))} ${usd > 0 ? 'dearer' : 'cheaper'}`)
+      const road = Math.round(a.roadHours - b.roadHours)
+      if (road) out.push(`${Math.abs(road)} h ${road > 0 ? 'more' : 'less'} on a road`)
+
+      if (!out.length) return 'Much the same on every count — a different way, not a worse one.'
+      const last = out.pop()
+      return `${out.length ? `${out.join(', ')} and ${last}` : last}.`
+        .replace(/^./, c => c.toUpperCase())
+    }
+
+    const base = ways[0]
+    const cards = ways
+      .map(w => {
+        const t = w.plan.totals
+        const what =
+          w.index === 0
+            ? `Through ${w.plan.countries.map(c => countryName(network, c)).join(', ')}`
+            : distinguish(w, base) || 'Another way round'
+        return `
+          <li class="way${w.current ? ' on' : ''}">
+            <div class="way-head">
+              <b>${esc(w.index === 0 ? 'Recommended' : `Alternative ${w.index}`)}</b>
+              ${w.current ? '<span class="way-now">showing</span>' : ''}
+            </div>
+            <p class="way-what">${esc(what)}</p>
+            <p class="way-nums">
+              <span>${esc(hours(t.movingHours))} moving</span>
+              <span>${t.days} ${t.days === 1 ? 'day' : 'days'}</span>
+              <span>${esc(money(t.totalUsd))}</span>
+              <span>${t.legs} ${t.legs === 1 ? 'leg' : 'legs'}</span>
+            </p>
+            ${
+              w.index === 0
+                ? '<p class="way-vs">Rails as far as they go, a boat where the land ends.</p>'
+                : `<p class="way-vs">${esc(versus(w, base))}</p>`
+            }
+            ${
+              w.current
+                ? ''
+                : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
+            }
+          </li>`
+      })
+      .join('')
+
+    return `
+      <section class="block ways">
+        <h2>Other ways round</h2>
+        <p class="sub">The recommendation is what this planner would do with no
+        further information. These are the genuinely different journeys between
+        the same two points — not the same route with a station moved, which is
+        why there are two of them and not ten. Choosing one rebuilds everything
+        below it: the map, the nights, the borders and the cost are all
+        downstream of which way you go.</p>
+        <ul class="waylist">${cards}</ul>
+      </section>`
+  }
+
+  /* The clock, as far as this planner is honestly able to give you one.
+   *
+   * People ask for a timetable and the page has always refused, for a good
+   * reason: nine operators here publish in nine formats, several publish
+   * nothing, and a departure time is specific to a date and a direction. A
+   * planner that prints one is inviting somebody to stand on a platform at the
+   * time it made up.
+   *
+   * But refusing the whole question was too clean. What the data does hold,
+   * for about half the legs on this map, is when a service stops for the day —
+   * and that single number is the one that actually strands people. Nobody
+   * misses a connection because they did not know the 14:05 existed. They miss
+   * it because the last boat went at 17:00 and the train got in at 17:20.
+   *
+   * So: not a timetable. The legs that stop, and which of them decides the
+   * day. Every figure here is one that was already checked against the
+   * operator; nothing is derived and nothing is estimated.
+   */
+  function clockBlock(network, plan) {
+    const clock = /\d{1,2}:\d{2}/
+    const stopping = plan.legs
+      .map(entry => {
+        const d = entry.leg.daily || entry.operator?.daily
+        if (!d) return null
+        const last = d.last && clock.test(String(d.last)) ? String(d.last) : null
+        // A row earns its place by having a clock time somewhere, but once it
+        // is here the prose is shown whether or not it contains one: "roughly
+        // hourly from HarbourFront" is the answer to "when does it run", and
+        // printing "not recorded" beside a last sailing of 21:00 was not.
+        if (!last && !clock.test(d.spread || '')) return null
+        return { entry, last, window: d.spread || null }
+      })
+      .filter(Boolean)
+
+    if (!stopping.length) return ''
+
+    /* The earliest last departure on the route. Not a claim that it is the one
+       that will catch you — that depends on the day you start and which train
+       you took out of the previous town — but it is the one to plan backwards
+       from, and it is the one to look at first. */
+    /* And only worth naming if it is early enough to change what you do. The
+       first version of this told a reader to plan backwards from a shuttle
+       that runs every half hour until 23:45, which is true, useless, and the
+       sort of thing that teaches people to skip the box. */
+    const EARLY = '20:00'
+    const binding = stopping
+      .filter(s => s.last && s.last < EARLY)
+      .sort((a, b) => a.last.localeCompare(b.last))[0]
+
+    const rows = stopping
+      .map(
+        s => `
+        <tr${s === binding ? ' class="binds"' : ''}>
+          <td class="where">
+            <b>${esc(s.entry.fromName)}</b>
+            <span class="arrow" aria-hidden="true">→</span>
+            <b>${esc(s.entry.toName)}</b>
+            <span class="svc">${esc(s.entry.leg.service)}</span>
+          </td>
+          <td>${s.window ? esc(s.window) : '<span class="muted">not recorded</span>'}</td>
+          <td class="num-col">${s.last ? esc(s.last) : '—'}</td>
+        </tr>`
+      )
+      .join('')
+
+    return `
+      <section class="block clockblock">
+        <h2>What stops running, and when</h2>
+        <p class="sub">Not a timetable — this planner will not print a departure
+        time it cannot stand behind, and no two operators here publish in a way
+        that would let it. This is the other half of the question, and the half
+        that strands people: which legs stop for the day, and how late. Nobody
+        misses a connection for want of knowing the 14:05 existed. They miss it
+        because the last boat went at 17:00.</p>
+        ${
+          binding
+            ? `<p class="clock-binds">Plan backwards from the
+               <b>${esc(binding.last)}</b> ${esc(binding.entry.fromCity)} to
+               ${esc(binding.entry.toCity)} — it is the earliest door to close on
+               this route.</p>`
+            : ''
+        }
+        <div class="table-wrap">
+          <table class="route clock">
+            <thead><tr><th>Leg</th><th>Runs</th><th class="num-col">Last</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </section>`
   }
 
   /* A destination image. A real photograph wins; the drawn illustration is the
@@ -5503,7 +5875,7 @@ const UI = (() => {
 
   /* ------------------------------------------------------------ assembled */
 
-  function itinerary(network, plan, fromId, toId, opts) {
+  function itinerary(network, plan, fromId, toId, opts, ways) {
     const from = network.stations[fromId]
     const to = network.stations[toId]
     const t = plan.totals
@@ -5545,7 +5917,9 @@ const UI = (() => {
           ? `<div class="callout"><h3>Stations that catch people out</h3><ul class="warns">${stationWarnings}</ul></div>`
           : ''
       }
+      ${waysSection(network, ways, plan)}
       ${routeTable(network, plan)}
+      ${clockBlock(network, plan)}
       ${scheduleBlock(network, plan)}
       ${lodgingSection(network, plan)}
       ${borderSection(network, plan)}
@@ -5753,10 +6127,7 @@ const UI = (() => {
  */
 
 ;(function () {
-  const COUNTRY_NAME = {
-    cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
-    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', ph: 'Philippines', mm: 'Myanmar',
-  }
+  const COUNTRY_NAME = NETWORK.countryNames
   const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'bn', 'id', 'ph', 'mm']
 
   const PRESETS = [
@@ -5844,6 +6215,10 @@ const UI = (() => {
     pace: 'standard',
     stay: 'room',
     plan: null,
+    /* Which routing is being shown: 0 is the recommendation, 1 and 2 are the
+       other ways round. Lives in the URL, so a link to "the long way through
+       Sumatra" is a link somebody else opens on the same route. */
+    variant: 0,
     // Set only when the question named places rather than stations, so the
     // answer can be headlined in the words that were actually used.
     labels: null,
@@ -5991,7 +6366,25 @@ const UI = (() => {
       stay: state.stay,
       labels: state.labels,
     }
+    /* The recommendation, and the other ways round it found on the way.
+     *
+     * Costed once here rather than in the panel, because the alternatives are
+     * not decoration — one of them can be adopted, and the moment it is, it is
+     * the itinerary. So they are built as full plans and the reader picks
+     * which one this page is about. */
     const routed = Router.route(NETWORK, state.from, state.to, opts)
+    const others = routed ? Router.alternatives(NETWORK, state.from, state.to, opts, 2) : []
+    // A variant remembered from a previous pair of stations is meaningless
+    // against this one, and index 3 of a list of one is a crash.
+    const pair = `${state.from}>${state.to}`
+    // `lastPair === null` is the first run, where the variant came out of the
+    // URL and is the whole point of the link — only a *change* of route clears
+    // it, not the absence of a previous one.
+    if (state.variant > others.length || (lastPair !== null && lastPair !== pair)) {
+      state.variant = 0
+    }
+    lastPair = pair
+    const chosen = state.variant ? others[state.variant - 1] : routed
 
     if (!routed) {
       state.plan = null
@@ -6004,11 +6397,20 @@ const UI = (() => {
       return
     }
 
-    const plan = Plan.build(NETWORK, routed, opts)
+    const plan = Plan.build(NETWORK, chosen, opts)
     state.plan = plan
     app.dataset.active = 'true'
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
-    panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
+    /* Every routing, costed, with the one being shown marked. The panel needs
+       all of them to describe the choice, and needs to know which is on screen
+       to say so. */
+    const ways = [routed, ...others].map((r, i) => ({
+      plan: i === state.variant ? plan : Plan.build(NETWORK, r, opts),
+      worseBy: r.worseBy ?? 1,
+      index: i,
+      current: i === state.variant,
+    }))
+    panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts, ways)
     resetScroll(true)
     paintScenes()
     bindPanel()
@@ -6057,6 +6459,18 @@ const UI = (() => {
   )
 
   function bindPanel() {
+    /* Adopting an alternative re-runs the whole computation rather than
+       swapping the table: the map line, the night-by-night, the border
+       briefings and the totals are all downstream of which way you go, and a
+       page showing one route's legs against another's costs would be worse
+       than not offering the choice. */
+    panel.querySelectorAll('[data-way]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.variant = Number(el.dataset.way)
+        compute()
+      })
+    })
+
     panel.querySelectorAll('tr.leg').forEach(row => {
       const i = Number(row.dataset.leg)
       const on = () => map.focusLeg(i)
@@ -6067,6 +6481,11 @@ const UI = (() => {
       row.addEventListener('blur', off)
     })
   }
+
+  /* Which pair the current variant was chosen for. "The second way round"
+     means nothing once the destination changes, and silently carrying it over
+     shows a reader an alternative to a question they did not ask. */
+  let lastPair = null
 
   /* ------------------------------------------------------------ url state */
 
@@ -6079,6 +6498,7 @@ const UI = (() => {
     if (state.nationality) p.set('nat', state.nationality)
     if (state.pace !== 'standard') p.set('pace', state.pace)
     if (state.stay !== 'room') p.set('stay', state.stay)
+    if (state.variant) p.set('way', String(state.variant))
     history.replaceState(null, '', '#' + p.toString())
   }
 
@@ -6093,6 +6513,7 @@ const UI = (() => {
     state.nationality = p.get('nat') || ''
     state.pace = p.get('pace') || 'standard'
     state.stay = p.get('stay') || 'room'
+    state.variant = Number(p.get('way')) || 0
   }
 
   /* -------------------------------------------------------- map behaviour */

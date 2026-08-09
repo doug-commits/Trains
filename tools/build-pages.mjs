@@ -721,11 +721,7 @@ ${DOCFOOT}
  * with nothing but its own name would be a thin page, so one is not emitted.
  */
 
-const COUNTRY = {
-  th: 'Thailand', my: 'Malaysia', sg: 'Singapore', la: 'Laos', kh: 'Cambodia',
-  vn: 'Vietnam', id: 'Indonesia', mm: 'Myanmar', bn: 'Brunei', ph: 'Philippines',
-  cn: 'China',
-}
+const COUNTRY = NETWORK.countryNames
 
 // The planner's own rule, so the list it renders on the homepage and the files
 // written here cannot disagree about where a crossing lives.

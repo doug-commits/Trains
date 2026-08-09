@@ -12,6 +12,14 @@ const UI = (() => {
 
   const MODE_LABEL = { rail: 'Rail', ferry: 'Sea', road: 'Road' }
 
+  // Two of the eleven take a definite article and reading "Through Philippines"
+  // once is enough to want this.
+  const THE = new Set(['Philippines'])
+  const countryName = (network, code) => {
+    const name = network.countryNames?.[code] || code
+    return THE.has(name) ? `the ${name}` : name
+  }
+
   function hours(h) {
     if (h == null) return '—'
     if (h < 1) return `${Math.round(h * 60)}m`
@@ -130,6 +138,236 @@ const UI = (() => {
           `<div class="stat${kind ? ' is-' + kind : ''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`
       )
       .join('')}</div>`
+  }
+
+  /* The other ways round, and what each one trades.
+   *
+   * A router that shows one answer is asking to be trusted about a judgement
+   * it cannot make: whether you have the extra two days, whether you would
+   * rather be on a boat than a coach, whether you have already seen Sumatra.
+   * The cost function encodes a defensible default and nothing more, so where
+   * a genuinely different journey exists it goes on the page beside the
+   * recommendation with its own numbers.
+   *
+   * Only where one exists. Most corridors here have exactly one way through,
+   * and inventing a second by moving a station would be padding.
+   */
+  function waysSection(network, ways, plan) {
+    if (!ways || ways.length < 2) return ''
+
+    /* What actually separates this routing from the recommended one.
+     *
+     * The first version of this listed new operators and the first three
+     * unfamiliar stations, and for Singapore to Bali it produced "Urban metro
+     * and KTMB · via Singapore, Johor Bahru, Kluang and 14 more" — every word
+     * true and not one of them the point, which is that this one crosses
+     * Sumatra by coach instead of sailing to Jakarta. So: countries first,
+     * because a different country is the difference anyone would notice; then
+     * the single longest leg that is unique to this way, because that is what
+     * the day will actually feel like. */
+    const distinguish = (mine, base) => {
+      const seen = new Set(base.plan.stationIds)
+      const theirCountries = new Set(base.plan.countries)
+      const fresh = mine.plan.countries.filter(c => !theirCountries.has(c))
+
+      const ours = new Set(base.plan.legs.map(e => e.leg))
+      const only = mine.plan.legs.filter(e => !ours.has(e.leg))
+      const longest = only.slice().sort((a, b) => b.leg.hours - a.leg.hours)[0]
+
+      const bits = []
+      if (fresh.length) {
+        bits.push(`Through ${fresh.map(c => countryName(network, c)).join(' and ')}`)
+      } else {
+        /* Not the endpoints. Both routings start and finish in the same
+           place, and "Via Manila" on a journey out of Manila is the kind of
+           line that makes a reader stop trusting the rest of the page. */
+        /* By city, not by id. Manila has two stations on this map — the
+           terminus and the pier — so excluding the id let "Via Manila" back
+           onto a card for a journey that starts in Manila. */
+        const ids = mine.plan.stationIds
+        const ends = new Set(
+          [ids[0], ids[ids.length - 1]].map(id => network.stations[id]?.city)
+        )
+        const where = ids.filter(
+          id => !seen.has(id) && !ends.has(network.stations[id]?.city)
+        )
+        if (where.length) {
+          bits.push(`Via ${network.stations[where[0]]?.city || where[0]}`)
+        }
+      }
+      if (longest) {
+        bits.push(
+          `${hours(longest.leg.hours)} ${MODE_LABEL[longest.leg.mode].toLowerCase()} ` +
+            `${longest.fromCity} to ${longest.toCity}`
+        )
+      }
+      return bits.join(', ')
+    }
+
+    /* Against the recommendation, in the units a traveller feels — days, money
+     * and hours on a road — rather than the router's own cost, which is a
+     * weighting and not a thing anyone can check.
+     *
+     * Written as a phrase rather than signed numbers: "+3 days · +$150 · +18 h
+     * by road than the recommendation" parsed as a sum on first reading, and
+     * the sign on a saving is exactly the thing people misread. */
+    const versus = (mine, base) => {
+      const a = mine.plan.totals
+      const b = base.plan.totals
+      const out = []
+      const more = (n, one, many) =>
+        `${Math.abs(n)} ${Math.abs(n) === 1 ? one : many} ${n > 0 ? 'longer' : 'shorter'}`
+
+      const day = a.days - b.days
+      if (day) out.push(more(day, 'day', 'days'))
+      const usd = Math.round(a.totalUsd - b.totalUsd)
+      if (usd) out.push(`${money(Math.abs(usd))} ${usd > 0 ? 'dearer' : 'cheaper'}`)
+      const road = Math.round(a.roadHours - b.roadHours)
+      if (road) out.push(`${Math.abs(road)} h ${road > 0 ? 'more' : 'less'} on a road`)
+
+      if (!out.length) return 'Much the same on every count — a different way, not a worse one.'
+      const last = out.pop()
+      return `${out.length ? `${out.join(', ')} and ${last}` : last}.`
+        .replace(/^./, c => c.toUpperCase())
+    }
+
+    const base = ways[0]
+    const cards = ways
+      .map(w => {
+        const t = w.plan.totals
+        const what =
+          w.index === 0
+            ? `Through ${w.plan.countries.map(c => countryName(network, c)).join(', ')}`
+            : distinguish(w, base) || 'Another way round'
+        return `
+          <li class="way${w.current ? ' on' : ''}">
+            <div class="way-head">
+              <b>${esc(w.index === 0 ? 'Recommended' : `Alternative ${w.index}`)}</b>
+              ${w.current ? '<span class="way-now">showing</span>' : ''}
+            </div>
+            <p class="way-what">${esc(what)}</p>
+            <p class="way-nums">
+              <span>${esc(hours(t.movingHours))} moving</span>
+              <span>${t.days} ${t.days === 1 ? 'day' : 'days'}</span>
+              <span>${esc(money(t.totalUsd))}</span>
+              <span>${t.legs} ${t.legs === 1 ? 'leg' : 'legs'}</span>
+            </p>
+            ${
+              w.index === 0
+                ? '<p class="way-vs">Rails as far as they go, a boat where the land ends.</p>'
+                : `<p class="way-vs">${esc(versus(w, base))}</p>`
+            }
+            ${
+              w.current
+                ? ''
+                : `<button type="button" class="way-go" data-way="${w.index}">Plan this one instead</button>`
+            }
+          </li>`
+      })
+      .join('')
+
+    return `
+      <section class="block ways">
+        <h2>Other ways round</h2>
+        <p class="sub">The recommendation is what this planner would do with no
+        further information. These are the genuinely different journeys between
+        the same two points — not the same route with a station moved, which is
+        why there are two of them and not ten. Choosing one rebuilds everything
+        below it: the map, the nights, the borders and the cost are all
+        downstream of which way you go.</p>
+        <ul class="waylist">${cards}</ul>
+      </section>`
+  }
+
+  /* The clock, as far as this planner is honestly able to give you one.
+   *
+   * People ask for a timetable and the page has always refused, for a good
+   * reason: nine operators here publish in nine formats, several publish
+   * nothing, and a departure time is specific to a date and a direction. A
+   * planner that prints one is inviting somebody to stand on a platform at the
+   * time it made up.
+   *
+   * But refusing the whole question was too clean. What the data does hold,
+   * for about half the legs on this map, is when a service stops for the day —
+   * and that single number is the one that actually strands people. Nobody
+   * misses a connection because they did not know the 14:05 existed. They miss
+   * it because the last boat went at 17:00 and the train got in at 17:20.
+   *
+   * So: not a timetable. The legs that stop, and which of them decides the
+   * day. Every figure here is one that was already checked against the
+   * operator; nothing is derived and nothing is estimated.
+   */
+  function clockBlock(network, plan) {
+    const clock = /\d{1,2}:\d{2}/
+    const stopping = plan.legs
+      .map(entry => {
+        const d = entry.leg.daily || entry.operator?.daily
+        if (!d) return null
+        const last = d.last && clock.test(String(d.last)) ? String(d.last) : null
+        // A row earns its place by having a clock time somewhere, but once it
+        // is here the prose is shown whether or not it contains one: "roughly
+        // hourly from HarbourFront" is the answer to "when does it run", and
+        // printing "not recorded" beside a last sailing of 21:00 was not.
+        if (!last && !clock.test(d.spread || '')) return null
+        return { entry, last, window: d.spread || null }
+      })
+      .filter(Boolean)
+
+    if (!stopping.length) return ''
+
+    /* The earliest last departure on the route. Not a claim that it is the one
+       that will catch you — that depends on the day you start and which train
+       you took out of the previous town — but it is the one to plan backwards
+       from, and it is the one to look at first. */
+    /* And only worth naming if it is early enough to change what you do. The
+       first version of this told a reader to plan backwards from a shuttle
+       that runs every half hour until 23:45, which is true, useless, and the
+       sort of thing that teaches people to skip the box. */
+    const EARLY = '20:00'
+    const binding = stopping
+      .filter(s => s.last && s.last < EARLY)
+      .sort((a, b) => a.last.localeCompare(b.last))[0]
+
+    const rows = stopping
+      .map(
+        s => `
+        <tr${s === binding ? ' class="binds"' : ''}>
+          <td class="where">
+            <b>${esc(s.entry.fromName)}</b>
+            <span class="arrow" aria-hidden="true">→</span>
+            <b>${esc(s.entry.toName)}</b>
+            <span class="svc">${esc(s.entry.leg.service)}</span>
+          </td>
+          <td>${s.window ? esc(s.window) : '<span class="muted">not recorded</span>'}</td>
+          <td class="num-col">${s.last ? esc(s.last) : '—'}</td>
+        </tr>`
+      )
+      .join('')
+
+    return `
+      <section class="block clockblock">
+        <h2>What stops running, and when</h2>
+        <p class="sub">Not a timetable — this planner will not print a departure
+        time it cannot stand behind, and no two operators here publish in a way
+        that would let it. This is the other half of the question, and the half
+        that strands people: which legs stop for the day, and how late. Nobody
+        misses a connection for want of knowing the 14:05 existed. They miss it
+        because the last boat went at 17:00.</p>
+        ${
+          binding
+            ? `<p class="clock-binds">Plan backwards from the
+               <b>${esc(binding.last)}</b> ${esc(binding.entry.fromCity)} to
+               ${esc(binding.entry.toCity)} — it is the earliest door to close on
+               this route.</p>`
+            : ''
+        }
+        <div class="table-wrap">
+          <table class="route clock">
+            <thead><tr><th>Leg</th><th>Runs</th><th class="num-col">Last</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </section>`
   }
 
   /* A destination image. A real photograph wins; the drawn illustration is the
@@ -655,7 +893,7 @@ const UI = (() => {
 
   /* ------------------------------------------------------------ assembled */
 
-  function itinerary(network, plan, fromId, toId, opts) {
+  function itinerary(network, plan, fromId, toId, opts, ways) {
     const from = network.stations[fromId]
     const to = network.stations[toId]
     const t = plan.totals
@@ -697,7 +935,9 @@ const UI = (() => {
           ? `<div class="callout"><h3>Stations that catch people out</h3><ul class="warns">${stationWarnings}</ul></div>`
           : ''
       }
+      ${waysSection(network, ways, plan)}
       ${routeTable(network, plan)}
+      ${clockBlock(network, plan)}
       ${scheduleBlock(network, plan)}
       ${lodgingSection(network, plan)}
       ${borderSection(network, plan)}

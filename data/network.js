@@ -62,6 +62,16 @@ const NETWORK = {
    * how the ticket is actually bought. Never invent a URL to fill the column: a
    * dead booking link is worse than an honest "buy it at the pier".
    */
+    /* The names behind the two-letter codes every station carries.
+     * Here rather than in each consumer, because the planner, the panel and
+     * the static page builder all needed them and all had their own copy —
+     * three lists that agreed until one of them did not. */
+    countryNames: {
+      cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
+      my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia',
+      ph: 'Philippines', mm: 'Myanmar',
+    },
+
   operators: {
     // --- rail
     lcr:   { name: 'Laos–China Railway', short: 'LCR', mono: 'LCR', livery: '#c8102e', ink: '#fff',
@@ -127,6 +137,10 @@ const NETWORK = {
     localferry:    { name: 'Local ferry', short: 'Local ferry', mono: 'FRY', livery: '#4b7c8c', ink: '#fff',
                      daily: { n: 'several', spread: 'through daylight hours — check the last departure when you arrive' }, punctual: 'weather', book: null, bookVia: 'counter',
                      bookNote: 'Bought at the pier. Turn up, check the last departure when you arrive, and do not be the one still on the dock.', note: '' },
+    pelni:         { name: 'Pelni', short: 'Pelni', mono: 'PELNI', livery: '#0b5c9e', ink: '#fff',
+                     daily: { n: '1–2 a week', spread: 'a scheduled shipping line, not a ferry — a sailing is a date, not a time of day' }, punctual: 'weather', book: 'https://www.pelni.co.id',
+                     bookNote: 'Books online and through the Pelni app, and sells at the port. Economy is a numbered berth in an open dormitory; the cabin classes are a few dollars more and worth it on anything overnight.',
+                     note: 'Indonesia\'s state shipping line. Its ships are what make the Sumatra coach chain optional — one boat replaces three days of buses.' },
     twogo:         { name: '2GO Travel', short: '2GO', mono: '2GO', livery: '#0a5ba8', ink: '#fff',
                      daily: { n: '1–3 a week', spread: 'a shipping line, not a ferry — check the sailing list first' }, punctual: 'weather', book: 'https://travel.2go.com.ph',
                      bookNote: 'The Philippines\' main long-haul shipping line, and genuinely bookable from abroad. Cabin classes are worth the small difference over the open tourist deck on anything overnight.',
@@ -676,6 +690,18 @@ const NETWORK = {
     { from: 'portklang', to: 'dumai', mode: 'ferry', op: 'riauferry', service: 'Port Klang–Dumai international ferry', hours: 5.0, usd: 45, border: 'dumai', confidence: 'verify' },
     { from: 'georgetown', to: 'belawan', mode: 'ferry', op: 'riauferry', service: 'Penang–Belawan ferry', hours: 5.0, usd: 50, border: 'belawan', confidence: 'verify',
       note: 'Historically operated, intermittent. When running it shortcuts the whole peninsula.' },
+
+    // === Pelni: the ships that make Sumatra optional ====================
+    // The Riau ferries above are hops between islands. These are a shipping
+    // line: one boat, a day and a half at sea, and the whole of the Sumatran
+    // coach chain skipped. The trade is frequency — a sailing is a date, not a
+    // departure time, and missing one costs the better part of a week.
+    { from: 'batam', to: 'jakarta', mode: 'ferry', op: 'pelni', service: 'Pelni KM Kelud (Batu Ampar – Tanjung Priok)', hours: 32.0, usd: 28, sleeper: true, cls: 'Economy berth', scenic: true,
+      daily: { n: 'about weekly', spread: 'the Jakarta sailing is normally the Wednesday one; the rotation alternates via Tanjung Balai Karimun and Bintan' }, confidence: 'reported',
+      note: 'The reason not to cross Sumatra by coach. Batu Ampar to Tanjung Priok in about a day and a third, arriving in Jakarta itself rather than at the far end of three bus days. Economy is a berth in an open dormitory from around $26; a cabin is roughly $80. Book ahead around Idul Fitri, when this ship is how a good part of Sumatra goes home.' },
+    { from: 'batam', to: 'belawan', mode: 'ferry', op: 'pelni', service: 'Pelni KM Kelud (Batu Ampar – Belawan)', hours: 28.0, usd: 20, sleeper: true, cls: 'Economy berth',
+      daily: { n: '1–2 a week', spread: 'the Belawan sailing is normally the Sunday one' }, confidence: 'reported',
+      note: 'The same ship, northbound. Belawan is Medan\'s port and half an hour from the city, so this reaches north Sumatra without the fourteen-hour coach from Pekanbaru.' },
 
     // === Sumatra =======================================================
     { from: 'belawan', to: 'medan', mode: 'road', op: 'transfer', service: 'Taxi / bus', hours: 0.5, usd: 5, essential: true, confidence: 'reported' },

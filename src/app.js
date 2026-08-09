@@ -3,10 +3,7 @@
  */
 
 ;(function () {
-  const COUNTRY_NAME = {
-    cn: 'China', la: 'Laos', th: 'Thailand', kh: 'Cambodia', vn: 'Vietnam',
-    my: 'Malaysia', sg: 'Singapore', bn: 'Brunei', id: 'Indonesia', ph: 'Philippines', mm: 'Myanmar',
-  }
+  const COUNTRY_NAME = NETWORK.countryNames
   const COUNTRY_ORDER = ['cn', 'la', 'th', 'kh', 'vn', 'my', 'sg', 'bn', 'id', 'ph', 'mm']
 
   const PRESETS = [
@@ -94,6 +91,10 @@
     pace: 'standard',
     stay: 'room',
     plan: null,
+    /* Which routing is being shown: 0 is the recommendation, 1 and 2 are the
+       other ways round. Lives in the URL, so a link to "the long way through
+       Sumatra" is a link somebody else opens on the same route. */
+    variant: 0,
     // Set only when the question named places rather than stations, so the
     // answer can be headlined in the words that were actually used.
     labels: null,
@@ -241,7 +242,25 @@
       stay: state.stay,
       labels: state.labels,
     }
+    /* The recommendation, and the other ways round it found on the way.
+     *
+     * Costed once here rather than in the panel, because the alternatives are
+     * not decoration — one of them can be adopted, and the moment it is, it is
+     * the itinerary. So they are built as full plans and the reader picks
+     * which one this page is about. */
     const routed = Router.route(NETWORK, state.from, state.to, opts)
+    const others = routed ? Router.alternatives(NETWORK, state.from, state.to, opts, 2) : []
+    // A variant remembered from a previous pair of stations is meaningless
+    // against this one, and index 3 of a list of one is a crash.
+    const pair = `${state.from}>${state.to}`
+    // `lastPair === null` is the first run, where the variant came out of the
+    // URL and is the whole point of the link — only a *change* of route clears
+    // it, not the absence of a previous one.
+    if (state.variant > others.length || (lastPair !== null && lastPair !== pair)) {
+      state.variant = 0
+    }
+    lastPair = pair
+    const chosen = state.variant ? others[state.variant - 1] : routed
 
     if (!routed) {
       state.plan = null
@@ -254,11 +273,20 @@
       return
     }
 
-    const plan = Plan.build(NETWORK, routed, opts)
+    const plan = Plan.build(NETWORK, chosen, opts)
     state.plan = plan
     app.dataset.active = 'true'
     map.setRoute({ legs: plan.legs, stationIds: plan.stationIds, stopIds: plan.stopIds })
-    panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts)
+    /* Every routing, costed, with the one being shown marked. The panel needs
+       all of them to describe the choice, and needs to know which is on screen
+       to say so. */
+    const ways = [routed, ...others].map((r, i) => ({
+      plan: i === state.variant ? plan : Plan.build(NETWORK, r, opts),
+      worseBy: r.worseBy ?? 1,
+      index: i,
+      current: i === state.variant,
+    }))
+    panel.innerHTML = UI.itinerary(NETWORK, plan, state.from, state.to, opts, ways)
     resetScroll(true)
     paintScenes()
     bindPanel()
@@ -307,6 +335,18 @@
   )
 
   function bindPanel() {
+    /* Adopting an alternative re-runs the whole computation rather than
+       swapping the table: the map line, the night-by-night, the border
+       briefings and the totals are all downstream of which way you go, and a
+       page showing one route's legs against another's costs would be worse
+       than not offering the choice. */
+    panel.querySelectorAll('[data-way]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.variant = Number(el.dataset.way)
+        compute()
+      })
+    })
+
     panel.querySelectorAll('tr.leg').forEach(row => {
       const i = Number(row.dataset.leg)
       const on = () => map.focusLeg(i)
@@ -317,6 +357,11 @@
       row.addEventListener('blur', off)
     })
   }
+
+  /* Which pair the current variant was chosen for. "The second way round"
+     means nothing once the destination changes, and silently carrying it over
+     shows a reader an alternative to a question they did not ask. */
+  let lastPair = null
 
   /* ------------------------------------------------------------ url state */
 
@@ -329,6 +374,7 @@
     if (state.nationality) p.set('nat', state.nationality)
     if (state.pace !== 'standard') p.set('pace', state.pace)
     if (state.stay !== 'room') p.set('stay', state.stay)
+    if (state.variant) p.set('way', String(state.variant))
     history.replaceState(null, '', '#' + p.toString())
   }
 
@@ -343,6 +389,7 @@
     state.nationality = p.get('nat') || ''
     state.pace = p.get('pace') || 'standard'
     state.stay = p.get('stay') || 'room'
+    state.variant = Number(p.get('way')) || 0
   }
 
   /* -------------------------------------------------------- map behaviour */

@@ -2760,6 +2760,110 @@ function check(label, condition, detail = '') {
   }
 }
 
+/* --------------------------------------------------- the other ways round */
+
+/* The reported bug and the feature it produced. A reader in Batam was being
+   sent up Sumatra by coach because the network had no edge for the ship that
+   sails to Jakarta — and could not see that any other way existed. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url + '#from=batam&to=jakarta')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+
+  const first = await page.evaluate(() =>
+    [...document.querySelectorAll('tr.leg .svc')].map(e => e.textContent).join(' | '))
+  check('Batam to Jakarta sails rather than taking three days of buses',
+    /Pelni/.test(first), first.slice(0, 90))
+
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.way')].length)
+  check('and the coach route is still offered as the other way round', cards >= 2, `${cards} cards`)
+
+  /* The one that mattered: adopting an alternative has to rebuild the page,
+     not swap the table. A route's cost, nights and borders are all downstream
+     of which way it goes, and showing one route's legs against another's
+     totals would be worse than not offering the choice. */
+  const before = await page.evaluate(() => ({
+    stats: document.querySelector('.stats').textContent,
+    legs: document.querySelectorAll('tr.leg').length,
+  }))
+  await page.locator('.way-go').first().click()
+  await page.waitForTimeout(400)
+  const after = await page.evaluate(() => ({
+    stats: document.querySelector('.stats').textContent,
+    legs: document.querySelectorAll('tr.leg').length,
+    marked: document.querySelector('.way.on .way-head b')?.textContent.trim(),
+    hash: location.hash,
+  }))
+  check('choosing one rebuilds the whole itinerary',
+    after.stats !== before.stats && after.legs !== before.legs,
+    `${before.legs} legs -> ${after.legs}`)
+  check('and marks the one being shown', /Alternative/.test(after.marked || ''), after.marked)
+  // So that "the long way through Sumatra" is a link somebody else can open.
+  check('and puts it in the url', /way=1/.test(after.hash), after.hash)
+  await context.close()
+}
+
+{
+  const { page, context } = await newPage()
+  /* Half an hour on the Singapore MRT. Before the ceiling this offered three
+     days through Sumatra at twenty-five times the cost, which is the failure
+     mode of every k-shortest-path implementation that does not have one. */
+  await page.goto(url + '#from=woodlands&to=singapore')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  check('a short hop is not offered a three-day detour',
+    await page.evaluate(() => !document.querySelector('.ways')))
+
+  /* Nor the same journey twice with one station moved — the other way this
+     goes wrong, and the reason the overlap test is on travelling time rather
+     than on the list of stops. */
+  await page.goto('about:blank')
+  await page.goto(url + '#from=singapore&to=klsentral')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  check('nor the same route with a station swapped',
+    await page.evaluate(() => !document.querySelector('.ways')))
+  await context.close()
+}
+
+/* ------------------------------------------------ what stops running, when */
+
+{
+  const { page, context } = await newPage()
+  await page.goto(url + '#from=chiangmai&to=luangprabang')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+
+  const clock = await page.evaluate(() => {
+    const el = document.querySelector('.clockblock')
+    if (!el) return null
+    return {
+      binds: el.querySelector('.clock-binds')?.textContent.replace(/\s+/g, ' ').trim() || null,
+      rows: document.querySelectorAll('table.clock tbody tr').length,
+      marked: document.querySelectorAll('table.clock tr.binds').length,
+    }
+  })
+  check('the route says what stops running and when', !!clock, clock ? `${clock.rows} legs` : 'missing')
+  /* One boat a day, leaving at nine and not waiting. If any route on this map
+     should name the door that closes first, it is this one. */
+  check('and names the one to plan backwards from',
+    clock && /09:30/.test(clock.binds || ''), clock?.binds?.slice(0, 70))
+  check('and marks the same row the sentence points at', clock && clock.marked === 1)
+
+  /* The other half of the rule. A shuttle running every half hour until 23:45
+     is a true answer to "what closes first" and a useless one, and a box that
+     says something useless is a box people learn to skip. */
+  await page.goto('about:blank')
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  check('but does not tell anyone to plan backwards from a midnight shuttle',
+    await page.evaluate(() =>
+      !!document.querySelector('.clockblock') && !document.querySelector('.clock-binds')))
+  await context.close()
+}
+
 /* -------------------------------------------- the strip that offers the app */
 
 /* The one piece of the site that is an advertisement, which is exactly why it

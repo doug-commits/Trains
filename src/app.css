@@ -2520,3 +2520,123 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 }
 .appbanner-no svg { width: 1.15rem; height: 1.15rem; }
 .appbanner-no:hover { color: var(--ink); background: var(--panel-edge); }
+
+/* ------------------------------------------------------- other ways round */
+
+/* Cards rather than a table, because the comparison is not column-by-column:
+   what separates two routings is a boat, or a country, or two extra days, and
+   those are sentences. A table would force each of them into a cell and make
+   the interesting one look like the rest. */
+.waylist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.way {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 0.9rem 0.9rem;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r);
+  background: var(--panel-solid);
+}
+
+/* The one on screen, marked by the accent rather than by position — the list
+   is in cost order and the current card is not always first. */
+.way.on {
+  border-color: var(--rail);
+  box-shadow: inset 3px 0 0 0 var(--rail);
+}
+
+.way-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.way-head b {
+  font-family: var(--sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.way.on .way-head b { color: var(--rail); }
+.way-now {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.way-what {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.way-nums {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.7rem;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.way-vs {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.way-go {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 0.42rem 0.8rem;
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.way-go:hover { background: var(--raise); border-color: var(--rail); }
+
+/* ------------------------------------------------ what stops running, when */
+
+.clockblock .clock-binds {
+  margin: 1rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-left: 3px solid var(--rail);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--raise);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.clockblock .clock-binds b { font-variant-numeric: tabular-nums; }
+
+table.clock td { vertical-align: top; }
+table.clock .svc {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+table.clock .muted { color: var(--muted); }
+/* The earliest door to close. Marked in the table as well as named above it,
+   because a reader scanning the column for the small number should find the
+   same row the sentence sent them to. */
+table.clock tr.binds { background: color-mix(in srgb, var(--rail) 9%, transparent); }
+table.clock tr.binds td:last-child { color: var(--rail); font-weight: 600; }
