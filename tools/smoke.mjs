@@ -2365,13 +2365,38 @@ function check(label, condition, detail = '') {
     check('no third-party SDK has appeared in the app', ours.length === 0,
       deps.length ? deps.join(', ') : 'none declared')
 
-    /* "Two settings." Named on the page, so a third would make it wrong. */
+    /* The policy enumerates what is kept on the device, so anything stored
+       that it does not name makes a published legal document wrong.
+       
+       Every source, not just src/app.js. The earlier version read that one
+       file, so the key the app-install strip writes — which lives in
+       src/appbanner.html — was invisible to it, and the policy said "two
+       settings" for three commits while the site stored three. A check that
+       reads one of the places a thing can happen is a check that reports the
+       absence of evidence. */
     const keys = [...new Set(
-      [...readFileSync(join(root, 'src/app.js'), 'utf8').matchAll(/'(overlandsea:[a-z-]+)'/g)]
-        .map(m => m[1])
+      readdirSync(join(root, 'src'))
+        .map(f => readFileSync(join(root, 'src', f), 'utf8'))
+        .flatMap(text => [...text.matchAll(/'(overlandsea:[a-z-]+)'/g)].map(m => m[1]))
     )].sort()
-    check('the app still stores exactly the two settings the policy names',
-      keys.join(' ') === 'overlandsea:folded overlandsea:theme', keys.join(' ') || 'none')
+    const named = 'overlandsea:app overlandsea:folded overlandsea:theme overlandsea:trip'
+    check('the app stores only what the privacy policy names', keys.join(' ') === named,
+      keys.join(' ') || 'none')
+
+    /* And the policy has to describe each of them. Naming the count was what
+       let this drift: "two settings" stays true-looking while the list under
+       it grows. */
+    const policy = readFileSync(join(root, 'public/privacy.html'), 'utf8')
+    for (const [key, said] of [
+      ['theme', /light or dark theme/],
+      ['fold', /search panel folded/],
+      ['trip', /journey you last planned/],
+      ['app strip', /dismissed the strip/],
+    ]) {
+      check(`and the policy says what it keeps — ${key}`, said.test(policy))
+    }
+    check('and no longer claims a count it would have to keep correcting',
+      !/two settings/.test(policy))
 
     /* "No analytics, no tag manager, no advertising pixel." The deployed page
        loads one script, its own, and that is asserted elsewhere — here it is
@@ -2935,6 +2960,95 @@ function check(label, condition, detail = '') {
   }))
   check('and a tap rebuilds the itinerary around it', after.legs !== before && /Alternative/.test(after.on || ''),
     `${before} legs -> ${after.legs}, showing ${after.on}`)
+  await context.close()
+}
+
+/* The app remembers what you were planning.
+ *
+ * The website keeps the route in the hash, where the tab, the history and a
+ * bookmark all hold it. The app cold-starts at its launch URL with no hash, so
+ * without this a traveller who planned on the hostel wifi and got on a train
+ * found the start screen — the wrong failure for a program whose promise is
+ * that the phone stops needing a signal. */
+{
+  const bundle = 'file://' + join(root, 'dist/app.html')
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+  })
+  const head = () => page.evaluate(() => document.querySelector('#panel h1')?.textContent.trim() || '')
+  /* about:blank between each, because a goto that only changes the fragment
+     does not reload — and a check that never reloaded would pass by reading
+     the page it was already on. */
+  const relaunch = async hash => {
+    await page.goto('about:blank')
+    await page.goto(bundle + (hash || ''))
+    await page.waitForTimeout(700)
+  }
+
+  await relaunch('#from=bkk_aphiwat&to=singapore')
+  const planned = await head()
+  await relaunch()
+  check('the app opens where the traveller left off', (await head()) === planned, planned)
+
+  /* A link into a specific journey is a stronger instruction than what
+     somebody happened to be looking at last time. */
+  await relaunch('#from=singapore&to=denpasar')
+  check('but a link still names the journey', /Bali/.test(await head()), await head())
+
+  // Start over has to mean start over, or the next launch undoes it.
+  await relaunch()
+  const idleFirst = planned
+  await page.locator('#startover').click()
+  await page.waitForTimeout(300)
+  const idle = await head()
+  check('Start over returns to the front screen', idle !== idleFirst, idle)
+  await relaunch()
+  check('and the next launch does not undo it', (await head()) === idle, await head())
+  await context.close()
+}
+
+{
+  /* The website keeps its front door. Restoring there would mean a returning
+     reader never sees the page that explains what this is. */
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+  })
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  const routed = await page.evaluate(() => document.querySelector('#panel h1').textContent.trim())
+  await page.goto('about:blank')
+  await page.goto(url)
+  await page.waitForTimeout(700)
+  const front = await page.evaluate(() => document.querySelector('#panel h1').textContent.trim())
+  check('the website still opens on the front door', front !== routed, front)
+  await context.close()
+}
+
+/* A service that does not run every day, and the fact that the totals above it
+ * are running times rather than trip length. Sharpened by the Pelni ships:
+ * Batam to Jakarta is one 32-hour leg and reads as two days, which is true of
+ * the voyage and can be most of a week wrong about the trip. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url + '#from=batam&to=jakarta')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  const warned = await page.evaluate(() =>
+    [...document.querySelectorAll('#panel')].map(e => e.textContent).join(' '))
+  check('a weekly sailing says so where the totals can be seen',
+    /does not run every day/.test(warned) && /length of the trip/.test(warned))
+
+  /* And nowhere else. A frequency warning on a service running every twenty
+     minutes is how a reader learns to skip the risk box — which is what the
+     first version of the test did, by matching "0–2" inside "every 10–20 min". */
+  await page.goto('about:blank')
+  await page.goto(url + '#from=klsentral&to=singapore')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  check('and a daily corridor is left alone',
+    !/does not run every day/.test(
+      await page.evaluate(() => document.querySelector('#panel').textContent)))
   await context.close()
 }
 

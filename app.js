@@ -2756,6 +2756,50 @@ const Plan = (() => {
         })
       }
 
+      /* A service that does not run every day, and what that costs.
+       *
+       * The totals on this page are running times. They do not contain the
+       * wait for a boat that sails on Wednesdays, because the planner does not
+       * know what day you reach the port — and until it does, the number it
+       * shows is the length of the journey rather than the length of the trip.
+       * On a route with a weekly sailing those are different by most of a week.
+       *
+       * This matters more since the Pelni ships were added: Batam to Jakarta is
+       * now one 32-hour leg and reads as two days, which is true of the voyage
+       * and can be badly wrong about the trip. The frequency is already printed
+       * against the leg; what was missing was anyone saying out loud that the
+       * total does not include it. */
+      /* Tested on the count, deliberately, and not by pattern-matching the
+         prose beside it. The first version searched both for things like
+         "0–2" and "2–3 a", which also live inside "every 10–20 min" and any
+         spread beginning with "a" — a frequency warning on a service running
+         every twenty minutes would teach people to ignore the box. */
+      const runs = leg.daily || entry.operator?.daily
+      const n = String(runs?.n ?? '')
+      const rare =
+        !!runs &&
+        // "1–2 a week", "about weekly" — anything counted in weeks is by
+        // definition not daily.
+        (/week/i.test(n) ||
+          // "0–2" — a service that may simply not run on the day you turn up.
+          /^0/.test(n) ||
+          // And where the operator says so in words rather than in a number.
+          /selected days|not daily/i.test(runs.spread || ''))
+      if (rare) {
+        risks.push({
+          severity: 'caution',
+          title: `${entry.fromName} to ${entry.toName} does not run every day`,
+          text:
+            `This one goes ${runs.n}${runs.spread ? ` — ${runs.spread}` : ''}. ` +
+            'The days and the cost above are running times and fares: they do not include ' +
+            'waiting for the next departure, because that depends on which day you arrive. ' +
+            'On a weekly service that wait can be most of a week, and it is the difference ' +
+            'between the length of the journey and the length of the trip.',
+          fix: 'Find the sailing or departure date first and build the rest of the itinerary backwards from it, rather than planning the route and looking up this leg last.',
+          legIndex: i,
+        })
+      }
+
       if (leg.mode === 'ferry' && !leg.essential) {
         risks.push({
           severity: 'note',
@@ -6519,6 +6563,78 @@ const UI = (() => {
      shows a reader an alternative to a question they did not ask. */
   let lastPair = null
 
+  /* -------------------------------------------------------- remembering it */
+
+  /* The app has no address bar, so it has nowhere to keep the plan.
+   *
+   * On the website the hash is enough: the tab holds it, history holds it, and
+   * a bookmark holds it. The app cold-starts at its launch URL with no hash
+   * every time, so a traveller who planned Bangkok to Singapore on the hostel
+   * wifi, closed the app and got on a train found the start screen and nothing
+   * else — which is the wrong failure for a program whose whole promise is
+   * that the phone stops needing a signal.
+   *
+   * Written for both and read only by the app. Restoring on the website would
+   * mean a returning reader never sees the front door again, and the front
+   * door is what explains what this is. */
+  const TRIP_KEY = 'overlandsea:trip'
+
+  function rememberTrip() {
+    if (!state.from || !state.to) return
+    try {
+      localStorage.setItem(
+        TRIP_KEY,
+        JSON.stringify({
+          from: state.from,
+          to: state.to,
+          railOnly: state.railOnly,
+          date: state.date,
+          nationality: state.nationality,
+          pace: state.pace,
+          stay: state.stay,
+          labels: state.labels,
+          variant: state.variant,
+        })
+      )
+    } catch (e) {
+      /* private mode, or storage full — the plan is still on screen */
+    }
+  }
+
+  function forgetTrip() {
+    try {
+      localStorage.removeItem(TRIP_KEY)
+    } catch (e) {}
+  }
+
+  /* Only in the app, and only when the launch carried no route of its own — a
+     link into a specific journey is a stronger instruction than what somebody
+     was looking at last time. */
+  function restoreTrip() {
+    if (!document.documentElement.dataset.app) return false
+    if (state.from && state.to) return false
+    let saved = null
+    try {
+      saved = JSON.parse(localStorage.getItem(TRIP_KEY) || 'null')
+    } catch (e) {
+      return false
+    }
+    // Stations are renamed and retired between releases, and a stored id that
+    // no longer exists would restore an empty route rather than nothing.
+    if (!saved || !NETWORK.stations[saved.from] || !NETWORK.stations[saved.to]) return false
+
+    state.from = saved.from
+    state.to = saved.to
+    state.railOnly = !!saved.railOnly
+    state.date = saved.date || ''
+    state.nationality = saved.nationality || ''
+    state.pace = saved.pace || 'standard'
+    state.stay = saved.stay || 'room'
+    state.labels = saved.labels || null
+    state.variant = Number(saved.variant) || 0
+    return true
+  }
+
   /* ------------------------------------------------------------ url state */
 
   function writeHash() {
@@ -6532,6 +6648,7 @@ const UI = (() => {
     if (state.stay !== 'room') p.set('stay', state.stay)
     if (state.variant) p.set('way', String(state.variant))
     history.replaceState(null, '', '#' + p.toString())
+    rememberTrip()
   }
 
   function readHash() {
@@ -7428,6 +7545,9 @@ const UI = (() => {
     $('#askbox').value = ''
     showAskNote('')
     history.replaceState(null, '', location.pathname + location.search)
+    // Start over means start over. Without this the next launch would restore
+    // the trip the reader had just cleared.
+    forgetTrip()
     renderControls()
     compute()
     map.resetView()
@@ -7933,6 +8053,7 @@ const UI = (() => {
   /* ------------------------------------------------------------------ boot */
 
   readHash()
+  restoreTrip()
   renderControls()
   // Fonts are inlined, but the canvas measures text — wait for them so labels
   // are laid out against the real face rather than the fallback metrics.

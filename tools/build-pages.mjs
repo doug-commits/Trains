@@ -524,10 +524,18 @@ function privacyPage(css) {
       in flight mode at a border with no signal, which is the point of it.</p>
     </div>
 
-    <p>What it keeps on your phone: two settings — whether you chose the light
-    or dark theme, and whether you left the search panel folded. They are
-    written to the app's own local storage on the device, are never sent
-    anywhere, and go when you uninstall the app or clear its data.</p>
+    <p>What it keeps on your phone: whether you chose the light or dark theme,
+    whether you left the search panel folded, and the journey you last planned
+    — the two stations and the trip settings beside them, so that closing the
+    app and opening it again on a train with no signal returns you to what you
+    were looking at rather than to the start. On the website only, it also
+    remembers if you dismissed the strip offering the Android app, so that it
+    does not ask twice.</p>
+
+    <p>All of it is written to local storage on the device, none of it is sent
+    anywhere, and it goes when you uninstall the app or clear its data. A
+    journey is two station names and your own routing preferences; it is not a
+    record of where you went, because nothing here knows where you went.</p>
 
     <p>What it does not have: any account or sign-in, your email address, your
     location, your contacts, an advertising identifier, an analytics library,
@@ -551,9 +559,9 @@ function privacyPage(css) {
   <section class="block">
     <h2>The iPhone and iPad app</h2>
 
-    <p>Same program, same bundled data, same two settings on the device, same
-    absence of accounts, analytics, advertising identifiers and third-party
-    code. What differs is one sentence of the guarantee above, and it differs
+    <p>Same program, same bundled data, the same handful of settings kept on
+    the device, same absence of accounts, analytics, advertising identifiers
+    and third-party code. What differs is one sentence of the guarantee above, and it differs
     enough to be worth spelling out rather than quietly reusing.</p>
 
     <div class="callout">
@@ -585,9 +593,11 @@ function privacyPage(css) {
     because there is nothing to consent to. The site sets no cookies of any
     kind.</p>
 
-    <p>It stores the same two settings the app does, in your browser's local
-    storage, and nothing else. Clearing site data for slowasia.com removes
-    them.</p>
+    <p>It stores the same theme and panel settings the app does, in your
+    browser's local storage, plus a note of whether you dismissed the strip
+    offering the Android app. It does not keep your last journey — the website
+    holds that in the address bar, where your own history and bookmarks already
+    keep it. Clearing site data for slowasia.com removes all of it.</p>
 
     <p>Fonts and photographs are served from slowasia.com itself rather than
     from Google Fonts or a CDN, so opening a page here does not announce your
@@ -658,7 +668,7 @@ function privacyPage(css) {
     there is nothing for such a request to return. That is not a way of
     declining: it is what "collects nothing" means when you follow it to the
     end.</p>
-    <p>The two settings on your device are yours and are removed by uninstalling
+    <p>What is stored on your device is yours and is removed by uninstalling
     the app, clearing its data in Android's app settings, or clearing site data
     for slowasia.com in your browser.</p>
   </section>

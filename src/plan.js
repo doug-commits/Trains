@@ -481,6 +481,50 @@ const Plan = (() => {
         })
       }
 
+      /* A service that does not run every day, and what that costs.
+       *
+       * The totals on this page are running times. They do not contain the
+       * wait for a boat that sails on Wednesdays, because the planner does not
+       * know what day you reach the port — and until it does, the number it
+       * shows is the length of the journey rather than the length of the trip.
+       * On a route with a weekly sailing those are different by most of a week.
+       *
+       * This matters more since the Pelni ships were added: Batam to Jakarta is
+       * now one 32-hour leg and reads as two days, which is true of the voyage
+       * and can be badly wrong about the trip. The frequency is already printed
+       * against the leg; what was missing was anyone saying out loud that the
+       * total does not include it. */
+      /* Tested on the count, deliberately, and not by pattern-matching the
+         prose beside it. The first version searched both for things like
+         "0–2" and "2–3 a", which also live inside "every 10–20 min" and any
+         spread beginning with "a" — a frequency warning on a service running
+         every twenty minutes would teach people to ignore the box. */
+      const runs = leg.daily || entry.operator?.daily
+      const n = String(runs?.n ?? '')
+      const rare =
+        !!runs &&
+        // "1–2 a week", "about weekly" — anything counted in weeks is by
+        // definition not daily.
+        (/week/i.test(n) ||
+          // "0–2" — a service that may simply not run on the day you turn up.
+          /^0/.test(n) ||
+          // And where the operator says so in words rather than in a number.
+          /selected days|not daily/i.test(runs.spread || ''))
+      if (rare) {
+        risks.push({
+          severity: 'caution',
+          title: `${entry.fromName} to ${entry.toName} does not run every day`,
+          text:
+            `This one goes ${runs.n}${runs.spread ? ` — ${runs.spread}` : ''}. ` +
+            'The days and the cost above are running times and fares: they do not include ' +
+            'waiting for the next departure, because that depends on which day you arrive. ' +
+            'On a weekly service that wait can be most of a week, and it is the difference ' +
+            'between the length of the journey and the length of the trip.',
+          fix: 'Find the sailing or departure date first and build the rest of the itinerary backwards from it, rather than planning the route and looking up this leg last.',
+          legIndex: i,
+        })
+      }
+
       if (leg.mode === 'ferry' && !leg.essential) {
         risks.push({
           severity: 'note',

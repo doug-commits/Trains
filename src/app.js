@@ -363,6 +363,78 @@
      shows a reader an alternative to a question they did not ask. */
   let lastPair = null
 
+  /* -------------------------------------------------------- remembering it */
+
+  /* The app has no address bar, so it has nowhere to keep the plan.
+   *
+   * On the website the hash is enough: the tab holds it, history holds it, and
+   * a bookmark holds it. The app cold-starts at its launch URL with no hash
+   * every time, so a traveller who planned Bangkok to Singapore on the hostel
+   * wifi, closed the app and got on a train found the start screen and nothing
+   * else — which is the wrong failure for a program whose whole promise is
+   * that the phone stops needing a signal.
+   *
+   * Written for both and read only by the app. Restoring on the website would
+   * mean a returning reader never sees the front door again, and the front
+   * door is what explains what this is. */
+  const TRIP_KEY = 'overlandsea:trip'
+
+  function rememberTrip() {
+    if (!state.from || !state.to) return
+    try {
+      localStorage.setItem(
+        TRIP_KEY,
+        JSON.stringify({
+          from: state.from,
+          to: state.to,
+          railOnly: state.railOnly,
+          date: state.date,
+          nationality: state.nationality,
+          pace: state.pace,
+          stay: state.stay,
+          labels: state.labels,
+          variant: state.variant,
+        })
+      )
+    } catch (e) {
+      /* private mode, or storage full — the plan is still on screen */
+    }
+  }
+
+  function forgetTrip() {
+    try {
+      localStorage.removeItem(TRIP_KEY)
+    } catch (e) {}
+  }
+
+  /* Only in the app, and only when the launch carried no route of its own — a
+     link into a specific journey is a stronger instruction than what somebody
+     was looking at last time. */
+  function restoreTrip() {
+    if (!document.documentElement.dataset.app) return false
+    if (state.from && state.to) return false
+    let saved = null
+    try {
+      saved = JSON.parse(localStorage.getItem(TRIP_KEY) || 'null')
+    } catch (e) {
+      return false
+    }
+    // Stations are renamed and retired between releases, and a stored id that
+    // no longer exists would restore an empty route rather than nothing.
+    if (!saved || !NETWORK.stations[saved.from] || !NETWORK.stations[saved.to]) return false
+
+    state.from = saved.from
+    state.to = saved.to
+    state.railOnly = !!saved.railOnly
+    state.date = saved.date || ''
+    state.nationality = saved.nationality || ''
+    state.pace = saved.pace || 'standard'
+    state.stay = saved.stay || 'room'
+    state.labels = saved.labels || null
+    state.variant = Number(saved.variant) || 0
+    return true
+  }
+
   /* ------------------------------------------------------------ url state */
 
   function writeHash() {
@@ -376,6 +448,7 @@
     if (state.stay !== 'room') p.set('stay', state.stay)
     if (state.variant) p.set('way', String(state.variant))
     history.replaceState(null, '', '#' + p.toString())
+    rememberTrip()
   }
 
   function readHash() {
@@ -1272,6 +1345,9 @@
     $('#askbox').value = ''
     showAskNote('')
     history.replaceState(null, '', location.pathname + location.search)
+    // Start over means start over. Without this the next launch would restore
+    // the trip the reader had just cleared.
+    forgetTrip()
     renderControls()
     compute()
     map.resetView()
@@ -1777,6 +1853,7 @@
   /* ------------------------------------------------------------------ boot */
 
   readHash()
+  restoreTrip()
   renderControls()
   // Fonts are inlined, but the canvas measures text — wait for them so labels
   // are laid out against the real face rather than the fallback metrics.
