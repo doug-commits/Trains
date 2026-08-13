@@ -336,6 +336,27 @@ The app's matching half is `asset_statements` in
 `android/app/src/main/res/values/strings.xml`. Both halves are needed; neither
 does anything alone.
 
+### The two certificates, written down
+
+Both are public — a certificate is not a secret, it ships inside every copy of
+the app — and both are here because not having them written down is what turned
+a wrong keystore into an afternoon.
+
+| | SHA-1 / SHA-256 | What it is |
+| --- | --- | --- |
+| **Upload key** | `D3:72:0A:CC:9B:71:9A:1D:B6:03:51:78:41:75:78:68:44:55:1E:AD` | What Play requires every bundle to be signed with. `CN=Mukbang Shows, OU=Loyalty`, issued 14 June 2026. |
+| **App signing key** | `D9:7A:1C:0A:4C:86:12:B1:5E:C1:5A:7E:A8:B1:FA:0B:16:C2:37:B1:DB:AE:20:37:F1:65:11:30:B4:02:01:32` | Google's own, held by Play. What actually reaches devices. This is the value `PLAY_SHA256` wants. |
+
+They are different certificates doing different jobs and the whole point of
+Play App Signing is that they can be. You sign with the first; Google re-signs
+with the second before anything is distributed. So the upload key can be
+replaced without touching a single installed copy of the app — which is the
+escape hatch when the first one is lost.
+
+Note whose name is on the upload certificate. This listing was first published
+with the keystore belonging to a *different* app, and nothing about that is
+visible until Play refuses a bundle and names two fingerprints.
+
 ### Signing without giving the key to a build server
 
 The Android workflow has a **Build unsigned** tick box. With it set, CI compiles
