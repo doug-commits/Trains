@@ -336,26 +336,38 @@ The app's matching half is `asset_statements` in
 `android/app/src/main/res/values/strings.xml`. Both halves are needed; neither
 does anything alone.
 
-### The two certificates, written down
+### If Play says the bundle is signed with the wrong key
 
-Both are public — a certificate is not a secret, it ships inside every copy of
-the app — and both are here because not having them written down is what turned
-a wrong keystore into an afternoon.
+Read the certificate it names before touching a keystore. Play prints two
+fingerprints and no account of whose they are, and the first assumption —
+that the wrong key is in CI — is not the likely one.
 
-| | SHA-1 / SHA-256 | What it is |
-| --- | --- | --- |
-| **Upload key** | `D3:72:0A:CC:9B:71:9A:1D:B6:03:51:78:41:75:78:68:44:55:1E:AD` | What Play requires every bundle to be signed with. `CN=Mukbang Shows, OU=Loyalty`, issued 14 June 2026. |
-| **App signing key** | `D9:7A:1C:0A:4C:86:12:B1:5E:C1:5A:7E:A8:B1:FA:0B:16:C2:37:B1:DB:AE:20:37:F1:65:11:30:B4:02:01:32` | Google's own, held by Play. What actually reaches devices. This is the value `PLAY_SHA256` wants. |
+Save the upload certificate from **App integrity → App signing** and look at
+the subject:
 
-They are different certificates doing different jobs and the whole point of
-Play App Signing is that they can be. You sign with the first; Google re-signs
-with the second before anything is distributed. So the upload key can be
-replaced without touching a single installed copy of the app — which is the
-escape hatch when the first one is lost.
+```sh
+openssl x509 -inform DER -in upload_cert.der -noout -subject -fingerprint -sha1
+```
 
-Note whose name is on the upload certificate. This listing was first published
-with the keystore belonging to a *different* app, and nothing about that is
-visible until Play refuses a bundle and names two fingerprints.
+If the subject names a different product, you are uploading to the wrong app.
+Which is exactly what happened here: this bundle was being uploaded to a
+different listing in the same Play account, and the certificate Play demanded
+belonged to that other app. Nothing was wrong with the keystore, the build or
+the secrets, and an afternoon went into proving it.
+
+One Play account holds every app, the listings look alike in the sidebar, and
+the error for uploading to the wrong one is worded as though your signing key
+were at fault. Check the app name at the top of the page first.
+
+To make CI catch a genuinely wrong key, set the repository **variable**
+`ANDROID_UPLOAD_SHA1` to the SHA-1 on **this app's** App signing page, in the
+colon-separated form Play prints. Every build then checks itself and fails
+loudly rather than at the upload dialog.
+
+`PLAY_SHA256` is a different certificate again — the **app signing** SHA-256,
+the one Google holds and re-signs with, from the same page of the same listing.
+Take both from Overland SEA's own App integrity page and from nowhere else; a
+fingerprint copied from a neighbouring app is wrong in a way nothing reports.
 
 ### Signing without giving the key to a build server
 
