@@ -20,6 +20,11 @@ name: Android
 
 on:
   workflow_dispatch:
+    inputs:
+      unsigned:
+        description: 'Build unsigned, to sign on your own machine'
+        type: boolean
+        default: false
   push:
     tags: ['v*']
 
@@ -55,8 +60,11 @@ jobs:
       - name: Build the page and stage it into the app
         run: node tools/build-android.mjs
 
+      # Skipped on request, which is the whole of the unsigned path: with no
+      # ANDROID_KEYSTORE_PATH, Gradle leaves the release build unsigned and
+      # every step below already knows what to do with that.
       - name: Decode the upload keystore
-        if: env.KEYSTORE_B64 != ''
+        if: env.KEYSTORE_B64 != '' && !inputs.unsigned
         run: |
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
@@ -144,8 +152,14 @@ jobs:
             if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
               echo "Signed with the upload key. The .aab is ready for Play Console."
             else
-              echo "**Unsigned** — no keystore secrets are set, so this cannot be"
-              echo "uploaded to Play. The APK will still sideload for testing."
+              echo "**Unsigned.** Play will not take this as it stands — sign it on"
+              echo "the machine that holds the key:"
+              echo
+              echo '```sh'
+              echo "./tools/sign-aab.sh app-release.aab ~/.android/your-keystore.jks"
+              echo '```'
+              echo
+              echo "The APK beside it will sideload with \`adb install\` either way."
             fi
             echo
             find android/app/build/outputs -name '*.aab' -o -name '*.apk' \
@@ -154,9 +168,13 @@ jobs:
                 done
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Named for what it is. An unsigned bundle uploaded to Play is rejected
+      # with a message about the signature, and the worst version of that is
+      # spending twenty minutes on it because the file was called the same as
+      # the signed one.
       - uses: actions/upload-artifact@v4
         with:
-          name: overland-sea-android
+          name: overland-sea-android${{ inputs.unsigned && '-unsigned' || '' }}
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/release/*.apk

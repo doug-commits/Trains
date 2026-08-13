@@ -336,6 +336,29 @@ The app's matching half is `asset_statements` in
 `android/app/src/main/res/values/strings.xml`. Both halves are needed; neither
 does anything alone.
 
+### Signing without giving the key to a build server
+
+The Android workflow has a **Build unsigned** tick box. With it set, CI compiles
+the bundle and stops, and you sign it on the machine that holds the key:
+
+```sh
+./tools/sign-aab.sh app-release.aab ~/.android/upload.jks
+```
+
+It asks for the passwords rather than taking them as arguments — an argument is
+in your shell history and in the process list while it runs — and prints the
+fingerprint of what it produced so you can check it against Play before
+uploading rather than after.
+
+This is the safer arrangement and the less convenient one. The key stays in one
+place you control, and nobody who can read the repository's secrets can sign as
+you; the cost is that releases can only be cut from that machine. Signing in CI
+is fine too, and is what the four secrets above are for — pick one deliberately
+rather than by accident.
+
+An `.aab` is signed as a JAR. `apksigner` does not handle bundles; `jarsigner`,
+which ships with the JDK, is the documented tool.
+
 ### The Android upload key
 
 Play pins the **upload certificate** on the first release and refuses every
