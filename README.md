@@ -336,6 +336,31 @@ The app's matching half is `asset_statements` in
 `android/app/src/main/res/values/strings.xml`. Both halves are needed; neither
 does anything alone.
 
+### The Android upload key
+
+Play pins the **upload certificate** on the first release and refuses every
+later bundle signed with anything else. There is one right keystore for this
+listing and no way to substitute another, so the one in
+`ANDROID_KEYSTORE_BASE64` has to be that one.
+
+To find out which keystore you are holding:
+
+```sh
+keytool -list -v -keystore upload.jks -alias <your-alias> | grep 'SHA1:'
+```
+
+Set the repository **variable** (not secret — a certificate hash is public)
+`ANDROID_UPLOAD_SHA1` to that value in the colon-separated form Play prints,
+and the workflow checks every build against it and fails on a mismatch. Without
+it the build still succeeds and the upload is where you find out, which is
+after the build, the download and half the Play Console form.
+
+If the keystore is genuinely lost, Play can register a new one:
+**Test and release → Setup → App integrity → App signing → Request upload key
+reset.** It replaces the upload key only. The app signing key is unaffected and
+installed users keep receiving updates, which is the whole reason Play App
+Signing exists.
+
 ### Regenerating the data files
 
 Both outputs are committed, so you only need these when the inputs change.

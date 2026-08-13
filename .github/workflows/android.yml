@@ -98,6 +98,44 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # And check it is the key Play is expecting, rather than leaving that
+          # to be discovered by the upload dialog.
+          #
+          # Play pins the upload certificate on the first release and refuses
+          # every later bundle signed with anything else. The message it gives
+          # names two fingerprints and no cause, and by then the build has been
+          # made, downloaded and half-uploaded. The fingerprint is a public
+          # certificate hash and not a secret, so it lives in a repository
+          # variable: Settings -> Secrets and variables -> Actions -> Variables,
+          # ANDROID_UPLOAD_SHA1, in the colon-separated form Play prints.
+          SHA1=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null \
+            | grep -m1 -i 'SHA-1 digest' | sed 's/.*: *//' | tr -d ' ' | tr 'a-f' 'A-F')
+          # apksigner prints it unseparated; Play prints it with colons. Compare
+          # in one shape so a correct key never fails on punctuation.
+          WANT=$(printf '%s' "${{ vars.ANDROID_UPLOAD_SHA1 }}" | tr -d ': ' | tr 'a-f' 'A-F')
+          {
+            echo
+            echo "Upload certificate SHA-1: \`$SHA1\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$WANT" ]; then
+            echo "::warning title=Upload key unverified::Set the repository variable\
+            ANDROID_UPLOAD_SHA1 to $SHA1 and this build will check itself against\
+            the key Play expects, instead of finding out at upload."
+          elif [ "$SHA1" != "$WANT" ]; then
+            echo "::error title=Wrong signing key::This bundle is signed with $SHA1,\
+            but Play expects $WANT. The keystore in ANDROID_KEYSTORE_BASE64 is not\
+            the one this listing was first uploaded with. Play will reject it."
+            {
+              echo
+              echo "**This bundle would be rejected by Play.**"
+              echo "Signed with \`$SHA1\`, expected \`$WANT\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo "Matches the key Play expects." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Say what came out
         run: |
           {
