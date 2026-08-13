@@ -1,0 +1,123 @@
+# What is in the upload keystore, and its certificate.
+#
+# Run this when Play rejects a bundle with "signed with the wrong key", or
+# whenever you need the certificate for an upload key reset request.
+#
+# It exists because a GitHub secret is write-only. Once ANDROID_KEYSTORE_BASE64
+# is set, nobody — including you — can read it back through the UI or the API.
+# So when the question is "which keystore is actually in there?", the only thing
+# that can answer it is a job that has the secret, and this is that job.
+#
+#   Actions -> Android signing key -> Run workflow
+#
+# It prints the aliases and their certificate fingerprints into the run summary,
+# and attaches the public certificate as an artifact.
+#
+# What it does not do, and must not: print the keystore, print any password, or
+# put the private key in an artifact. A certificate is public by construction —
+# a copy of it ships inside every APK ever signed with it, and Google asks you
+# to upload one in the clear. A keystore is the opposite, and an artifact is a
+# file anyone with read access to this repository can download for ninety days.
+
+name: Android signing key
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+
+    steps:
+      - name: Refuse if there is nothing to inspect
+        if: env.KEYSTORE_B64 == ''
+        run: |
+          echo "::error title=No keystore::ANDROID_KEYSTORE_BASE64 is not set,\
+          so there is no keystore in this repository to look at."
+          exit 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Read the keystore
+        run: |
+          # No `set -x` anywhere in this job. The password is on these command
+          # lines and tracing would print it into a log that outlives the run.
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+          # Every alias, not just the configured one. The right keystore with
+          # the wrong alias fails at Play in exactly the same way as the wrong
+          # keystore, and this is where you would see the difference.
+          {
+            echo "### What is in the keystore"
+            echo
+            echo '```'
+            keytool -list -v \
+              -keystore "$RUNNER_TEMP/upload.jks" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              | grep -E 'Alias name|Creation date|Owner|Valid from|SHA1:|SHA256:' \
+              || echo "could not read it — check ANDROID_KEYSTORE_PASSWORD"
+            echo '```'
+            echo
+            echo "Configured alias: \`${ANDROID_KEY_ALIAS:-(unset)}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Say whether Play will accept it
+        run: |
+          set -euo pipefail
+          SHA1=$(keytool -list -v \
+            -keystore "$RUNNER_TEMP/upload.jks" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" 2>/dev/null \
+            | grep -m1 'SHA1:' | sed 's/.*SHA1: *//' | tr -d ' ' | tr 'a-f' 'A-F')
+          WANT=$(printf '%s' "${{ vars.ANDROID_UPLOAD_SHA1 }}" | tr -d ': ' | tr 'a-f' 'A-F')
+          BARE=$(printf '%s' "$SHA1" | tr -d ':')
+
+          {
+            echo
+            echo "### The answer"
+            echo
+            echo "This keystore signs as \`$SHA1\`."
+            if [ -z "$WANT" ]; then
+              echo
+              echo "Set the repository variable \`ANDROID_UPLOAD_SHA1\` to the"
+              echo "fingerprint Play says it expects, and every build will check"
+              echo "itself against it."
+            elif [ "$BARE" = "$WANT" ]; then
+              echo
+              echo "**Play expects this key.** Bundles signed with it will upload."
+            else
+              echo
+              echo "**Play does not expect this key.** It wants \`${{ vars.ANDROID_UPLOAD_SHA1 }}\`."
+              echo "This listing was first published with a different keystore. Either"
+              echo "find that one, or use the certificate attached to this run to"
+              echo "request an upload key reset in the Play Console."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The public half only. This is the file Google's upload key reset form
+      # asks for, and it is safe to hand over — it is already inside every copy
+      # of the app that has ever shipped.
+      - name: Export the certificate
+        run: |
+          set -euo pipefail
+          keytool -exportcert -rfc \
+            -keystore "$RUNNER_TEMP/upload.jks" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -file "$RUNNER_TEMP/upload_certificate.pem"
+          rm -f "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upload-certificate
+          path: ${{ runner.temp }}/upload_certificate.pem
+          if-no-files-found: error
