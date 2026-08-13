@@ -56,15 +56,26 @@ jobs:
           # Every alias, not just the configured one. The right keystore with
           # the wrong alias fails at Play in exactly the same way as the wrong
           # keystore, and this is where you would see the difference.
+          keytool -list -v \
+            -keystore "$RUNNER_TEMP/upload.jks" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            | grep -E 'Alias name|Creation date|Owner|Valid from|SHA1:|SHA256:' \
+            > "$RUNNER_TEMP/aliases.txt" \
+            || echo "could not read it — check ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/aliases.txt"
+
+          # To the log as well as the summary. Both are readable by anyone who
+          # can read this repository and neither contains a secret — these are
+          # certificate hashes, which ship inside every APK — and the log is
+          # the half that can be fetched through the API when somebody is
+          # helping you at a distance.
+          cat "$RUNNER_TEMP/aliases.txt"
+          echo "Configured alias: ${ANDROID_KEY_ALIAS:-(unset)}"
+
           {
             echo "### What is in the keystore"
             echo
             echo '```'
-            keytool -list -v \
-              -keystore "$RUNNER_TEMP/upload.jks" \
-              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-              | grep -E 'Alias name|Creation date|Owner|Valid from|SHA1:|SHA256:' \
-              || echo "could not read it — check ANDROID_KEYSTORE_PASSWORD"
+            cat "$RUNNER_TEMP/aliases.txt"
             echo '```'
             echo
             echo "Configured alias: \`${ANDROID_KEY_ALIAS:-(unset)}\`"
@@ -80,6 +91,9 @@ jobs:
             | grep -m1 'SHA1:' | sed 's/.*SHA1: *//' | tr -d ' ' | tr 'a-f' 'A-F')
           WANT=$(printf '%s' "${{ vars.ANDROID_UPLOAD_SHA1 }}" | tr -d ': ' | tr 'a-f' 'A-F')
           BARE=$(printf '%s' "$SHA1" | tr -d ':')
+
+          echo "CONFIGURED ALIAS SIGNS AS: $SHA1"
+          echo "PLAY EXPECTS: ${{ vars.ANDROID_UPLOAD_SHA1 }}"
 
           {
             echo
