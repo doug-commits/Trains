@@ -1003,6 +1003,31 @@ const css = read('src/app.css') + '\n' + read('src/doc.css')
  * Nong Khai crossing works on a phone is exactly who wants it offline. */
 const APPBANNER = read('src/appbanner.html')
 
+/* An intent line that counts the boats has to count them correctly.
+ *
+ * "Land and sea the whole way, across two countries and four ferries" was true
+ * of Singapore to Bali until the Pelni ship replaced the Sumatran coach chain
+ * and left it with three. Nothing noticed, because the sentence still read
+ * perfectly well — a stale number is invisible in a way a stale word is not.
+ *
+ * So any intent that spells out a count of boats or trains is checked against
+ * the route it describes, and a build that disagrees with itself stops. */
+function countsAgree(r, plan) {
+  const WORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 }
+  const actual = {
+    boat: plan.legs.filter(e => e.leg.mode === 'ferry').length,
+    train: plan.legs.filter(e => e.leg.mode === 'rail').length,
+  }
+  const wrong = []
+  const re = /(one|two|three|four|five|six|seven|eight|nine) (ferries|ferry|boats|boat|trains|train)/gi
+  for (const m of r.intent.matchAll(re)) {
+    const said = WORD[m[1].toLowerCase()]
+    const kind = /train/i.test(m[2]) ? 'train' : 'boat'
+    if (said !== actual[kind]) wrong.push(`"${m[0]}" but the route has ${actual[kind]}`)
+  }
+  return wrong
+}
+
 const built = []
 const failed = []
 
@@ -1014,6 +1039,11 @@ for (const r of ROUTES) {
     continue
   }
   const plan = Plan.build(NETWORK, routed, {})
+  const miscounted = countsAgree(r, plan)
+  if (miscounted.length) {
+    console.error(`guides             ${r.slug} says ${miscounted.join('; ')}`)
+    process.exit(1)
+  }
   built.push({
     ...r,
     plan,

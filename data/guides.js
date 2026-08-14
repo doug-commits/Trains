@@ -23,9 +23,18 @@ const GUIDES = [
   { from: 'luangprabang', to: 'klsentral', slug: 'laos-to-malaysia-by-train',
     h1: 'Laos to Malaysia by train',
     intent: 'Luang Prabang to Kuala Lumpur, pure spine, southbound.' },
+  /* Titled for the question rather than the philosophy. Three months of
+   * Search Console had this page at position 6 to 11 for "singapore to bali
+   * ferry", "ferry from singapore to bali" and "is there a ferry from
+   * singapore to bali" — sixteen impressions of ferry-shaped queries against
+   * ten for trains — while the word "ferry" appeared nowhere in its title. Not
+   * one query in a hundred and forty-eight contained "without flying".
+   *
+   * The slug stays. It holds whatever authority the page has earned, and
+   * "without-flying" costs nothing sitting in a URL. */
   { from: 'singapore', to: 'denpasar', slug: 'singapore-to-bali-without-flying',
-    h1: 'Singapore to Bali without flying',
-    intent: 'Land and sea the whole way, across two countries and four ferries.' },
+    h1: 'Singapore to Bali by ferry and train',
+    intent: 'Three boats and two trains: the strait to Batam, thirty-two hours at sea to Java, then the rails east and the dawn crossing into Bali.' },
   { from: 'bkk_aphiwat', to: 'siemreap', slug: 'bangkok-to-siem-reap-overland',
     h1: 'Bangkok to Siem Reap overland',
     intent: 'Train to the frontier, and the truth about the Poipet crossing.' },
