@@ -83,8 +83,15 @@ const SITE_NAME = 'Overland SEA'
 
 /* ------------------------------------------------------------------ page */
 
-const nights = plan =>
-  plan.totals.days === 1 ? 'a single day' : `${plan.totals.days} days`
+/* Days, as a range wherever waiting for an infrequent service can change it.
+ * The description is the snippet Google shows, and "2 days" on a journey that
+ * hangs on a weekly sailing is the kind of promise this planner exists not to
+ * make. */
+const nights = plan => {
+  const t = plan.totals
+  if (t.daysWorst > t.days) return `${t.days} to ${t.daysWorst} days`
+  return t.days === 1 ? 'a single day' : `${t.days} days`
+}
 
 /* Shift every heading down one level, deepest first so h2→h3 does not then get
  * caught by h1→h2 on the same pass. h5 is the floor; nothing here nests that
@@ -1047,7 +1054,10 @@ for (const r of ROUTES) {
   built.push({
     ...r,
     plan,
-    summary: `${plan.totals.legs} legs · ${plan.totals.days}d · $${Math.round(plan.totals.totalUsd)}`,
+    summary:
+      `${plan.totals.legs} legs · ` +
+      `${plan.totals.daysWorst > plan.totals.days ? `${plan.totals.days}–${plan.totals.daysWorst}` : plan.totals.days}d · ` +
+      `$${Math.round(plan.totals.totalUsd)}`,
   })
 }
 

@@ -3037,6 +3037,50 @@ const Plan = (() => {
     const seaHours = legs.filter(e => e.leg.mode === 'ferry').reduce((n, e) => n + e.leg.hours, 0)
     const roadHours = legs.filter(e => e.leg.mode === 'road').reduce((n, e) => n + e.leg.hours, 0)
     const bufferHours = junctions.reduce((n, j) => n + j.minutes / 60, 0)
+    /* What waiting for the next departure can cost you.
+     *
+     * The day count below is running time: it assumes every connection is
+     * there when you reach it. That is true of a railway running hourly and
+     * false of a ship that sails on Wednesdays, and the gap between the two is
+     * most of a week — which made "Batam to Jakarta, 2 days" a statement about
+     * the voyage that could be wrong about the trip by six days.
+     *
+     * The honest figure is not one number. It is a floor and a ceiling: what
+     * the journey costs if you plan around the sailing, and what it costs if
+     * you arrive the day after one. The planner cannot know which, because it
+     * does not know your date and does not pretend to publish theirs — so it
+     * gives both and says which is which.
+     *
+     * Worst case, and deliberately: the point of the ceiling is to be the
+     * number nobody is surprised by. An expected value of half a period would
+     * be a more defensible average and a worse warning, because nobody
+     * experiences an average — you either make the Wednesday boat or you do
+     * not.
+     */
+    const waitDaysFor = entry => {
+      const runs = entry.leg.daily || entry.operator?.daily
+      if (!runs) return 0
+      const n = String(runs.n)
+      const spread = String(runs.spread || '')
+
+      // Sailings a week, taking the low end: the worst case is the week the
+      // second sailing does not run.
+      const weekly = n.match(/(\d+)(?:\s*[–-]\s*\d+)?\s*a?\s*week/i)
+      if (weekly) return Math.max(0, Math.ceil(7 / Number(weekly[1])) - 1)
+      if (/weekly/i.test(n)) return 6
+
+      /* "0–2" is the Cambodian railway: it may simply not run on the day you
+         turn up, and its own note says selected days rather than daily. */
+      if (/^0/.test(n) || /selected days|not daily/i.test(spread)) return 3
+      return 0
+    }
+
+    const waits = legs
+      .map(e => ({ entry: e, days: waitDaysFor(e) }))
+      .filter(w => w.days > 0)
+    // Additive, because each infrequent leg is its own chance to miss one.
+    const waitDays = waits.reduce((n, w) => n + w.days, 0)
+
     const movingHours = railHours + seaHours + roadHours + bufferHours
 
     const pace = PACE_HOURS[opts.pace] ?? PACE_HOURS.standard
@@ -3045,6 +3089,9 @@ const Plan = (() => {
      * to two days while the schedule below plainly showed three. */
     const schedule = buildDays(legs, junctions, pace)
     const days = schedule.length
+    // The ceiling. Equal to `days` on any route where everything runs daily,
+    // which is most of them, and the UI shows a single number when they match.
+    const daysWorst = days + waitDays
     const sleeperNights = schedule.filter(d => d.night === 'sleeper').length
     const hotelNights = schedule.filter(d => d.night === 'hotel').length
 
@@ -3099,6 +3146,8 @@ const Plan = (() => {
         bufferHours,
         movingHours,
         days,
+        daysWorst,
+        waitDays,
         sleeperNights,
         hotelNights,
         transportUsd,
@@ -5238,6 +5287,14 @@ const UI = (() => {
         `with ${t.borders} ${t.borders === 1 ? 'frontier' : 'frontiers'} in between.`
     )
 
+    if (t.daysWorst > t.days) {
+      sentences.push(
+        `It is ${t.days} days if every connection is there when you reach it, and up to ` +
+          `${t.daysWorst} if you arrive the day after one — the difference is waiting for a ` +
+          `service that does not run daily, not travelling.`
+      )
+    }
+
     const top = plan.risks[0]
     if (top) sentences.push(`The one to watch: ${esc(top.title)}.`)
 
@@ -5283,9 +5340,28 @@ const UI = (() => {
 
   function statBar(plan) {
     const t = plan.totals
+    /* A range where waiting can change the answer, one number where it cannot.
+     *
+     * The low figure is the journey with every connection made; the high one is
+     * the same journey having missed the weekly boat. Showing only the low one
+     * was a claim about the voyage passed off as a claim about the trip, and
+     * showing only an average would be a number nobody actually experiences —
+     * you either make the Wednesday sailing or you wait for the next. */
+    const waits = t.daysWorst > t.days
+    const dayRange = waits ? `${t.days}–${t.daysWorst}` : `${t.days}`
+    /* One word, like every other tile. "days, with the waits" wrapped to two
+       lines in a tile a quarter of a phone wide and left the row uneven, and a
+       range already reads as "somewhere between" without being told. What it
+       is between goes in the title, and in the risk card further down. */
+    const dayLabel = waits || t.days !== 1 ? 'days' : 'day'
+    const dayWhy = waits
+      ? `${t.days} days if every connection is there when you reach it, up to ${t.daysWorst} ` +
+        'if you arrive the day after one. The difference is waiting for a service that does ' +
+        'not run daily.'
+      : ''
     const bits = [
-      [`${t.days}`, t.days === 1 ? 'day' : 'days'],
-      [`${t.legs}`, 'legs'],
+      [dayRange, dayLabel, null, dayWhy],
+      [`${t.legs}`, t.legs === 1 ? 'leg' : 'legs'],
       [`${t.borders}`, t.borders === 1 ? 'border' : 'borders'],
       // Marked, not positional: the cost carries the accent, and it stopped
       // being the last tile the moment a journey had road hours to report.
@@ -5296,8 +5372,9 @@ const UI = (() => {
     if (t.roadHours) bits.push([hours(t.roadHours), 'by road', 'road'])
     return `<div class="stats">${bits
       .map(
-        ([v, l, kind]) =>
-          `<div class="stat${kind ? ' is-' + kind : ''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`
+        ([v, l, kind, why]) =>
+          `<div class="stat${kind ? ' is-' + kind : ''}"${why ? ` title="${esc(why)}"` : ''}>` +
+          `<b>${esc(v)}</b><span>${esc(l)}</span></div>`
       )
       .join('')}</div>`
   }

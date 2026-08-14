@@ -3069,6 +3069,66 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* Waiting for a boat that sails on Wednesdays, counted.
+ *
+ * The day total is running time and assumes every connection is there when you
+ * reach it. On a route hanging on a weekly sailing that is a statement about
+ * the voyage passed off as one about the trip, wrong by most of a week. */
+{
+  const { page, context } = await newPage()
+  await page.goto(url + '#from=batam&to=jakarta')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+
+  const shown = await page.evaluate(() => {
+    const tile = document.querySelector('.stat')
+    return { text: tile.textContent.trim(), why: tile.getAttribute('title') || '' }
+  })
+  /* A weekly ship: two days of sailing, up to six more waiting for the next
+     one. The range is the honest answer and a single number is not — neither
+     the floor, which promises what it cannot, nor an average, which nobody
+     experiences. */
+  check('a weekly sailing turns the day count into a range', /2–8/.test(shown.text), shown.text)
+  check('and the tile says what the range is between', /waiting for a service/.test(shown.why))
+  check('and the lede says it in words',
+    /up to 8 if you arrive the day after one/.test(
+      await page.evaluate(() => document.querySelector('.lede').textContent)))
+
+  /* And a corridor where everything runs daily is left with one number, or
+     every route on the map would grow a range it has not earned. */
+  await page.goto('about:blank')
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(400)
+  const daily = await page.evaluate(() => {
+    const tile = document.querySelector('.stat')
+    return { text: tile.textContent.trim(), why: tile.getAttribute('title') }
+  })
+  check('a route that runs daily keeps a single number', !/–/.test(daily.text) && !daily.why,
+    daily.text)
+
+  // The slip that has now appeared twice: a count that never learned to be one.
+  check('and the tiles never say "1 legs"',
+    !/1legs|1borders/.test(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('.stat')].map(e => e.textContent.replace(/\s/g, '')).join(' '))))
+  await context.close()
+}
+
+{
+  /* The guide pages carry the range too — into the snippet Google shows,
+     which is where "2 days" would do the most damage. */
+  const ferry = readFileSync(join(root, 'public/batam-to-jakarta-by-ferry.html'), 'utf8')
+  const desc = (ferry.match(/name="description" content="([^"]*)"/) || [])[1] || ''
+  check('and the search snippet gives the range, not the floor', /2 to 8 days/.test(desc), desc.slice(0, 80))
+
+  /* Two infrequent legs on one route and the waits add up, because each is its
+     own chance to miss one. Singapore to Bali is the Riau ferry and then the
+     weekly ship. */
+  const bali = readFileSync(join(root, 'public/singapore-to-bali-without-flying.html'), 'utf8')
+  check('and the waits compound where a route has more than one', /4–10/.test(bali))
+}
+
 /* A service that does not run every day, and the fact that the totals above it
  * are running times rather than trip length. Sharpened by the Pelni ships:
  * Batam to Jakarta is one 32-hour leg and reads as two days, which is true of

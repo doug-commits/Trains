@@ -76,6 +76,14 @@ const UI = (() => {
         `with ${t.borders} ${t.borders === 1 ? 'frontier' : 'frontiers'} in between.`
     )
 
+    if (t.daysWorst > t.days) {
+      sentences.push(
+        `It is ${t.days} days if every connection is there when you reach it, and up to ` +
+          `${t.daysWorst} if you arrive the day after one — the difference is waiting for a ` +
+          `service that does not run daily, not travelling.`
+      )
+    }
+
     const top = plan.risks[0]
     if (top) sentences.push(`The one to watch: ${esc(top.title)}.`)
 
@@ -121,9 +129,28 @@ const UI = (() => {
 
   function statBar(plan) {
     const t = plan.totals
+    /* A range where waiting can change the answer, one number where it cannot.
+     *
+     * The low figure is the journey with every connection made; the high one is
+     * the same journey having missed the weekly boat. Showing only the low one
+     * was a claim about the voyage passed off as a claim about the trip, and
+     * showing only an average would be a number nobody actually experiences —
+     * you either make the Wednesday sailing or you wait for the next. */
+    const waits = t.daysWorst > t.days
+    const dayRange = waits ? `${t.days}–${t.daysWorst}` : `${t.days}`
+    /* One word, like every other tile. "days, with the waits" wrapped to two
+       lines in a tile a quarter of a phone wide and left the row uneven, and a
+       range already reads as "somewhere between" without being told. What it
+       is between goes in the title, and in the risk card further down. */
+    const dayLabel = waits || t.days !== 1 ? 'days' : 'day'
+    const dayWhy = waits
+      ? `${t.days} days if every connection is there when you reach it, up to ${t.daysWorst} ` +
+        'if you arrive the day after one. The difference is waiting for a service that does ' +
+        'not run daily.'
+      : ''
     const bits = [
-      [`${t.days}`, t.days === 1 ? 'day' : 'days'],
-      [`${t.legs}`, 'legs'],
+      [dayRange, dayLabel, null, dayWhy],
+      [`${t.legs}`, t.legs === 1 ? 'leg' : 'legs'],
       [`${t.borders}`, t.borders === 1 ? 'border' : 'borders'],
       // Marked, not positional: the cost carries the accent, and it stopped
       // being the last tile the moment a journey had road hours to report.
@@ -134,8 +161,9 @@ const UI = (() => {
     if (t.roadHours) bits.push([hours(t.roadHours), 'by road', 'road'])
     return `<div class="stats">${bits
       .map(
-        ([v, l, kind]) =>
-          `<div class="stat${kind ? ' is-' + kind : ''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`
+        ([v, l, kind, why]) =>
+          `<div class="stat${kind ? ' is-' + kind : ''}"${why ? ` title="${esc(why)}"` : ''}>` +
+          `<b>${esc(v)}</b><span>${esc(l)}</span></div>`
       )
       .join('')}</div>`
   }

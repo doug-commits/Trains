@@ -646,6 +646,50 @@ const Plan = (() => {
     const seaHours = legs.filter(e => e.leg.mode === 'ferry').reduce((n, e) => n + e.leg.hours, 0)
     const roadHours = legs.filter(e => e.leg.mode === 'road').reduce((n, e) => n + e.leg.hours, 0)
     const bufferHours = junctions.reduce((n, j) => n + j.minutes / 60, 0)
+    /* What waiting for the next departure can cost you.
+     *
+     * The day count below is running time: it assumes every connection is
+     * there when you reach it. That is true of a railway running hourly and
+     * false of a ship that sails on Wednesdays, and the gap between the two is
+     * most of a week — which made "Batam to Jakarta, 2 days" a statement about
+     * the voyage that could be wrong about the trip by six days.
+     *
+     * The honest figure is not one number. It is a floor and a ceiling: what
+     * the journey costs if you plan around the sailing, and what it costs if
+     * you arrive the day after one. The planner cannot know which, because it
+     * does not know your date and does not pretend to publish theirs — so it
+     * gives both and says which is which.
+     *
+     * Worst case, and deliberately: the point of the ceiling is to be the
+     * number nobody is surprised by. An expected value of half a period would
+     * be a more defensible average and a worse warning, because nobody
+     * experiences an average — you either make the Wednesday boat or you do
+     * not.
+     */
+    const waitDaysFor = entry => {
+      const runs = entry.leg.daily || entry.operator?.daily
+      if (!runs) return 0
+      const n = String(runs.n)
+      const spread = String(runs.spread || '')
+
+      // Sailings a week, taking the low end: the worst case is the week the
+      // second sailing does not run.
+      const weekly = n.match(/(\d+)(?:\s*[–-]\s*\d+)?\s*a?\s*week/i)
+      if (weekly) return Math.max(0, Math.ceil(7 / Number(weekly[1])) - 1)
+      if (/weekly/i.test(n)) return 6
+
+      /* "0–2" is the Cambodian railway: it may simply not run on the day you
+         turn up, and its own note says selected days rather than daily. */
+      if (/^0/.test(n) || /selected days|not daily/i.test(spread)) return 3
+      return 0
+    }
+
+    const waits = legs
+      .map(e => ({ entry: e, days: waitDaysFor(e) }))
+      .filter(w => w.days > 0)
+    // Additive, because each infrequent leg is its own chance to miss one.
+    const waitDays = waits.reduce((n, w) => n + w.days, 0)
+
     const movingHours = railHours + seaHours + roadHours + bufferHours
 
     const pace = PACE_HOURS[opts.pace] ?? PACE_HOURS.standard
@@ -654,6 +698,9 @@ const Plan = (() => {
      * to two days while the schedule below plainly showed three. */
     const schedule = buildDays(legs, junctions, pace)
     const days = schedule.length
+    // The ceiling. Equal to `days` on any route where everything runs daily,
+    // which is most of them, and the UI shows a single number when they match.
+    const daysWorst = days + waitDays
     const sleeperNights = schedule.filter(d => d.night === 'sleeper').length
     const hotelNights = schedule.filter(d => d.night === 'hotel').length
 
@@ -708,6 +755,8 @@ const Plan = (() => {
         bufferHours,
         movingHours,
         days,
+        daysWorst,
+        waitDays,
         sleeperNights,
         hotelNights,
         transportUsd,
