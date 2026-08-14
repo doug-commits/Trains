@@ -1752,6 +1752,46 @@ const GUIDES = [
   { from: 'bkk_aphiwat', to: 'wakafbaharu', slug: 'bangkok-to-kota-bharu-by-train',
     h1: 'Bangkok to Kota Bharu by train',
     intent: 'The east-coast crossing at Sungai Kolok — and the security advice to read first.' },
+
+  /* The boats.
+   *
+   * Added because Search Console said to. Seventeen days in, the site averaged
+   * position 50 on Thailand–Laos rail queries and position 18 on Indonesian sea
+   * crossings — three times better on water than on rails, with no backlinks
+   * either way. Which makes sense: "Bangkok to Chiang Mai" has twenty adequate
+   * answers and the operator's own site among them, while "is there a ferry
+   * from Singapore to Bali" had this planner at position 8 and no page written
+   * for it at all.
+   *
+   * Every one of these is at least three quarters sea by running time. Routes
+   * that merely end at a pier — Bangkok to Koh Tao is 19% water and 81% train —
+   * are already covered by the rail guides and do not need a second page
+   * saying the same thing with a boat in the title.
+   *
+   * The Philippine ones are here because the network has carried forty
+   * Philippine stations and a complete inter-island ferry system since the
+   * beginning, and not one page had ever been written about any of it. */
+  { from: 'batam', to: 'jakarta', slug: 'batam-to-jakarta-by-ferry',
+    h1: 'Batam to Jakarta by ferry',
+    intent: 'The Pelni ship that makes three days of Sumatran coaches optional — and the sailing day you have to plan around.' },
+  { from: 'singapore', to: 'batam', slug: 'singapore-to-batam-by-ferry',
+    h1: 'Singapore to Batam by ferry',
+    intent: 'Forty-five minutes across the strait, and the way out of Singapore\'s rail dead end into Indonesia.' },
+  { from: 'denpasar', to: 'mataram', slug: 'bali-to-lombok-by-ferry',
+    h1: 'Bali to Lombok by ferry',
+    intent: 'The slow Padangbai crossing against the tourist fast boats, and why the night sailings are the rough ones.' },
+  { from: 'cebu', to: 'tagbilaran', slug: 'cebu-to-bohol-by-ferry',
+    h1: 'Cebu to Bohol by ferry',
+    intent: 'The busiest fast-craft route in the Visayas, roughly hourly — and the one that sells out at weekends.' },
+  { from: 'manila', to: 'coron', slug: 'manila-to-coron-by-ferry',
+    h1: 'Manila to Coron by ferry',
+    intent: 'A night at sea to northern Palawan on a shipping line that does not sail daily.' },
+  { from: 'manila', to: 'puertoprincesa', slug: 'manila-to-puerto-princesa-by-ferry',
+    h1: 'Manila to Puerto Princesa by ferry',
+    intent: 'Twenty-six hours to Palawan by sea, and what a cabin buys over the tourist deck.' },
+  { from: 'georgetown', to: 'langkawi', slug: 'penang-to-langkawi-by-ferry',
+    h1: 'Penang to Langkawi by ferry',
+    intent: 'Three hours up the Malacca Strait, daylight only — and the last departure that decides your day.' },
 ]
 
 

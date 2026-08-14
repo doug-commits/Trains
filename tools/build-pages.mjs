@@ -98,15 +98,31 @@ function demote(html) {
   return html
 }
 
+/* The snippet Google may show, so every word of it has to survive being read
+ * on its own.
+ *
+ * `t.ferryHours` does not exist — the field is `seaHours` — so "sea" had never
+ * once appeared in a description, including on the routes that are mostly
+ * boat. Invisible while every page had a train on it and the sentence still
+ * read; the ferry guides made it "1 legs by  over 2 days" and gave it away. */
 function description(r, plan) {
   const t = plan.totals
   const modes = []
   if (t.railHours) modes.push('rail')
-  if (t.ferryHours) modes.push('sea')
+  if (t.seaHours) modes.push('sea')
   if (t.roadHours) modes.push('road')
+
+  const legs = `${t.legs} ${t.legs === 1 ? 'leg' : 'legs'}`
+  const by = modes.length ? ` by ${modes.join(', ')}` : ''
+  // Domestic routes were announcing "0 borders", which is a fact about
+  // nothing and a waste of the only 155 characters anyone reads.
+  const borders = t.borders
+    ? `${t.borders} border${t.borders === 1 ? '' : 's'}, `
+    : ''
+
   return (
-    `${r.h1}: ${t.legs} legs by ${modes.join(', ')} over ${nights(plan)}, ` +
-    `${t.borders} border${t.borders === 1 ? '' : 's'}, about $${Math.round(t.totalUsd)} all in. ` +
+    `${r.h1}: ${legs}${by} over ${nights(plan)}, ` +
+    `${borders}about $${Math.round(t.totalUsd)} all in. ` +
     `Every crossing, connection buffer and booking route spelled out.`
   ).slice(0, 300)
 }

@@ -2893,6 +2893,40 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* Every guide page's meta description, which is the snippet Google may show
+   and the only 155 characters most people ever read of a page.
+
+   Checked because `t.ferryHours` — a field that does not exist, the real one
+   being `seaHours` — meant "sea" had never once appeared in a description,
+   including on the routes that are mostly boat. It stayed invisible for as
+   long as every written route had a train on it and the sentence still read. */
+{
+  const pages = readdirSync(join(root, 'public')).filter(f => f.endsWith('.html'))
+  const descs = pages
+    .map(f => [f, readFileSync(join(root, 'public', f), 'utf8')])
+    .map(([f, h]) => [f, (h.match(/name="description" content="([^"]*)"/) || [])[1] || ''])
+    .filter(([f]) => !/privacy|support|border-crossing/.test(f))
+
+  check('every guide page has a description', descs.every(([, d]) => d.length > 60),
+    descs.filter(([, d]) => d.length <= 60).map(([f]) => f).join(' ') || 'all present')
+
+  /* The two shapes the bug produced: an empty mode list, and a count that
+     never learned to be singular. */
+  const broken = descs.filter(([, d]) => / by  |by , | 1 legs /.test(d))
+  check('and none of them says "1 legs" or "by  "', !broken.length,
+    broken.map(([f]) => f).join(' '))
+
+  /* And a route that is entirely boat says so. This is the assertion the old
+     field name would have failed. */
+  const ferry = descs.find(([f]) => f === 'cebu-to-bohol-by-ferry.html')
+  check('a crossing made only of sea is described as sea', ferry && / by sea /.test(ferry[1]),
+    ferry ? ferry[1].slice(0, 60) : 'page missing')
+
+  /* Nothing announces a border count of zero. It is a fact about nothing,
+     spent out of the only characters anyone reads. */
+  check('and no page advertises having no borders', !descs.some(([, d]) => /0 borders/.test(d)))
+}
+
 /* The guide pages are most of what anyone reads — a search lands on one of
    them, not on the planner — so an alternative that only exists behind the
    JavaScript is one most readers never see. */
