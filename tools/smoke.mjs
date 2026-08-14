@@ -2944,6 +2944,16 @@ function check(label, condition, detail = '') {
   check('including the Jungle Railway against the west coast',
     /Other ways round/.test(bkk) && /Jungle Railway|Wakaf|Gua Musang|Kuala Lipis/.test(bkk))
 
+  /* Two routings with nothing in common are different journeys however short
+     they are. The absolute-hours floor exists to kill the same route with a
+     station moved — which always overlaps heavily — so on its own it threw
+     away the opposite case: Cebu to Dumaguete is three boats through Bohol and
+     Siquijor or a four-hour bus down the coast, sharing not one leg, and at
+     four and a half hours each the floor called them the same journey. */
+  const cebu = readFileSync(join(root, 'public/cebu-to-dumaguete-by-ferry.html'), 'utf8')
+  check('a short journey with a completely different way round still offers it',
+    /Other ways round/.test(cebu) && /Santander/i.test(cebu))
+
   /* A static page cannot rebuild itself, so the choice has to be a link into
      the planner with the routing already picked — not a button nothing is
      listening for. */

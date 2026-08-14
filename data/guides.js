@@ -165,4 +165,37 @@ const GUIDES = [
   { from: 'georgetown', to: 'langkawi', slug: 'penang-to-langkawi-by-ferry',
     h1: 'Penang to Langkawi by ferry',
     intent: 'Three hours up the Malacca Strait, daylight only — and the last departure that decides your day.' },
+
+  /* The Philippine inter-island network, which is what this country has
+   * instead of a railway.
+   *
+   * Forty stations and twenty-two sea legs have been in the data since the
+   * beginning, carrying nothing. The national rail is a Manila commuter line
+   * closed for works and two Bicol shuttles, so every one of these journeys is
+   * a boat — which makes the Philippines the one place on this map where a
+   * ferry planner is not a supplement to the trains, it is the whole answer.
+   *
+   * Chosen so that no two of them are the same journey. Cebu to Siquijor was
+   * dropped because Cebu to Dumaguete already sails through it, and the short
+   * Visayan hops — Bohol to Siquijor, Dumaguete to Siquijor, Iloilo to Bacolod
+   * — are ninety-minute crossings that would carry a full itinerary apparatus
+   * around a single boat and read as filler. */
+  { from: 'coron', to: 'elnido', slug: 'coron-to-el-nido-by-ferry',
+    h1: 'Coron to El Nido by ferry',
+    intent: 'Four hours across open water between the two ends of northern Palawan, and the swell that cancels it.' },
+  { from: 'manila', to: 'iloilo', slug: 'manila-to-iloilo-by-ferry',
+    h1: 'Manila to Iloilo by ferry',
+    intent: 'A night and most of a day at sea to Panay, on a shipping line that sails a few times a week rather than daily.' },
+  { from: 'cebu', to: 'iloilo', slug: 'cebu-to-iloilo-by-ferry',
+    h1: 'Cebu to Iloilo by ferry',
+    intent: 'The overnight across the Visayan Sea — twelve hours, and a berth costs less than the flight you did not take.' },
+  { from: 'cebu', to: 'cagayandeoro', slug: 'cebu-to-cagayan-de-oro-by-ferry',
+    h1: 'Cebu to Cagayan de Oro by ferry',
+    intent: 'Nine hours to northern Mindanao, and the crossing that opens the whole island up without a plane.' },
+  { from: 'cebu', to: 'surigao', slug: 'cebu-to-surigao-by-ferry',
+    h1: 'Cebu to Surigao by ferry',
+    intent: 'The overnight Cokaliong boat to the top of Mindanao — and the port everyone bound for Siargao passes through.' },
+  { from: 'cebu', to: 'dumaguete', slug: 'cebu-to-dumaguete-by-ferry',
+    h1: 'Cebu to Dumaguete by ferry',
+    intent: 'Island-hopping down through Bohol and Siquijor, against the four-hour bus most people take instead — both are here.' },
 ]

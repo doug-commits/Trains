@@ -78,6 +78,16 @@ const Router = (() => {
    * genuinely long but almost entirely retraces the recommendation. */
   const MAX_SHARE = 0.9
 
+  /* Below this much overlap the hours stop mattering: two routings with almost
+   * nothing in common are different journeys however short they are.
+   *
+   * The floor above exists to kill the same route with a station moved, and
+   * that case always has a *high* overlap — so making it the only test threw
+   * away the opposite case. Cebu to Dumaguete is three boats through Bohol and
+   * Siquijor or a four-hour bus down the coast; they share not one leg, and at
+   * four and a half hours each the floor called them the same journey. */
+  const DISJOINT = 0.15
+
   /* And past this much worse than the recommendation, it is not an alternative
    * — it is a different holiday. Without a ceiling the search will always find
    * something, so Woodlands to Singapore, half an hour on the MRT, came back
@@ -222,7 +232,11 @@ const Router = (() => {
       return floor ? shared / floor : 1
     }
 
-    const different = (a, b) => uniqueHours(a, b) >= MIN_UNIQUE_HOURS && share(a, b) <= MAX_SHARE
+    const different = (a, b) => {
+      const overlap = share(a, b)
+      if (overlap <= DISJOINT) return true
+      return uniqueHours(a, b) >= MIN_UNIQUE_HOURS && overlap <= MAX_SHARE
+    }
 
     const penalty = new Map()
     const charge = r => {
