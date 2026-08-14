@@ -6128,7 +6128,11 @@ const MapView = (() => {
     ]
 
     function drawPlaces(zoom) {
-      const boxes = []
+      // The scale bar's corner is spoken for. Seeded as an occupied box rather
+      // than checked separately, so it goes through the same collision test as
+      // every other name and a toponym simply loses that corner.
+      const bar = scaleBar()
+      const boxes = bar ? [bar.box] : []
       /* Names grow with the map, but far more slowly than it does — a fourth
          root, so eight times the magnification is one and a half times the
          type. A country name that scaled with the land would be a headline by
@@ -6197,19 +6201,26 @@ const MapView = (() => {
       }
     }
 
-    function drawScaleBar() {
+    /* Where the scale bar will go, worked out before anything is drawn.
+     *
+     * Separated from the drawing because the toponyms need it too: they are
+     * painted first and knew nothing about it, so BORNEO ran straight into
+     * "500 km" in the corner. One geometry, two readers — the alternative is
+     * two copies of the same arithmetic that drift apart the first time either
+     * is touched. */
+    function scaleBar() {
       const y = view.h / 2
       const a = Proj.unproject(view, view.w * 0.4, y)
       const b = Proj.unproject(view, view.w * 0.6, y)
       const kmPerPx = Proj.haversine(a, b) / (view.w * 0.2)
-      if (!isFinite(kmPerPx) || kmPerPx <= 0) return
+      if (!isFinite(kmPerPx) || kmPerPx <= 0) return null
 
       // The widest round number that still fits the space allowed for it.
       const maxPx = Math.min(150, view.w * 0.22)
       let km = NICE_KM[0]
       for (const n of NICE_KM) if (n / kmPerPx <= maxPx) km = n
       const px = km / kmPerPx
-      if (px < 30) return
+      if (px < 30) return null
 
       /* Bottom right of the *visible* map, which is not the bottom right of the
          canvas: the store runs the full width of the stage and the itinerary
@@ -6222,6 +6233,14 @@ const MapView = (() => {
          card is top left and the legend bottom left. */
       const x = view.w - inset.right - px - 22
       const by = view.h - inset.bottom - 26
+      // The bar, its ticks and the figure sitting above it.
+      return { km, px, x, by, box: { x: x - 6, y: by - 26, w: px + 12, h: 34 } }
+    }
+
+    function drawScaleBar() {
+      const bar = scaleBar()
+      if (!bar) return
+      const { km, px, x, by } = bar
 
       ctx.save()
       ctx.globalAlpha = 0.85
