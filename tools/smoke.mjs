@@ -2957,10 +2957,23 @@ function check(label, condition, detail = '') {
   /* A static page cannot rebuild itself, so the choice has to be a link into
      the planner with the routing already picked — not a button nothing is
      listening for. */
-  const one = withWays.map(f => readFileSync(join(root, 'public', f), 'utf8')).find(h => /way-go/.test(h))
+  /* Matched on `class="way-go"` rather than on the bare word, and asserted
+     across every page rather than the first one that mentions it. The loose
+     version searched the whole file for "way-go", the stylesheet is inlined
+     into every page, and the moment a `.way-go` rule was added to app.css the
+     first "match" became a page that has the rule and no such link — so the
+     check failed while every real link on the site was correct. */
+  const ways = withWays
+    .map(f => [f, readFileSync(join(root, 'public', f), 'utf8')])
+    .filter(([, h]) => /class="way-go"/.test(h))
+  const linked = ways.filter(
+    ([, h]) =>
+      /<a class="way-go" href="\/#from=[^"]*&amp;way=\d"/.test(h) &&
+      !/<button[^>]*class="way-go"/.test(h)
+  )
   check('and offer it as a link into the planner rather than a dead button',
-    one && /class="way-go" href="\/#from=[^"]*&amp;way=\d"/.test(one) &&
-      !/<button[^>]*class="way-go"/.test(one))
+    ways.length > 0 && linked.length === ways.length,
+    `${linked.length}/${ways.length} pages`)
 }
 
 /* And the app carries all of it.

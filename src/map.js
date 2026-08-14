@@ -405,8 +405,13 @@ const MapView = (() => {
 
       drawGraticule()
 
+      /* Lighter than it was. The vignette used to be the only thing giving the
+         water any shape, so it had to be heavy enough to be seen and turned the
+         corners of the frame into a void. The shelf does that job properly now,
+         and a vignette's real job is to settle the eye in the middle rather
+         than to be noticed. */
       ctx.save()
-      ctx.globalAlpha = 0.5
+      ctx.globalAlpha = 0.32
       ctx.drawImage(baked.vignette, 0, 0, view.w, view.h)
       ctx.restore()
 
@@ -776,6 +781,192 @@ const MapView = (() => {
       }
     }
 
+    /* A scale bar, because a map without one is a picture of a map.
+     *
+     * It is also the honest answer to a question this planner otherwise dodges.
+     * The itinerary talks in hours and dollars and never in kilometres, on the
+     * grounds that nobody boards a train because it is 1,400km — but the map is
+     * the one place where distance is the whole point, and "Bangkok to
+     * Singapore looks about twice Bangkok to Hanoi" is a thing a reader should
+     * be able to get from it.
+     *
+     * Measured across the middle of the frame rather than computed from the
+     * scale, because Mercator stretches with latitude and a bar derived from
+     * the transform would be right at the equator and wrong at Kunming. */
+    const NICE_KM = [10, 20, 50, 100, 200, 500, 1000, 2000]
+
+    /* The names of the places themselves, as distinct from the names of the
+     * stations on them.
+     *
+     * This is the thing that separated the chart from a diagram of a network
+     * drawn over a silhouette. Half of Southeast Asia is water, and unnamed
+     * water is just a dark hole in the middle of the frame; naming it is what
+     * every printed chart does with that space, and it costs one draw call.
+     *
+     * `rank` is the zoom at which a name has earned its room. Everything is
+     * placed by hand, because a polygon centroid puts VIETNAM in the South
+     * China Sea and INDONESIA somewhere in the Java Sea — the country is a
+     * crescent and an archipelago respectively, and neither contains its own
+     * average.
+     *
+     * `angle` is in degrees and only the straits use it: a strait is a
+     * diagonal channel, and a horizontal word laid across one reads as
+     * belonging to neither shore. */
+    const PLACES = [
+      // Land. Upright, tracked wide, in the colour of the coastline.
+      { name: 'MYANMAR', lon: 96.1, lat: 21.2, rank: 0 },
+      { name: 'THAILAND', lon: 101.4, lat: 16.4, rank: 0 },
+      { name: 'LAOS', lon: 103.2, lat: 19.6, rank: 0.9 },
+      { name: 'VIETNAM', lon: 107.9, lat: 14.4, rank: 0, angle: 62 },
+      { name: 'CAMBODIA', lon: 104.8, lat: 12.7, rank: 0.9 },
+      { name: 'MALAYSIA', lon: 114.2, lat: 3.2, rank: 0 },
+      // The peninsula is narrower than its own name, so the word runs down it
+      // rather than across it and out into the South China Sea.
+      { name: 'MALAYSIA', lon: 102.5, lat: 4.2, rank: 1.2, angle: 72 },
+      { name: 'BRUNEI', lon: 114.7, lat: 4.6, rank: 3.4 },
+      { name: 'SUMATRA', lon: 100.4, lat: 0.4, rank: 1.4, angle: -38 },
+      { name: 'BORNEO', lon: 113.6, lat: -1.4, rank: 0.9 },
+      { name: 'JAVA', lon: 110.6, lat: -7.3, rank: 1.6 },
+      { name: 'SULAWESI', lon: 120.6, lat: -2.4, rank: 1.6 },
+      // On South Sumatra, not in the Java Sea where the country's centroid
+      // falls: Indonesia is an archipelago and does not contain its average.
+      { name: 'INDONESIA', lon: 104.0, lat: -3.4, rank: 0 },
+      { name: 'PHILIPPINES', lon: 121.5, lat: 12.4, rank: 0 },
+      { name: 'LUZON', lon: 121.2, lat: 16.4, rank: 1.8 },
+      { name: 'MINDANAO', lon: 124.8, lat: 7.8, rank: 1.8 },
+      { name: 'CHINA', lon: 106.4, lat: 24.2, rank: 0 },
+
+      // Water. Italic and quieter, which is the convention that tells you at a
+      // glance which names you could stand on.
+      { name: 'SOUTH CHINA SEA', lon: 114.5, lat: 13.6, rank: 0, sea: true },
+      { name: 'PHILIPPINE SEA', lon: 128.4, lat: 14.5, rank: 0.8, sea: true },
+      { name: 'ANDAMAN SEA', lon: 95.4, lat: 10.6, rank: 0, sea: true },
+      { name: 'BAY OF BENGAL', lon: 89.6, lat: 15.4, rank: 0.8, sea: true },
+      { name: 'GULF OF THAILAND', lon: 101.9, lat: 9.4, rank: 0.7, sea: true },
+      { name: 'GULF OF TONKIN', lon: 107.9, lat: 19.4, rank: 1.6, sea: true },
+      { name: 'JAVA SEA', lon: 112.4, lat: -5.2, rank: 0.7, sea: true },
+      { name: 'CELEBES SEA', lon: 121.4, lat: 3.8, rank: 1, sea: true },
+      { name: 'SULU SEA', lon: 119.8, lat: 8.6, rank: 1.2, sea: true },
+      { name: 'BANDA SEA', lon: 126.8, lat: -5.6, rank: 1.2, sea: true },
+      { name: 'FLORES SEA', lon: 120.2, lat: -7.4, rank: 2, sea: true },
+      { name: 'STRAIT OF MALACCA', lon: 99.4, lat: 4.6, rank: 1.1, sea: true, angle: -40 },
+      { name: 'MAKASSAR STRAIT', lon: 118.4, lat: -1.6, rank: 2, sea: true, angle: 74 },
+      { name: 'INDIAN OCEAN', lon: 97.5, lat: -6.5, rank: 0, sea: true },
+    ]
+
+    function drawPlaces(zoom) {
+      const boxes = []
+      /* Names grow with the map, but far more slowly than it does — a fourth
+         root, so eight times the magnification is one and a half times the
+         type. A country name that scaled with the land would be a headline by
+         the third zoom step; one that never grew at all would be lost on a
+         continent. */
+      const grow = Math.pow(Math.max(zoom, 0.5), 0.25)
+
+      for (const place of PLACES) {
+        if (zoom < place.rank) continue
+        const p = Proj.project(view, place.lon, place.lat)
+        const size = (place.sea ? 11.5 : 13) * grow
+        if (p.x < -60 || p.x > view.w + 60 || p.y < -30 || p.y > view.h + 30) continue
+
+        ctx.save()
+        ctx.font = `${place.sea ? 'italic 400' : '600'} ${size}px BarlowCond, system-ui, sans-serif`
+        ctx.letterSpacing = `${place.sea ? 0.24 : 0.3}em`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const w = ctx.measureText(place.name).width
+
+        /* Overlap is measured on the unrotated box, which is wrong for the two
+           angled straits and not wrong enough to matter: they sit in open
+           water with nothing to collide with, and the alternative is a
+           separating-axis test to place fourteen words. */
+        const box = { x: p.x - w / 2, y: p.y - size * 0.7, w, h: size * 1.4 }
+        const clash = boxes.some(
+          b => box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y
+        )
+        /* Half of PHILIPPINES spent its first draft behind the itinerary
+           panel. A station name that will not fit is dropped rather than
+           truncated, and a country name has to be held to the same rule — the
+           angled ones are exempt because their box is not their footprint. */
+        const clipped =
+          !place.angle && (box.x < 6 || box.x + box.w > view.w - inset.right - 6)
+        if (clash || clipped) {
+          ctx.restore()
+          continue
+        }
+        boxes.push(box)
+
+        ctx.translate(p.x, p.y)
+        if (place.angle) ctx.rotate((place.angle * Math.PI) / 180)
+        /* Quiet on purpose. These are the ground the route is drawn on, and a
+           toponym that competes with a station name has misunderstood its job:
+           you should have to look for them, and find them when you do. */
+        ctx.globalAlpha = place.sea ? 0.4 : 0.5
+        ctx.fillStyle = place.sea ? colors.muted : colors.coast || colors.muted
+        // Centring is by the box, so the trailing letter-space has to come off
+        // the middle or every name sits a nudge to the right of its anchor.
+        ctx.fillText(place.name, -size * (place.sea ? 0.12 : 0.15), 0)
+        ctx.restore()
+      }
+    }
+
+    function drawScaleBar() {
+      const y = view.h / 2
+      const a = Proj.unproject(view, view.w * 0.4, y)
+      const b = Proj.unproject(view, view.w * 0.6, y)
+      const kmPerPx = Proj.haversine(a, b) / (view.w * 0.2)
+      if (!isFinite(kmPerPx) || kmPerPx <= 0) return
+
+      // The widest round number that still fits the space allowed for it.
+      const maxPx = Math.min(150, view.w * 0.22)
+      let km = NICE_KM[0]
+      for (const n of NICE_KM) if (n / kmPerPx <= maxPx) km = n
+      const px = km / kmPerPx
+      if (px < 30) return
+
+      /* Bottom right of the *visible* map, which is not the bottom right of the
+         canvas: the store runs the full width of the stage and the itinerary
+         panel sits on top of its right-hand end. `inset` is what the panel
+         covers and every other placement on this map already respects it —
+         this one did not, and the bar spent its first draft underneath the
+         panel where nobody would ever have seen it.
+
+         The right-hand end is the one corner nothing else claims: the search
+         card is top left and the legend bottom left. */
+      const x = view.w - inset.right - px - 22
+      const by = view.h - inset.bottom - 26
+
+      ctx.save()
+      ctx.globalAlpha = 0.85
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = colors.muted
+      ctx.lineCap = 'butt'
+
+      // A bar with a tick down at each end and one in the middle, which is the
+      // form every printed chart uses and the reason it reads as a scale
+      // rather than as a stray rule.
+      ctx.beginPath()
+      ctx.moveTo(x, by - 5)
+      ctx.lineTo(x, by)
+      ctx.lineTo(x + px, by)
+      ctx.lineTo(x + px, by - 5)
+      ctx.moveTo(x + px / 2, by)
+      ctx.lineTo(x + px / 2, by - 3.5)
+      ctx.stroke()
+
+      ctx.font = '500 11px BarlowCond, system-ui, sans-serif'
+      ctx.letterSpacing = '0.06em'
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'alphabetic'
+      const text = km >= 1000 ? `${km / 1000}000 km` : `${km} km`
+      ctx.lineWidth = 3
+      ctx.strokeStyle = colors.halo
+      ctx.strokeText(text, x + px, by - 9)
+      ctx.fillStyle = colors.muted
+      ctx.fillText(text, x + px, by - 9)
+      ctx.restore()
+    }
+
     function drawBorderMark(a, b) {
       const size = 5
       ctx.save()
@@ -901,12 +1092,14 @@ const MapView = (() => {
 
       const zoom = view.scale / view.baseScale
       drawBasemap()
+      drawPlaces(zoom)
       drawIdleNetwork(used)
       drawLandmarks(zoom)
       drawIdleStations(routeSet)
       drawRoute()
       drawRouteStations()
       drawLabels()
+      drawScaleBar()
       buildHitTargets()
     }
 

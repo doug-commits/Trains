@@ -47,6 +47,18 @@
      landmark is neither a station nor a leg. */
   --landmark: #b58ac4;
 
+  /* Ink for the few things printed ON the accent rather than beside it — the
+     Plan key, the app strip's button, a station popup's hover, a critical
+     severity chip. Four rules had each reached for --sea, which is the right
+     answer on the dark theme (near-black on marigold, 8.6:1) and the wrong one
+     on the light theme, where --sea is a pale blue and the marigold has gone
+     to a mid brown: 3.3:1, which is a fail at this size in anybody's reading.
+     A named pair fixes all four at once, and means the next filled thing
+     someone adds inherits a decision rather than repeating a mistake. */
+  --rail-fill: var(--rail);
+  --rail-ink: var(--sea);
+  --alert-ink: var(--sea);
+
   --panel-w: 29.5rem;
   --topbar-h: 3.5rem;
 
@@ -67,6 +79,59 @@
   /* A hairline of light along the top edge — the cheapest convincing depth cue
      on a dark ground, and it disappears correctly in light mode. */
   --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.045);
+  /* The same trick turned sideways, for the one surface that is a wall rather
+     than a card: the itinerary column, lit from the map side. */
+  --sheen-left: inset 1px 0 0 0 rgb(255 255 255 / 0.04);
+  /* What the itinerary column casts back onto the chart. Separate from the
+     --lift scale because it is enormous and directional, and because a black
+     shadow that reads as depth over petrol water reads as grime over a pale
+     one — see the light block, where it is both softer and bluer. */
+  --panel-shade: -30px 0 64px -34px rgb(0 0 0 / 0.62);
+  /* And the same for the sheet, which comes up from the bottom instead. */
+  --sheet-shade: 0 -20px 48px -24px rgb(0 0 0 / 0.62);
+
+  /* Hairlines *inside* a surface. Written out by hand as a colour-mix in nine
+     places, which meant the soft inner rules and the hard outer ones had
+     quietly drifted to three different strengths. Naming it makes them move
+     together. 58% rather than the old 55–60% spread: enough to separate two
+     rows of prose, not enough to draw a grid over them. */
+  --hair: color-mix(in srgb, var(--panel-edge) 58%, transparent);
+
+  /* Focus, as a ring with a halo rather than a bare outline.
+     A 2px marigold outline is perfectly legible on the panel and very nearly
+     invisible where it matters most — a zoom button sitting on top of the
+     amber rails it controls. The halo behind gives the ring its own ground
+     whatever it lands on, and it is a box-shadow rather than a second outline
+     so a control that already carries lift can compose the two. */
+  --ring: 0 0 0 4px color-mix(in srgb, var(--rail) 22%, transparent);
+
+  /* Motion. One curve and three durations for the whole interface, because a
+     page where every control eases differently reads as assembled rather than
+     designed. The curve leaves quickly and settles slowly — the shape of a
+     mechanism coming to rest, not of something bouncing. */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --t-tap: 90ms;
+  --t: 170ms;
+  --t-slow: 300ms;
+
+  /* The instrument ground. Four things float over the chart — the search
+     panel, the legend, the zoom pair, Reset view — and each had mixed its own
+     translucency and its own blur, so they sat at four different altitudes
+     above the same map. One recipe, one altitude. */
+  --float: color-mix(in srgb, var(--panel) 88%, transparent);
+  --float-blur: blur(14px) saturate(1.25);
+  /* Every floating instrument is this tall. The legend, the zoom buttons and
+     Reset view were 34, 30 and 30 pixels, which is the sort of thing nobody
+     names and everybody sees. */
+  --instr-h: 2.1rem;
+  /* And every form control is this tall. A text input, a date input and a
+     select are 38.6, 40.6 and 40.6 pixels tall respectively in Chromium, from
+     three different pieces of native furniture — so the four fields under
+     "Trip details" sat at three heights and their captions above them landed
+     on three different baselines. Nothing about that is visible as a bug; it
+     just makes a panel look like nobody drew it. One value a hair above the
+     tallest native control, and the row is a row. */
+  --ctl-h: 2.55rem;
 
   --sans: BarlowCond, ui-sans-serif, system-ui, sans-serif;
   --serif: Spectral, Georgia, serif;
@@ -102,10 +167,29 @@
     --coast: #b7c8ca;
     --landmark: #7a4f8c;
 
+    /* One stop deeper than --rail, and white on top. #a96a08 cannot carry
+       legible text of either polarity — white on it is 4.4:1 and the pale sea
+       was 3.3:1 — so the *filled* surface goes darker while --rail itself, the
+       colour of the rails on the chart and of every accent mark in the
+       itinerary, is left exactly where it was. */
+    --rail-fill: #9c6106;
+    --rail-ink: #fffaf3;
+    --alert-ink: #fff8f6;
+
     --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
     --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
     --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
     --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
+    --sheen-left: inset 1px 0 0 0 rgb(255 255 255 / 0.85);
+    /* Tinted rather than neutral. Pure black at any opacity over a pale
+       chart reads as dirt on the paper; carrying the sea's own hue into the
+       shadow keeps it reading as distance. */
+    --panel-shade: -30px 0 64px -34px rgb(31 62 74 / 0.26);
+    /* Two layers here where the dark theme needs one. The sheet's ground
+       and the map's land are four values apart in this palette, so where
+       the sheet crosses a coastline its edge all but disappears; the
+       tight contact shadow is what puts it back. */
+    --sheet-shade: 0 -20px 48px -24px rgb(31 62 74 / 0.3), 0 -1px 3px rgb(31 62 74 / 0.12);
   }
 }
 
@@ -119,6 +203,20 @@
   --rail: #e9a63e; --ferry: #57b6c8; --road: #978d7f; --alert: #e2615a;
   --idle-line: #3a6674; --idle-dot: #4c7d8b;
   --sea-deep: #061217; --grid: #16323d; --coast: #2d5a6b; --landmark: #b58ac4;
+  --rail-fill: var(--rail); --rail-ink: var(--sea); --alert-ink: var(--sea);
+  /* Depth has to be restated here as well, and was not. This block only wins
+     against the light media query for the properties it actually names, so a
+     reader whose system is set to light and who then asked for dark got the
+     dark palette lit by the light theme's shadows — a 70%-white top sheen on
+     petrol, and drop shadows so faint that nothing was raised off anything.
+     The palette swapped and the depth did not follow it. */
+  --lift-1: 0 1px 2px rgb(0 0 0 / 0.24);
+  --lift-2: 0 4px 10px -4px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.2);
+  --lift-3: 0 18px 40px -20px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.25);
+  --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.045);
+  --sheen-left: inset 1px 0 0 0 rgb(255 255 255 / 0.04);
+  --panel-shade: -30px 0 64px -34px rgb(0 0 0 / 0.62);
+  --sheet-shade: 0 -20px 48px -24px rgb(0 0 0 / 0.62);
 }
 
 :root[data-theme='light'] {
@@ -134,11 +232,22 @@
   --rail: #a96a08; --ferry: #1f7c92; --road: #7b7263; --alert: #b93a2e;
   --idle-line: #aab5b2; --idle-dot: #93a09e;
   --sea-deep: #c3d4d7; --grid: #c2d2d4; --coast: #b7c8ca; --landmark: #7a4f8c;
+  --rail-fill: #9c6106; --rail-ink: #fffaf3; --alert-ink: #fff8f6;
   --lift-1: 0 1px 2px rgb(28 38 44 / 0.07);
   --lift-2: 0 4px 10px -4px rgb(28 38 44 / 0.12), 0 1px 2px rgb(28 38 44 / 0.06);
   --lift-3: 0 18px 40px -20px rgb(28 38 44 / 0.22), 0 2px 6px rgb(28 38 44 / 0.08);
   --sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
+  --sheen-left: inset 1px 0 0 0 rgb(255 255 255 / 0.85);
+  --panel-shade: -30px 0 64px -34px rgb(31 62 74 / 0.26);
+  --sheet-shade: 0 -20px 48px -24px rgb(31 62 74 / 0.3), 0 -1px 3px rgb(31 62 74 / 0.12);
 }
+
+/* --hair, --ring, --float, --instr-h and the motion tokens are declared once,
+   at the top, and are absent from every theme block on purpose: each is
+   written in terms of --panel, --panel-edge or --rail, and a custom property
+   is substituted where it is used rather than where it is declared. They
+   follow the palette without being restated three times. Only the literal
+   rgb() values — the lifts and the sheens — have to be repeated. */
 
 * { box-sizing: border-box; }
 
@@ -150,12 +259,29 @@ body {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* Said rather than assumed. Old-style figures are lovely in a sentence and
+     wrong in a fare, and which set a serif hands you depends on the face, the
+     weight and whether the webfont or the fallback is the one that loaded —
+     which on this page means the digits could change character between
+     Spectral and Georgia. Every number here is a quantity someone will compare
+     against another one, so: lining everywhere, and tabular declared
+     separately on the places where figures stack into a column. */
+  font-variant-numeric: lining-nums;
+  text-rendering: optimizeLegibility;
 }
 
+/* The ring, everywhere. Outline for the shape — it follows border-radius and
+   cannot be clipped by a rounded parent the way an inset shadow can — plus the
+   halo behind it, which is what makes it survive landing on the map. */
 :focus-visible {
   outline: 2px solid var(--rail);
   outline-offset: 2px;
+  box-shadow: var(--ring);
 }
+/* Anything that carries its own box-shadow for depth — the chrome buttons, the
+   Plan key, a corridor card — has to restate the ring beside that shadow, or
+   the later, equally specific rule simply wins and the halo never appears.
+   Each of those does so where it is defined. */
 
 /* ------------------------------------------------------------------ frame */
 
@@ -177,7 +303,15 @@ body {
   padding: 0 1.25rem;
   background: var(--panel-solid);
   border-bottom: 1px solid var(--panel-edge);
-  box-shadow: 0 1px 0 0 color-mix(in srgb, var(--rail) 22%, transparent);
+  /* Three layers doing three jobs: the marigold keel line that says the chrome
+     ends here, a soft cast onto the map below it so the bar reads as sitting
+     on top of the chart rather than being butted against it, and the sheen
+     that lights its own top edge. The keel was doing all three on its own and
+     the bar sat flat on the map like a strip of tape. */
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, var(--rail) 20%, transparent),
+    var(--lift-2),
+    var(--sheen);
   z-index: 5;
 }
 
@@ -192,7 +326,7 @@ body {
   border-radius: var(--r-sm);
   font-family: var(--sans);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--t) var(--ease);
 }
 .brand:hover { background: var(--raise); }
 
@@ -206,14 +340,19 @@ body {
 }
 
 .brandtext {
-  font-size: 1.08rem;
+  font-size: 1.05rem;
   font-weight: 500;
-  letter-spacing: 0.15em;
+  /* 0.17em rather than 0.15em. A two-word wordmark set in a condensed face is
+     doing the work of a logotype, and the extra sixtieth of an em is the
+     difference between "uppercase text" and "a mark" at this size. */
+  letter-spacing: 0.17em;
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
 }
-.brandtext b { color: var(--ink); font-weight: 600; }
+/* The letterspacing puts a gap after the final S that belongs to nothing;
+   pulling it back re-centres the mark against the divider that follows. */
+.brandtext b { color: var(--ink); font-weight: 600; margin-right: -0.17em; }
 
 .tagline {
   margin: 0;
@@ -229,27 +368,51 @@ body {
 /* Nothing to start over from until a route exists. */
 .app[data-active='false'] #startover { display: none; }
 
+/* The two chrome buttons, and the shared instrument recipe.
+ *
+ * Both of these appear twice: in the top bar, on solid panel, and over the
+ * open chart at the foot of the map. Giving them one ground and one height
+ * means Reset view beside the legend and Start over beside the wordmark are
+ * recognisably the same control, which is the thing that separates a console
+ * from a page with buttons on it. */
 .btn-ghost {
-  padding: 0.42rem 0.75rem;
+  height: var(--instr-h);
+  padding: 0 0.8rem;
   font-family: var(--sans);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.09em;
+  /* Wider than the old 0.09em. At 12px, condensed, uppercase, the letters run
+     together into a block; opening them turns the label back into words and
+     costs nothing but a millimetre of width. */
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--lift-1), var(--sheen);
+  transition:
+    color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease),
+    transform var(--t-tap) var(--ease);
 }
 .btn-ghost:hover {
   color: var(--ink);
-  border-color: var(--muted);
+  border-color: color-mix(in srgb, var(--muted) 70%, var(--panel-edge));
+  box-shadow: var(--lift-2), var(--sheen);
+}
+/* A press has to be felt, not only inferred from the pointer having stopped.
+   One pixel down and the lift withdrawn is the whole of it — anything more on
+   a control this small reads as a wobble. */
+.btn-ghost:active {
+  transform: translateY(1px);
   box-shadow: var(--lift-1);
 }
+.btn-ghost:focus-visible { box-shadow: var(--ring), var(--lift-1), var(--sheen); }
 
 /* A square icon button, and the only place in the chrome where an icon carries
    the meaning on its own — so it also carries a screen-reader label that names
@@ -258,27 +421,37 @@ body {
   position: relative;
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  /* Square, and the same height as everything else on the instrument row. It
+     was 2.25rem against a 2.1rem neighbour, which at a glance reads as a
+     mistake rather than as emphasis. */
+  width: var(--instr-h);
+  height: var(--instr-h);
   padding: 0;
   color: var(--muted);
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--lift-1), var(--sheen);
+  transition:
+    color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease),
+    transform var(--t-tap) var(--ease);
 }
 .btn-icon:hover {
   color: var(--rail);
-  border-color: var(--muted);
-  box-shadow: var(--lift-1);
+  border-color: color-mix(in srgb, var(--muted) 70%, var(--panel-edge));
+  box-shadow: var(--lift-2), var(--sheen);
 }
+.btn-icon:active { transform: translateY(1px); box-shadow: var(--lift-1); }
+.btn-icon:focus-visible { box-shadow: var(--ring), var(--lift-1), var(--sheen); }
 .btn-icon .ic {
   grid-area: 1 / 1;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.05rem;
+  height: 1.05rem;
   display: none;
 }
 /* One icon at a time, chosen by the mode stamped on the button. Auto shows a
@@ -301,7 +474,13 @@ body {
 }
 
 /* Nothing on the page should snap between two palettes; the surfaces cross-fade
-   while the map redraws. Respects a reduced-motion preference. */
+   while the map redraws. Respects a reduced-motion preference.
+ *
+ * Every other transition in this file is written inline on the rule that owns
+ * it — that is the house style and it keeps a control's motion beside its
+ * appearance — and the blanket reduce rule at the bottom of the file zeroes
+ * all of them. This block stays separate because it is not about one control:
+ * it is the single behaviour that has to name every surface at once. */
 @media (prefers-reduced-motion: no-preference) {
   body,
   .topbar,
@@ -312,8 +491,14 @@ body {
   .stays > li,
   .callout,
   .compare,
+  .stat,
+  .way,
+  .legend,
   .route tr.leg > td {
-    transition: background-color 0.28s ease, border-color 0.28s ease, color 0.28s ease;
+    transition:
+      background-color var(--t-slow) ease,
+      border-color var(--t-slow) ease,
+      color var(--t-slow) ease;
   }
 }
 
@@ -343,31 +528,56 @@ body {
 /* ---------------------------------------------------------- map controls */
 
 /* Beside "Reset view", which is the one strip of map guaranteed to be clear
- * of both the controls and the result panel. */
+ * of both the controls and the result panel.
+ *
+ * A segmented control, drawn as one object with a rule through it rather than
+ * as two buttons with a crack between them. The old version separated the
+ * halves with a 1px flex gap, which is not a divider — it is a slot with the
+ * chart showing through, and on busy water it filled with coastline.
+ *
+ * overflow:hidden is deliberately *not* used to round the ends any more. It
+ * clipped the focus ring of whichever button was focused down to a stub, which
+ * on the one control a keyboard user reaches for most is not a detail. The
+ * children round their own outer corners instead. */
 .zoomers {
   display: flex;
-  gap: 1px;
+  border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
-  overflow: hidden;
-  box-shadow: var(--lift-1);
+  box-shadow: var(--lift-1), var(--sheen);
 }
 
 .btn-zoom {
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 2rem;
+  height: calc(var(--instr-h) - 2px);
   border: 0;
   font: inherit;
-  font-size: 1.1rem;
+  /* The glyphs are U+2212 and U+002B, which sit on different optical weights
+     in most faces; the condensed sans draws both as plain strokes and keeps
+     the pair looking like one control. */
+  font-family: var(--sans);
+  font-size: 1.05rem;
   line-height: 1;
   cursor: pointer;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--panel) 94%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  transition: background 0.15s ease;
+  color: var(--ink-soft);
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
+  transition:
+    background-color var(--t) var(--ease),
+    color var(--t) var(--ease);
 }
+.btn-zoom:first-child {
+  border-radius: calc(var(--r-sm) - 1px) 0 0 calc(var(--r-sm) - 1px);
+  border-right: 1px solid var(--panel-edge);
+}
+.btn-zoom:last-child { border-radius: 0 calc(var(--r-sm) - 1px) calc(var(--r-sm) - 1px) 0; }
 
-.btn-zoom:hover { background: var(--panel); }
+.btn-zoom:hover { background: var(--raise); color: var(--rail); }
 .btn-zoom:active { background: color-mix(in srgb, var(--panel) 80%, var(--ink)); }
+/* Above its sibling, so the ring is not half-covered by the neighbour's
+   background — the ring is the only thing telling a keyboard user which half
+   of the pair they are on. */
+.btn-zoom:focus-visible { position: relative; z-index: 1; }
 
 
 /* ------------------------------------------------------------- controls */
@@ -378,15 +588,25 @@ body {
   left: 1.1rem;
   width: 24rem;
   max-width: calc(100vw - 2.2rem);
-  padding: 1.15rem 1.2rem;
+  /* Tighter at the top than at the bottom. The fold chevron sits alone on the
+     first line and its own padding already holds it off the edge; matching the
+     sides there left a visible band of nothing above the first question. */
+  padding: 0.75rem 1.2rem 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  /* Denser than the instruments below it — this one has a form in it and text
+     over moving coastline is the one thing a chart console cannot afford —
+     but the same blur, so it belongs to the same set. */
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--r);
+  /* --r-lg, not --r. It is by some way the largest floating object on the
+     chart, and a 11px radius on a 24rem panel reads as a browser dialog; the
+     radius has to grow with the box for the corner to look drawn rather than
+     defaulted. */
+  border-radius: var(--r-lg);
   box-shadow: var(--lift-3), var(--sheen);
   z-index: 3;
 }
@@ -402,7 +622,7 @@ body {
   color: var(--muted);
   text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--t) var(--ease), border-color var(--t) var(--ease);
 }
 .stay-book:hover { color: var(--ink); border-bottom-color: var(--rail); }
 
@@ -431,10 +651,13 @@ body {
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
-  transition: transform 0.15s ease;
+  transition: transform var(--t) var(--ease);
 }
 .describe[open] summary::before { transform: rotate(45deg); }
 .describe summary:hover { color: var(--ink); }
+/* The summary's own outline hugs the text; the chevron sits outside it and
+   drifts off the ring. A little padding to bring the whole control inside. */
+.describe summary:focus-visible { outline-offset: 3px; border-radius: var(--r-xs); }
 
 .describe-body {
   display: flex;
@@ -461,7 +684,7 @@ body {
 .describe-out li {
   padding: 0.5rem 0.55rem;
   border-radius: var(--r-xs);
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 55%, transparent);
+  border-bottom: 1px solid var(--hair);
 }
 .describe-out li:last-child { border-bottom: 0; }
 
@@ -506,7 +729,7 @@ body {
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-xs);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--t) var(--ease), border-color var(--t) var(--ease);
 }
 .d-acts button:hover { color: var(--ink); border-color: var(--rail); }
 
@@ -523,7 +746,15 @@ body {
    losing the route you already picked, which the collapsed bar keeps showing. */
 .controls-body { display: contents; }
 
-.controls[data-collapsed='true'] { gap: 0; padding: 0.5rem 0.6rem; width: auto; }
+/* Folded it is a chip, not a panel, and the radius has to come down with it —
+   --r-lg was chosen for a 24rem box and on a 3rem one the same corner turns
+   the whole thing into a lozenge. */
+.controls[data-collapsed='true'] {
+  gap: 0;
+  padding: 0.45rem 0.55rem;
+  width: auto;
+  border-radius: var(--r);
+}
 .controls[data-collapsed='true'] .controls-body { display: none; }
 
 .fold {
@@ -538,7 +769,7 @@ body {
   border: 0;
   border-radius: var(--r-xs);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color var(--t) var(--ease), background-color var(--t) var(--ease);
 }
 .fold:hover { color: var(--ink); background: var(--raise); }
 
@@ -546,7 +777,7 @@ body {
   width: 1.15rem;
   height: 1.15rem;
   flex: none;
-  transition: transform 0.2s ease;
+  transition: transform var(--t-slow) var(--ease);
 }
 
 .controls[data-collapsed='true'] .fold {
@@ -599,7 +830,7 @@ body {
   align-items: baseline;
   gap: 0.2rem 0.7rem;
   padding: 0.45rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 55%, transparent);
+  border-bottom: 1px solid var(--hair);
 }
 
 .guides a {
@@ -658,6 +889,14 @@ body {
 
 .combo-list li[aria-selected='true'],
 .combo-list li:hover { background: var(--raise); }
+/* Which row the arrow keys are on, said in two ways rather than one. The
+   ground alone is also what hover uses, so on a list where the pointer is
+   resting over one row and the keyboard is on another, two rows looked
+   identically chosen. The bar down the leading edge belongs only to the
+   keyboard, and it is the accent's one appearance in this list. */
+.combo-list li[aria-selected='true'] {
+  box-shadow: inset 2px 0 0 0 var(--rail);
+}
 
 /* The country each run of stations belongs to.
    Sticky, because the whole point is knowing where you are in a list of two
@@ -719,7 +958,11 @@ body {
 .field input {
   width: 100%;
   min-width: 0;
-  padding: 0.58rem 0.62rem;
+  /* min-height rather than height: a select whose own furniture needs more
+     room should get it rather than clip, and on the fields that already fit
+     this is exactly a fixed height. */
+  min-height: var(--ctl-h);
+  padding: 0.55rem 0.65rem;
   font-family: var(--sans);
   font-size: 1rem;
   font-weight: 500;
@@ -727,30 +970,53 @@ body {
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Sunk rather than flat. One hairline of shadow inside the top edge is the
+     inverse of the sheen every raised surface carries, and it is what tells
+     the eye that this is a well you type into and the button beside it is a
+     thing you press. */
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.14);
+  transition:
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease);
 }
 .field select:hover,
 .field input:hover { border-color: var(--muted); }
+/* :focus rather than :focus-visible on purpose — a text field that has the
+   caret in it is focused whether it was reached by mouse or by tab, and it
+   should say so either way. The halo is the shared one, so a field and a
+   button light up identically.
+   The outline is deliberately *not* suppressed here. Clicking in gets the
+   border and the halo; arriving by tab gets those and the 2px outline on top,
+   from the blanket rule at the head of the file. A halo alone is a weaker
+   signal than a solid outline, and weakening the keyboard signal to tidy up
+   the mouse one is the wrong trade. */
 .field select:focus,
 .field input:focus {
   border-color: var(--rail);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rail) 16%, transparent);
+  box-shadow: var(--ring);
 }
 
+/* Square, and the height of the two fields it sits between. It was 2.2rem
+   against their two-and-a-half, so the one control whose whole job is to be
+   the pivot between From and To was the only thing on the line not lining up
+   with them. */
 .swap {
   flex: none;
-  width: 2.2rem;
-  height: 2.2rem;
-  margin-bottom: 0.05rem;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   font-size: 1rem;
   color: var(--muted);
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--sheen);
+  transition:
+    color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    background-color var(--t) var(--ease);
 }
-.swap:hover { color: var(--rail); border-color: var(--rail); }
+.swap:hover { color: var(--rail); border-color: var(--rail); background: var(--panel); }
 
 /* The four secondary inputs shouted as loudly as the two that matter, so they
    fold away until asked for. */
@@ -773,11 +1039,26 @@ body {
   letter-spacing: 0.01em;
   color: var(--ink-soft);
 }
+/* Drawn, not typed. ▸ and ▾ are two different glyphs at two different optical
+   weights from whatever font happens to have them, and the panel already has a
+   chevron three lines above this one — the one on "Describe it" — built out of
+   two borders. Two disclosure controls in one panel that disagree about what a
+   disclosure arrow looks like is the sort of thing that reads as unfinished
+   without the reader being able to say why. */
 .details > summary > span::after {
-  content: ' ▸';
-  color: var(--muted);
+  content: '';
+  display: inline-block;
+  width: 0.34rem;
+  height: 0.34rem;
+  margin-left: 0.38rem;
+  vertical-align: 0.12em;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform var(--t) var(--ease);
 }
-.details[open] > summary > span::after { content: ' ▾'; }
+.details[open] > summary > span::after { transform: rotate(45deg); }
+.details > summary:hover > span::after { border-color: var(--ink); }
 .details > summary > em {
   font-style: normal;
   font-size: 0.82rem;
@@ -821,7 +1102,7 @@ body {
   border: 1px solid var(--panel-edge);
   border-radius: 1rem;
   position: relative;
-  transition: background 0.16s ease, border-color 0.16s ease;
+  transition: background-color var(--t) var(--ease), border-color var(--t) var(--ease);
 }
 .toggle .knob {
   position: absolute;
@@ -831,11 +1112,23 @@ body {
   height: 0.8rem;
   border-radius: 50%;
   background: var(--muted);
-  transition: transform 0.16s ease, background 0.16s ease;
+  transition: transform var(--t) var(--ease), background-color var(--t) var(--ease);
 }
-.toggle > input:checked + .track { border-color: var(--rail); }
+.toggle > input:checked + .track {
+  border-color: var(--rail);
+  /* Filled, faintly, as well as outlined. The knob moving 15px and the border
+     changing hue was the whole of "on"; at a glance across a 24rem panel of
+     switches that is not enough difference to count them by. */
+  background: color-mix(in srgb, var(--rail) 15%, var(--raise));
+}
 .toggle > input:checked + .track .knob { transform: translateX(0.95rem); background: var(--rail); }
-.toggle > input:focus-visible + .track { outline: 2px solid var(--rail); outline-offset: 2px; }
+/* The input itself is clipped to a pixel, so the ring has to be drawn on the
+   track it controls — and with the same halo everything else gets. */
+.toggle > input:focus-visible + .track {
+  outline: 2px solid var(--rail);
+  outline-offset: 2px;
+  box-shadow: var(--ring);
+}
 
 .toggle-text { font-family: var(--sans); line-height: 1.35; }
 .toggle-text b { display: block; font-size: 0.95rem; font-weight: 600; }
@@ -859,23 +1152,32 @@ body {
   z-index: 3;
 }
 
+/* The key to the chart, and the one piece of chrome that is pure reference —
+   nothing in it is clickable. It still belongs to the instrument row, so it
+   takes the same ground, height, radius and lift as the controls beside it and
+   is separated from them only by not lighting up. */
 .legend {
   display: flex;
-  gap: 0.85rem;
-  padding: 0.42rem 0.7rem;
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  align-items: center;
+  gap: 0.8rem;
+  height: var(--instr-h);
+  padding: 0 0.75rem;
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
   border: 1px solid var(--panel-edge);
-  border-radius: var(--r);
+  /* Was --r, 11px, beside two 7px neighbours on the same line. A legend is not
+     a card; it is a rule with symbols on it. */
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-1), var(--sheen);
   font-family: var(--sans);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.key { display: flex; align-items: center; gap: 0.35rem; }
+.key { display: flex; align-items: center; gap: 0.38rem; }
 .line { width: 1.4rem; height: 0; border-top-width: 2.5px; }
 .line.rail { border-top: 2.5px solid var(--rail); }
 .line.ferry { border-top: 2.5px dashed var(--ferry); }
@@ -903,6 +1205,9 @@ body {
   /* A leg tooltip is a label and must not intercept the drag. A station popup
      has buttons in it and has to be reachable — see .tip.live. */
   pointer-events: none;
+  /* Solid, not translucent, and deliberately unlike the instruments below it.
+     A popup is the one surface that lands on top of the very thing it is
+     describing, so anything showing through it is the station it is about. */
   background: var(--panel-solid);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
@@ -951,14 +1256,18 @@ body {
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-sm);
+  box-shadow: var(--sheen);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+  transition:
+    color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    background-color var(--t) var(--ease);
 }
 .tip-go:hover {
-  color: var(--sea);
-  background: var(--rail);
-  border-color: var(--rail);
+  color: var(--rail-ink);
+  background: var(--rail-fill);
+  border-color: var(--rail-fill);
 }
 /* Already one end of the current route — a statement, not an offer. */
 .tip-go.on {
@@ -1000,22 +1309,36 @@ body {
   padding: 2.2rem 2.1rem 5rem;
   z-index: 2;
   background: color-mix(in srgb, var(--panel) 93%, transparent);
+  /* Deliberately not --float-blur. That recipe is tuned for objects a couple
+     of centimetres across; this is a full-height column carrying a thousand
+     words of serif over live coastline, and the map behind it has to be
+     pushed further out of focus than a legend ever needs. */
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   border-left: 1px solid var(--panel-edge);
-  box-shadow: -28px 0 60px -30px rgb(0 0 0 / 0.55);
+  /* A wall, not a card, so the hairline of light runs down its map-facing edge
+     rather than across its top. The cast onto the chart is a token now because
+     it was a literal black: at 55% over a pale sea it read as a smudge on the
+     paper rather than as the column standing off it. */
+  box-shadow: var(--panel-shade), var(--sheen-left);
+  /* The itinerary is the long read on this page and it is set in a serif; the
+     ligatures and contextual alternates are why that face was chosen. */
+  font-feature-settings: 'liga' 1, 'clig' 1;
 }
 
 /* --------------------------------------------------------------- heading */
 
 .head { margin-bottom: 1.6rem; }
 
+/* The chart-margin caption: what kind of routing this is, set in the mono the
+   map's own annotations use. Small and wide, the way a datum is printed on an
+   admiralty chart — it is a stamp on the document, not a line of the text. */
 .eyebrow {
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.6rem;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 400;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -1026,7 +1349,11 @@ body {
   font-size: clamp(1.9rem, 3.4vw, 2.5rem);
   font-weight: 600;
   line-height: 1.02;
-  letter-spacing: -0.005em;
+  /* Condensed faces need more negative tracking at display size than upright
+     ones, because the counters are already narrow and the sidebearings are the
+     only slack left. -0.018em closes "Singapore overland" into one word-shape
+     without touching legibility; past about -0.03em the S starts to collide. */
+  letter-spacing: -0.018em;
   text-wrap: balance;
 }
 .panel h1 span { color: var(--rail); font-weight: 500; }
@@ -1036,7 +1363,10 @@ body {
   font-size: 1.02rem;
   line-height: 1.62;
   color: var(--ink-soft);
-  max-width: 34em;
+  /* 60-odd characters. The panel is 29.5rem and the serif at 1.02rem was
+     running to 38em where the column allowed it — comfortably past the point
+     where the eye loses the start of the next line. */
+  max-width: 33em;
 }
 
 .sub {
@@ -1050,58 +1380,98 @@ body {
 
 /* ----------------------------------------------------------------- stats */
 
-/* A grid rather than a wrapping flex row. Seven stats in a flex row broke into
-   ragged lines at a different point on every route; a fixed track count means
-   the numbers line up under each other whatever the itinerary is. */
 /* The four numbers a reader came for: how long, how many legs, how many
-   frontiers, what it costs. They were set as plain text between two hairlines —
-   the most important line on the page rendered as the least prominent thing on
-   it. A ground of their own, and room to be read across a platform. */
+ * frontiers, what it costs. They were set as plain text between two hairlines —
+ * the most important line on the page rendered as the least prominent thing on
+ * it. A ground of their own, and room to be read across a platform.
+ *
+ * A grid rather than a wrapping flex row. Seven stats in a flex row broke into
+ * ragged lines at a different point on every route; a fixed track count means
+ * the numbers line up under each other whatever the itinerary is.
+ *
+ * And now discrete tiles rather than one bordered block ruled into cells.
+ *
+ * The block was the right instinct and the wrong shape, because the number of
+ * tiles is not four: it is four plus one for each mode the journey actually
+ * uses, so between four and seven. On five, the block put a lone cell in the
+ * second row and left three-quarters of that row as a wide empty box with a
+ * rule across the top of it — the most conspicuous thing in the panel was a
+ * gap. Ruled cells only work when the grid is full, and this one never is.
+ *
+ * Separate tiles have no ragged row to expose: the last row simply has fewer
+ * things in it, which is what a reader expects of a set of readings. The gap
+ * is 3px — wide enough to separate two grounds, narrow enough that the set
+ * still reads as one instrument cluster and not as six cards. */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  margin: 0 0 1.4rem;
+  gap: 3px;
+  margin: 0 0 1.5rem;
   padding: 0;
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--r);
-  background: var(--raise);
-  overflow: hidden;
 }
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  /* The gap between the figure and its label is set on the label, not here.
+     A flex gap sits on top of whatever leading the two line boxes already
+     carry, so 0.15rem of gap was really closer to 0.4rem of visible space and
+     the two halves of a reading had drifted into unrelated lines. Zero here
+     and 0.22rem declared on the label instead, which is a distance measured
+     from something rather than added to it. */
+  gap: 0;
   min-width: 0;
-  padding: 0.8rem 0.75rem;
-  border-left: 1px solid var(--panel-edge);
+  padding: 0.72rem 0.7rem 0.68rem;
+  background: var(--raise);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  box-shadow: var(--sheen);
 }
-/* Four to a row, so the reset is per row rather than once — otherwise the
-   second row opens with a divider against nothing. */
-.stat:nth-child(4n + 1) { border-left: 0; }
-.stat:nth-child(n + 5) { border-top: 1px solid var(--panel-edge); }
-
 /* The cost carries the accent: it is the number people scroll back for. The
-   time on each mode carries the colour that mode is drawn in on the map. */
+   time on each mode carries the colour that mode is drawn in on the map.
+ *
+ * Which comes to four amber tiles on a rail journey, and an accent used four
+ * times has stopped being one. So the second row — which is always the
+ * per-mode breakdown, never a headline — keeps its hues and gives up its
+ * weight: unfilled rather than raised, and a size down. It reads as a footing
+ * under the four numbers above it, which is exactly what it is. */
 .stat.is-cost b { color: var(--rail); }
 .stat.is-rail b { color: var(--rail); }
 .stat.is-ferry b { color: var(--ferry); }
 .stat.is-road b { color: var(--road); }
+.stat:nth-child(n + 5) {
+  background: none;
+  box-shadow: none;
+  border-color: var(--hair);
+}
+.stat:nth-child(n + 5) b { font-size: 1.06rem; }
+
 .stat b {
   font-family: var(--mono);
-  font-size: 1.24rem;
+  font-size: 1.3rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  /* Mono faces are drawn wide so that code lines up; a headline figure set in
+     one needs the tracking pulled back or it reads as spaced-out. */
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   color: var(--ink);
 }
 .stat span {
+  margin-top: 0.22rem;
   font-family: var(--sans);
-  font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.09em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  /* 0.12em. These are the smallest type in the panel and the only labels a
+     reader has to parse at a glance from across a concourse. */
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
+  /* "Borders" and "On rails" are one word too long for a quarter of the panel
+     at some widths, and a wrapped caption breaks the row of tiles into two
+     heights. Better to lose a letter than the alignment. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --------------------------------------------------------------- blocks */
@@ -1110,25 +1480,32 @@ body {
 
 /* A short rule above each section heading. Cheap rhythm: it tells the eye
    where one thing ends and the next begins on a page that is otherwise a
-   column of prose, and it is the one place the accent appears for free. */
+   column of prose, and it is the one place the accent appears for free.
+ *
+ * "The one place" was not true. Every heading also underlined itself in two
+ * solid pixels of the same marigold, so a scrolled itinerary showed six or
+ * seven full-width amber bars — more accent on the page than the route drawn
+ * on the map beside it. The tick above stays; the underline becomes the
+ * hairline it should always have been, and now the accent marks a section
+ * rather than fencing one. */
 .block > h2::before {
   content: '';
   display: block;
-  width: 2.2rem;
+  width: 1.8rem;
   height: 2px;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.5rem;
   border-radius: 2px;
   background: var(--rail);
 }
 
 .panel h2 {
   margin: 0;
-  padding-bottom: 0.45rem;
-  border-bottom: 2px solid var(--rail);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--panel-edge);
   font-family: var(--sans);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink);
 }
@@ -1154,17 +1531,32 @@ body {
 .callout {
   position: relative;
   margin-top: 1.2rem;
-  padding: 0.85rem 1rem 0.85rem 1.15rem;
+  padding: 0.85rem 1rem 0.85rem 1.2rem;
   background: var(--raise);
   border: 1px solid var(--panel-edge);
-  border-left: 3px solid var(--ferry);
   border-radius: var(--r);
+  /* The kind-of-thing bar is an inset shadow, not a thick left border. A 3px
+     border meeting a 1px one inside an 11px radius has to taper between the
+     two widths, and the corner comes out as a visible wedge of the wrong
+     colour — a small ugliness repeated on every callout in the itinerary. An
+     inset shadow is a constant 3px that follows the radius exactly, which is
+     also how .way.on further down marks the routing currently on screen.
+     Then the shallow lift every raised card in the panel carries: a callout
+     that is only a differently-coloured rectangle is a change of paint; one
+     that stands a millimetre off the page is a note pinned to it.
+
+     A note on wording, because this cost an hour: every one of these comments
+     is inlined verbatim into all sixty-eight guide pages, and several checks
+     in tools/smoke.mjs decide what a page contains by grepping its source for
+     a section heading. Naming a section in prose here silently adds that page
+     to the set the check is about. Refer to selectors, not to headings. */
+  box-shadow: inset 3px 0 0 0 var(--ferry), var(--lift-1), var(--sheen);
 }
 .callout h3 { color: var(--ink); }
 .callout.alert {
   border-color: color-mix(in srgb, var(--alert) 45%, var(--panel-edge));
-  border-left-color: var(--alert);
   background: color-mix(in srgb, var(--alert) 9%, var(--raise));
+  box-shadow: inset 3px 0 0 0 var(--alert), var(--lift-1), var(--sheen);
 }
 .callout.alert h3 { color: var(--alert); }
 .callout h3 { font-size: 0.98rem; }
@@ -1186,7 +1578,10 @@ table { width: 100%; border-collapse: collapse; }
   font-family: var(--sans);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.11em;
+  /* On the same tracking scale as the stat labels and the legend. Three
+     all-caps captions at 0.09em, 0.11em and 0.06em is not a scale, it is
+     three separate decisions taken on three separate days. */
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--muted);
   border-bottom: 1px solid var(--panel-edge);
@@ -1197,8 +1592,8 @@ table { width: 100%; border-collapse: collapse; }
 .route tr.leg > td {
   padding: 0.8rem 0.45rem;
   vertical-align: top;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 60%, transparent);
-  transition: background 0.14s ease;
+  border-bottom: 1px solid var(--hair);
+  transition: background-color var(--t) var(--ease);
 }
 .route tr.leg:hover > td,
 .route tr.leg:focus-visible > td {
@@ -1297,7 +1692,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   padding: 0.3rem 0.4rem 0.55rem;
   font-family: var(--sans);
   font-size: 0.82rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 60%, transparent);
+  border-bottom: 1px solid var(--hair);
 }
 .j-label { font-weight: 600; color: var(--muted); }
 .j-buffer {
@@ -1351,7 +1746,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   font-family: var(--sans);
   font-size: 0.76rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
   padding-top: 0.12rem;
@@ -1369,6 +1764,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   font-size: 0.93rem;
   line-height: 1.55;
   background: var(--raise);
+  border: 1px solid var(--hair);
   border-radius: var(--r);
 }
 .trap b {
@@ -1385,7 +1781,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 
 .risk {
   padding: 1.1rem 0;
-  border-bottom: 1px solid var(--panel-edge);
+  border-bottom: 1px solid var(--hair);
 }
 .risk:first-child { padding-top: 1.2rem; }
 
@@ -1401,7 +1797,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   border-radius: var(--r-xs);
 }
 /* Severity reads through fill weight as well as hue. */
-.risk.critical .sev { color: var(--sea); background: var(--alert); }
+.risk.critical .sev { color: var(--alert-ink); background: var(--alert); }
 .risk.caution .sev { color: var(--alert); border: 1px solid var(--alert); }
 .risk.note .sev { color: var(--ferry); border: 1px solid var(--ferry); }
 
@@ -1422,7 +1818,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   grid-template-columns: 1.9rem 1fr;
   gap: 0.75rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--panel-edge);
+  border-bottom: 1px solid var(--hair);
 }
 .booking .rank {
   font-family: var(--mono);
@@ -1455,7 +1851,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 .costs td {
   padding: 0.42rem 0;
   font-size: 0.94rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-edge) 60%, transparent);
+  border-bottom: 1px solid var(--hair);
 }
 .costs .num-col {
   font-family: var(--mono);
@@ -1479,6 +1875,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
+  box-shadow: var(--lift-1), var(--sheen);
 }
 .compare h3 { font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .compare p { font-size: 0.94rem; color: var(--ink-soft); }
@@ -1487,7 +1884,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 /* --------------------------------------------------------------- detours */
 
 .detours { margin: 0; padding: 0; list-style: none; }
-.detours li { padding: 1rem 0; border-bottom: 1px solid var(--panel-edge); }
+.detours li { padding: 1rem 0; border-bottom: 1px solid var(--hair); }
 .detours .cost {
   display: inline-block;
   margin-top: 0.25rem;
@@ -1514,10 +1911,13 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
-  box-shadow: var(--lift-1), var(--sheen);
+  box-shadow: var(--lift-2), var(--sheen);
   cursor: pointer;
   overflow: hidden;
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color var(--t) var(--ease),
+    transform var(--t) var(--ease),
+    box-shadow var(--t) var(--ease);
 }
 /* Lifting reads as "this is a thing you can take" far better than the sideways
    nudge did, and it does not shift the text under the cursor mid-click. */
@@ -1527,10 +1927,14 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   box-shadow: var(--lift-3), var(--sheen);
 }
 .corridor:active { transform: translateY(0); box-shadow: var(--lift-1), var(--sheen); }
+/* The card owns its shadow, so the ring has to be restated alongside it rather
+   than left to the blanket :focus-visible rule — which loses, being both
+   earlier in the file and no more specific. Same reason as .ask-go. */
+.corridor:focus-visible { box-shadow: var(--ring), var(--lift-3), var(--sheen); }
 /* The photograph creeps outward as the card lifts — a small thing, and the
    difference between a card that responds and one that just changes colour. */
 .corridor .photo,
-.corridor canvas.scene { transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.corridor canvas.scene { transition: transform 0.5s var(--ease); }
 .corridor:hover .photo,
 .corridor:hover canvas.scene { transform: scale(1.035); }
 
@@ -1561,9 +1965,9 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   gap: 0 0.85rem;
   margin-top: 0.7rem;
   padding-top: 0.6rem;
-  border-top: 1px solid var(--panel-edge);
-  font-size: 0.76rem;
-  letter-spacing: 0.06em;
+  border-top: 1px solid var(--hair);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -1579,7 +1983,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 }
 
 .myths { margin: 0.9rem 0 0; padding: 0; list-style: none; }
-.myths li { padding: 0.8rem 0; border-bottom: 1px solid var(--panel-edge); }
+.myths li { padding: 0.8rem 0; border-bottom: 1px solid var(--hair); }
 .myths .belief {
   display: block;
   font-family: var(--sans);
@@ -1643,6 +2047,13 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
  * over it as far as you want it. Three positions, because two is not enough to
  * both glance at the next departure and read the whole itinerary. */
 @media (max-width: 60rem) {
+  /* Every instrument grows by six pixels the moment the pointer becomes a
+     thumb. 2.1rem is a comfortable click and a poor tap; 2.5rem is 40px, which
+     is within reach of the 44px guidance without making the legend row eat two
+     lines of a phone screen. Changing the one token moves the legend, both
+     zoom buttons, Reset view and the theme toggle together. */
+  :root { --instr-h: 2.5rem; }
+
   .app {
     height: 100dvh;
     min-height: 0;
@@ -1678,10 +2089,17 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
     z-index: 40;
     padding: 0 0.85rem;
     padding-top: env(safe-area-inset-top);
-    background: color-mix(in srgb, var(--panel) 82%, transparent);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    /* Denser than --float and blurred harder than the desktop bar, because
+       here it is not sitting on a solid column — the map runs underneath it
+       edge to edge, and a wordmark over moving coastline has to hold. */
+    background: color-mix(in srgb, var(--panel) 84%, transparent);
+    backdrop-filter: var(--float-blur);
+    -webkit-backdrop-filter: var(--float-blur);
     border-bottom: 1px solid var(--panel-edge);
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, var(--rail) 18%, transparent),
+      var(--lift-2),
+      var(--sheen);
   }
   .tagline { display: none; }
 
@@ -1701,7 +2119,17 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
     gap: 0.5rem;
     z-index: 20;
   }
-  .legend { flex: 1 1 100%; flex-wrap: wrap; gap: 0.6rem; }
+  /* Wrapping means it can be taller than one instrument, so the fixed height
+     has to become a floor rather than a measurement. */
+  .legend {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.7rem;
+    height: auto;
+    min-height: var(--instr-h);
+    padding: 0.3rem 0.7rem;
+  }
+  .btn-zoom { width: 2.6rem; }
 
   .sheet {
     display: flex;
@@ -1714,8 +2142,15 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
     z-index: 30;
     background: var(--panel-solid);
     border-top: 1px solid var(--panel-edge);
-    border-radius: 1.1rem 1.1rem 0 0;
-    box-shadow: 0 -18px 44px -22px rgb(0 0 0 / 0.6);
+    /* 1.25rem. The sheet is the width of the phone, and the corner has to be
+       large enough to read as a sheet coming up over the chart rather than as
+       a rounded-off box; below about 1.2rem at this width it looks like a
+       rendering artefact. */
+    border-radius: 1.25rem 1.25rem 0 0;
+    /* The cast onto the map plus the hairline along its own leading edge. The
+       hairline is what makes the sheet look like it has thickness, which is
+       the only cue available when the thing it covers is a moving map. */
+    box-shadow: var(--sheet-shade), var(--sheen);
     /* Where it sits before app.js has placed it. From then on the transform is
        set inline, on the element, rather than through a variable — see
        placeSheet for why that is not a detail. */
@@ -1741,12 +2176,21 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   .sheet-grip > span {
     display: block;
     width: 2.4rem;
-    height: 0.28rem;
+    height: 0.25rem;
     margin: 0 auto;
     border-radius: 999px;
-    background: var(--panel-edge);
+    /* One step up from --panel-edge. Against the panel ground the edge colour
+       was very nearly invisible, and this bar is the only thing telling a
+       reader that the sheet moves at all. */
+    background: color-mix(in srgb, var(--muted) 55%, var(--panel-edge));
+    transition: background-color var(--t) var(--ease), width var(--t) var(--ease);
   }
+  .sheet-grip:hover > span,
+  .sheet-grip:active > span { background: var(--muted); width: 2.9rem; }
   .sheet-grip:active { cursor: grabbing; }
+  /* The strip is the target, so the ring goes on the strip; on the bar alone
+     it would be a 6px outline floating in the middle of the sheet. */
+  .sheet-grip:focus-visible { outline-offset: -3px; border-radius: 1.25rem 1.25rem 0 0; }
 
   .sheet-scroll {
     display: block;
@@ -1808,14 +2252,27 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   .controls { padding: 0 0.85rem 0.8rem; gap: 0.7rem; }
   .row { flex-wrap: wrap; }
   .toggle-text em { display: none; }
-  .legend { font-size: 0.72rem; }
-  .btn-ghost { font-size: 0.72rem; padding: 0.35rem 0.55rem; }
-  .brandtext { font-size: 0.95rem; letter-spacing: 0.1em; }
+  .legend { font-size: 0.7rem; letter-spacing: 0.08em; }
+  /* Horizontal only. The height is a token now and every instrument on the
+     row is keeping to it; narrowing the sides is what makes Reset view fit
+     beside the zoom pair on a 360px screen. */
+  .btn-ghost { font-size: 0.72rem; padding: 0 0.6rem; }
+  .brandtext { font-size: 0.95rem; letter-spacing: 0.12em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-  .corridor:hover { transform: none; }
+  /* Zeroing a duration removes the travel, not the destination — the element
+     still arrives, it just teleports there, which for someone who asked for
+     less motion is the worst of both. Anything that moves rather than merely
+     changing colour has to be told not to move at all. */
+  .corridor:hover,
+  .btn-ghost:active,
+  .btn-icon:active,
+  .ask-go:active,
+  .swap:active { transform: none; }
+  .sheet-grip:hover > span,
+  .sheet-grip:active > span { width: 2.4rem; }
 }
 
 .where .via {
@@ -1926,6 +2383,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   background: var(--raise);
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
+  box-shadow: var(--sheen);
   font-size: 0.86rem;
 }
 .disclosure b { font-family: var(--sans); color: var(--ink-soft); }
@@ -1937,31 +2395,52 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 .ask-row { display: flex; gap: 0.4rem; }
 .ask-row input { flex: 1 1 auto; min-width: 0; }
 
+/* The one filled button in the interface, and the only place the accent is
+ * spent as a ground rather than as a mark. It has to look pressable without
+ * looking sold: the vertical mix is a single stop of light along the top edge,
+ * the way any physical key is lit from above, not a decorative sweep — which
+ * is why it runs out by a third of the way down and the rest of the face is
+ * flat marigold. */
 .ask-go {
   flex: none;
-  padding: 0 1.15rem;
+  min-height: var(--ctl-h);
+  padding: 0 1.2rem;
   font-family: var(--sans);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.13em;
+  /* The word is four letters and it is the only instruction on the panel;
+     tracked out it reads as a key cap rather than as a label. */
+  text-indent: 0.13em;
   text-transform: uppercase;
-  color: var(--sea);
+  color: var(--rail-ink);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--rail) 92%, #fff) 0%,
-    var(--rail) 100%
+    color-mix(in srgb, var(--rail-fill) 90%, #fff) 0%,
+    var(--rail-fill) 34%
   );
-  border: 1px solid color-mix(in srgb, var(--rail) 80%, #000);
+  border: 1px solid color-mix(in srgb, var(--rail-fill) 78%, #000);
   border-radius: var(--r-sm);
   box-shadow: var(--lift-2);
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  transition:
+    filter var(--t) var(--ease),
+    transform var(--t-tap) var(--ease),
+    box-shadow var(--t) var(--ease);
 }
 .ask-go:hover {
-  filter: brightness(1.06);
-  box-shadow: var(--lift-2), 0 0 0 4px color-mix(in srgb, var(--rail) 18%, transparent);
+  filter: brightness(1.05);
+  box-shadow: var(--lift-2), var(--ring);
 }
-.ask-go:active { transform: translateY(1px); box-shadow: var(--lift-1); }
+/* Pressed, the light on the top edge goes out and the key sits down — the
+   gradient inverts to a shallow inner shadow rather than the face simply
+   getting darker, which is the difference between a button and a swatch. */
+.ask-go:active {
+  transform: translateY(1px);
+  background: var(--rail-fill);
+  box-shadow: var(--lift-1), inset 0 2px 4px rgb(0 0 0 / 0.22);
+}
+.ask-go:focus-visible { box-shadow: var(--ring), var(--lift-2); }
 
 /* How often the thing runs. Sits under the service name, quieter than the
    service but louder than a note, because on a once-a-day boat it is the most
@@ -2094,7 +2573,15 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   border-radius: var(--r-xs);
 }
 .band b { font-family: var(--mono); font-weight: 600; color: var(--ink-soft); }
-.band.on { border-color: var(--rail); color: var(--ink-soft); }
+.band.on {
+  border-color: var(--rail);
+  /* The same faint accent wash the checked toggle takes. A band you are
+     actually being quoted at should read as filled in, not merely outlined —
+     three chips in a row differing only by border hue is a lot to ask of a
+     glance. */
+  background: color-mix(in srgb, var(--rail) 10%, transparent);
+  color: var(--ink-soft);
+}
 .band.on b { color: var(--rail); }
 .stay-note {
   margin: 0.45rem 0 0;
@@ -2113,7 +2600,11 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   line-height: 1.45;
   background: var(--raise);
   border-left: 2px solid var(--panel-edge);
-  border-radius: var(--r);
+  /* Square where the bar is, rounded away from it. A coloured edge is a tab
+     stuck to the side of the note, and a tab with a rounded corner behind it
+     leaves a crescent of ground showing through — the same reason the clock
+     block two hundred lines down is cut this way. */
+  border-radius: 0 var(--r) var(--r) 0;
   color: var(--muted);
 }
 .ask-note b { color: var(--ink); font-weight: 600; }
@@ -2133,7 +2624,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   border: 1px solid var(--panel-edge);
   border-radius: var(--r-xs);
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition: border-color var(--t) var(--ease), color var(--t) var(--ease);
 }
 .ask-sug:hover,
 .ask-sug:focus-visible { border-color: var(--rail); color: var(--rail); }
@@ -2492,13 +2983,14 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   flex: none;
   padding: 0.4rem 0.85rem;
   border-radius: var(--r-sm);
-  background: var(--rail);
-  color: var(--sea);
+  background: var(--rail-fill);
+  color: var(--rail-ink);
   font-family: var(--sans);
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  box-shadow: var(--lift-1);
 }
 
 .appbanner-no {
@@ -2543,14 +3035,15 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   padding: 0.85rem 0.9rem 0.9rem;
   border: 1px solid var(--panel-edge);
   border-radius: var(--r);
-  background: var(--panel-solid);
+  background: var(--raise);
+  box-shadow: var(--lift-1), var(--sheen);
 }
 
 /* The one on screen, marked by the accent rather than by position — the list
    is in cost order and the current card is not always first. */
 .way.on {
-  border-color: var(--rail);
-  box-shadow: inset 3px 0 0 0 var(--rail);
+  border-color: color-mix(in srgb, var(--rail) 60%, var(--panel-edge));
+  box-shadow: inset 3px 0 0 0 var(--rail), var(--lift-2);
 }
 
 .way-head {
@@ -2611,10 +3104,18 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   color: var(--ink);
   font-family: var(--sans);
   font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color var(--t) var(--ease),
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease);
 }
-.way-go:hover { background: var(--raise); border-color: var(--rail); }
+.way-go:hover {
+  background: var(--panel-solid);
+  border-color: color-mix(in srgb, var(--rail) 60%, var(--panel-edge));
+  box-shadow: var(--lift-1);
+}
 
 /* ------------------------------------------------ what stops running, when */
 
