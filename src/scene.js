@@ -1040,54 +1040,72 @@ const Scene = (() => {
     river(ctx, w, h, pal, r) {
       const bend = w * (0.42 + r() * 0.16)
       const mouth = h * 0.44
+      const swing = (r() - 0.5) * w * 0.3 // where the reach has got to by the time it reaches us
       sun(ctx, w, h, pal)
       clouds(ctx, w, h, pal, r, 4)
-      landform(ctx, w, h, crest(w, h * 0.44, h * 0.11, r, 11), pal, 0.95, { rimAlpha: 0.3 })
-      mist(ctx, w, h, pal, h * 0.46, h * 0.07, 0.24)
+      landform(ctx, w, h, crest(w, h * 0.42, h * 0.11, r, 11), pal, 0.95, { rimAlpha: 0.3 })
+      mist(ctx, w, h, pal, h * 0.45, h * 0.07, 0.24)
 
-      // The channel, opening toward us out of the haze. It is the lightest
-      // thing in the plate, because it is a mirror held up to the brightest.
-      water(ctx, w, h, pal, mouth, r, { shore: false, lift: 0.3 })
-      ctx.fillStyle = mix(pal.glow, '#ffffff', 0.4, 0.22)
-      ctx.fillRect(0, mouth, w, Math.max(0.8, h * 0.005))
+      /* Land first, water cut through it second. Painting the water plane
+       * across the frame and then covering the ends with banks is the obvious
+       * order and the wrong one: what survives is a bright band with dark
+       * corners, which reads as a runway. Cutting a channel out of a
+       * continuous floodplain is what makes the water a river. */
+      landform(ctx, w, h, crest(w, h * 0.54, h * 0.03, r, 8), pal, 0.5, { rim: false })
 
-      /* Banks. The near one is a plain dark mass because that is what stops
-       * the eye at the front; the far one keeps a lit waterline, which is
-       * where a river's edge actually shows from downstream. */
-      for (const side of [-1, 1]) {
-        const depth = side < 0 ? 0.2 : 0.02
-        const edge = () => {
-          ctx.beginPath()
-          ctx.moveTo(side < 0 ? 0 : w, mouth + h * 0.1)
-          ctx.quadraticCurveTo(bend + side * w * 0.34, h * 0.55, bend + side * w * 0.055, mouth + h * 0.005)
-        }
-        ctx.fillStyle = layer(pal, depth)
-        edge()
-        ctx.quadraticCurveTo(bend + side * w * 0.3, h * 0.7, side < 0 ? w * 0.06 : w * 0.94, h)
-        ctx.lineTo(side < 0 ? 0 : w, h)
+      const bankL = t =>
+        bend - w * 0.05 - Math.pow(t, 1.7) * (w * 0.5) + swing * t
+      const bankR = t =>
+        bend + w * 0.05 + Math.pow(t, 1.7) * (w * 0.5) + swing * t
+      const channel = () => {
+        ctx.beginPath()
+        ctx.moveTo(bankL(0), mouth)
+        for (let i = 1; i <= 8; i++) ctx.lineTo(bankL(i / 8), mouth + (h - mouth) * (i / 8))
+        for (let i = 8; i >= 0; i--) ctx.lineTo(bankR(i / 8), mouth + (h - mouth) * (i / 8))
         ctx.closePath()
-        ctx.fill()
-        ctx.save()
-        ctx.strokeStyle = mix(pal.glow, '#ffffff', 0.4, side < 0 ? 0.26 : 0.12)
-        ctx.lineWidth = Math.max(0.8, h * 0.005)
-        edge()
-        ctx.stroke()
-        ctx.restore()
       }
+      ctx.save()
+      channel()
+      ctx.clip()
+      water(ctx, w, h, pal, mouth, r, { shore: false, lift: 0.28 })
+      ctx.restore()
 
-      /* A spur running out from one bank across the head of the reach. Without
-       * it the two banks meet in a point and the river reads as a road
-       * vanishing to a horizon; with it the water comes round a bend out of
-       * the haze, which is what rivers do and roads do not. */
+      // The waterline, lit on the sunward bank and barely there on the other,
+      // which is how a bank reads from downstream at this hour.
+      ctx.save()
+      ctx.lineWidth = Math.max(0.8, h * 0.005)
+      for (const [f, alpha] of [[bankL, 0.3], [bankR, 0.14]]) {
+        ctx.strokeStyle = mix(pal.glow, '#ffffff', 0.4, alpha)
+        ctx.beginPath()
+        ctx.moveTo(f(0), mouth)
+        for (let i = 1; i <= 8; i++) ctx.lineTo(f(i / 8), mouth + (h - mouth) * (i / 8))
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      /* A spur running out from one bank across the head of the reach, so the
+       * water comes round a bend out of the haze rather than terminating in a
+       * point. Rivers do that; roads vanishing to a horizon do not. */
       const spur = r() > 0.5 ? -1 : 1
-      ctx.fillStyle = layer(pal, 0.58)
+      ctx.fillStyle = layer(pal, 0.62)
       ctx.beginPath()
-      ctx.moveTo(bend + spur * w * 0.34, mouth - h * 0.01)
-      ctx.quadraticCurveTo(bend + spur * w * 0.12, mouth + h * 0.005, bend - spur * w * 0.1, mouth + h * 0.035)
-      ctx.lineTo(bend + spur * w * 0.4, mouth + h * 0.06)
+      ctx.moveTo(bend + spur * w * 0.34, mouth - h * 0.015)
+      ctx.quadraticCurveTo(bend + spur * w * 0.1, mouth + h * 0.004, bend - spur * w * 0.12, mouth + h * 0.03)
+      ctx.lineTo(bend + spur * w * 0.4, mouth + h * 0.055)
       ctx.closePath()
       ctx.fill()
-      mist(ctx, w, h, pal, mouth + h * 0.05, h * 0.06, 0.3)
+      mist(ctx, w, h, pal, mouth + h * 0.045, h * 0.055, 0.3)
+
+      // A near bank across the bottom corner, dark, to stop the eye at the
+      // front of the picture.
+      ctx.fillStyle = layer(pal, 0.02)
+      ctx.beginPath()
+      ctx.moveTo(bankL(1), h)
+      ctx.lineTo(bankL(0.72), mouth + (h - mouth) * 0.72)
+      ctx.lineTo(0, h * 0.9)
+      ctx.lineTo(0, h)
+      ctx.closePath()
+      ctx.fill()
 
       const dark = layer(pal, 0.02)
       palm(ctx, w * (0.1 + r() * 0.08), h * 0.96, h * 0.34, dark, r)

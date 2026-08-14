@@ -273,6 +273,10 @@ const MapView = (() => {
      * blitted, they cost a copy. */
     let backdrop = null
     let shelf = null
+    // Outlives the backdrop it is stamped into: the noise does not depend on
+    // the palette or the canvas size, so a resize or a theme flip has no
+    // reason to roll sixteen thousand new pixels.
+    let grainTile = null
 
     function backdrops() {
       const key = [canvas.width, canvas.height, colors.sea, colors.seaDeep].join('|')
@@ -287,6 +291,45 @@ const MapView = (() => {
         return { c, g }
       }
 
+      /* A dither laid over the sea gradient.
+       *
+       * A gradient this shallow — two close blues across nine hundred pixels —
+       * has fewer distinct values in it than it has rows to fill, so an 8-bit
+       * display quantises it into visible bands, and the bands sit across the
+       * open water where there is nothing else to look at. A pixel of noise
+       * under half a level breaks the boundary between one band and the next
+       * and the ramp reads as smooth. It is the same trick that makes a
+       * printed photograph continuous, and it is why the water now looks like
+       * paper rather than like a fill.
+       *
+       * Tiled from one small square rather than generated across the whole
+       * canvas: at this amplitude the repeat is not findable, and the honest
+       * version was four million random numbers on every resize. */
+      const GRAIN = 128
+      const grain = g => {
+        if (!grainTile) {
+          const t = document.createElement('canvas')
+          t.width = t.height = GRAIN
+          const tg = t.getContext('2d')
+          const img = tg.createImageData(GRAIN, GRAIN)
+          for (let i = 0; i < img.data.length; i += 4) {
+            const v = (Math.random() * 255) | 0
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = v
+            img.data[i + 3] = 255
+          }
+          tg.putImageData(img, 0, 0)
+          grainTile = t
+        }
+        g.save()
+        // Overlay keeps the mid grey of the noise neutral, so the dither lands
+        // as texture rather than as a wash lightening or darkening the water.
+        g.globalCompositeOperation = 'overlay'
+        g.globalAlpha = 0.035
+        g.fillStyle = g.createPattern(grainTile, 'repeat')
+        g.fillRect(0, 0, view.w, view.h)
+        g.restore()
+      }
+
       // A sea that deepens toward the bottom of the frame. One flat fill across
       // two thirds of the viewport is the least interesting thing a map can do.
       const sea = layer()
@@ -295,6 +338,7 @@ const MapView = (() => {
       sky.addColorStop(1, colors.seaDeep)
       sea.g.fillStyle = sky
       sea.g.fillRect(0, 0, view.w, view.h)
+      grain(sea.g)
 
       /* Darkens the corners so the eye settles in the middle where the route
        * is. Drawn on the ground rather than over everything, so it never dims
@@ -824,13 +868,16 @@ const MapView = (() => {
       // rather than across it and out into the South China Sea.
       { name: 'MALAYSIA', lon: 102.5, lat: 4.2, rank: 1.2, angle: 72 },
       { name: 'BRUNEI', lon: 114.7, lat: 4.6, rank: 3.4 },
-      { name: 'SUMATRA', lon: 100.4, lat: 0.4, rank: 1.4, angle: -38 },
+      { name: 'SUMATRA', lon: 98.6, lat: 2.8, rank: 2.4, angle: -38 },
       { name: 'BORNEO', lon: 113.6, lat: -1.4, rank: 0.9 },
       { name: 'JAVA', lon: 110.6, lat: -7.3, rank: 1.6 },
       { name: 'SULAWESI', lon: 120.6, lat: -2.4, rank: 1.6 },
-      // On South Sumatra, not in the Java Sea where the country's centroid
-      // falls: Indonesia is an archipelago and does not contain its average.
-      { name: 'INDONESIA', lon: 104.0, lat: -3.4, rank: 0 },
+      /* Down Sumatra's own axis, not in the Java Sea where the country's
+         centroid falls — Indonesia is an archipelago and does not contain its
+         average — and not across Sumatra either, because tracked out to a
+         country name the word is wider than the island and half of it ends up
+         in open water. */
+      { name: 'INDONESIA', lon: 102.4, lat: -2.4, rank: 0, angle: -38 },
       { name: 'PHILIPPINES', lon: 121.5, lat: 12.4, rank: 0 },
       { name: 'LUZON', lon: 121.2, lat: 16.4, rank: 1.8 },
       { name: 'MINDANAO', lon: 124.8, lat: 7.8, rank: 1.8 },
@@ -901,11 +948,25 @@ const MapView = (() => {
         /* Quiet on purpose. These are the ground the route is drawn on, and a
            toponym that competes with a station name has misunderstood its job:
            you should have to look for them, and find them when you do. */
-        ctx.globalAlpha = place.sea ? 0.4 : 0.5
-        ctx.fillStyle = place.sea ? colors.muted : colors.coast || colors.muted
         // Centring is by the box, so the trailing letter-space has to come off
         // the middle or every name sits a nudge to the right of its anchor.
-        ctx.fillText(place.name, -size * (place.sea ? 0.12 : 0.15), 0)
+        const x = -size * (place.sea ? 0.12 : 0.15)
+
+        /* A name this size will cross a coastline sooner or later — the ones
+           that do not are the ones on countries wide enough to hold them, and
+           this region has three of those. Without the halo the letters that
+           land on water and the letters that land on the shore are two
+           different colours against two different grounds, and the word stops
+           being a word. */
+        ctx.lineWidth = Math.max(2, size * 0.22)
+        ctx.lineJoin = 'round'
+        ctx.strokeStyle = colors.halo || colors.sea
+        ctx.globalAlpha = place.sea ? 0.3 : 0.38
+        ctx.strokeText(place.name, x, 0)
+
+        ctx.globalAlpha = place.sea ? 0.4 : 0.5
+        ctx.fillStyle = place.sea ? colors.muted : colors.coast || colors.muted
+        ctx.fillText(place.name, x, 0)
         ctx.restore()
       }
     }
