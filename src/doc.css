@@ -7,20 +7,47 @@
  * arriving from Google lands somewhere that is recognisably the same place.
  */
 
+/* The ground the sheet sits on. Fixed, so a four-thousand-pixel guide does not
+   drag the gradient past itself as it scrolls — the desk stays still and the
+   paper moves over it, which is the only version that reads as depth rather
+   than as a very tall smear. */
 body.doc {
   height: auto;
   overflow: visible;
   background: var(--sea);
+  background-image: linear-gradient(var(--sea), var(--sea-deep));
+  background-attachment: fixed;
 }
 
 body.doc .topbar { position: static; }
 
 body.doc .brand { text-decoration: none; }
 
+/* A sheet, rather than text laid straight onto the ground.
+ *
+ * The guide pages had the app's palette and none of its structure: the topbar
+ * was panel-coloured, the callouts and the stat tiles were panel-coloured, and
+ * the article between them sat directly on the sea. Cards floated on open
+ * water with the prose that explained them lying underneath, which read as
+ * styled widgets dropped into an unstyled page.
+ *
+ * The app already answers this — its itinerary is a panel raised over the map
+ * — so the document uses the same answer rather than inventing a second one.
+ * Same ground, same paper, same lift. Most of the site's readers arrive here
+ * from a search result and never see the planner; this is the whole of what
+ * they are shown, and it should look like somewhere that was built on purpose.
+ *
+ * Width is the measure plus the padding, not the measure: 46rem of column with
+ * 3rem of margin either side means a 52rem sheet. Sizing the sheet at the old
+ * 46rem would have quietly taken six rem off the line length. */
 .docwrap {
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.25rem 4rem;
+  max-width: 52rem;
+  margin: 2.25rem auto 3.5rem;
+  padding: 3rem 3rem 3.5rem;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-lg);
+  box-shadow: var(--lift-3), var(--sheen);
 }
 
 .docwrap h1 {
@@ -165,17 +192,33 @@ body.doc .banner img { display: block; width: 100%; height: 100%; object-fit: co
   font-variant-numeric: tabular-nums;
 }
 
+/* Below the sheet and on the ground, like a caption under a plate — so it
+   aligns to the sheet's edge rather than to its text column. */
 .docfoot {
-  max-width: 46rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: 0 1.25rem 3rem;
+  padding: 0 3rem 3rem;
   font-size: 0.92rem;
   color: var(--muted);
 }
 .docfoot a { color: var(--rail); }
 
+/* On a phone the sheet becomes the page. A 16px margin either side of a
+   340px-wide column is 10% of the reading width spent on showing that there is
+   a ground behind it, and the ground is not what anyone came for. The corners
+   and the left and right rules go with it, so nothing suggests an edge that is
+   no longer there. */
+@media (max-width: 46rem) {
+  .docwrap {
+    margin: 0 auto 2rem;
+    padding: 1.75rem 1.15rem 3rem;
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+  .docfoot { padding: 0 1.15rem 3rem; }
+}
+
 @media (max-width: 34rem) {
-  .docwrap { padding: 1.75rem 1rem 3rem; }
   .more span { margin-left: 0; }
 }
 

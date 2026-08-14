@@ -1409,6 +1409,24 @@ body {
   margin: 0 0 1.5rem;
   padding: 0;
 }
+/* Two tracks on a phone, not four.
+ *
+ * A quarter of 412px is 91px, and "BORDERS" and "ON RAILS" do not fit it — the
+ * captions were being clipped to "BORDE…" and "ON RAI…" on the single most
+ * common width the site is read at. The ellipsis rule below is the right
+ * answer to a caption one word too long for its tile; it is the wrong answer
+ * to a tile half the width it needs, which is a layout problem and gets a
+ * layout fix.
+ *
+ * Two rather than three because the tile count is four fixed readings plus one
+ * per mode, and everything from the fifth on is styled as an unfilled footing.
+ * Two divides four exactly, so that boundary keeps falling on a row edge and
+ * the footing stays a footing. Three would put the cost — filled — on the same
+ * row as the first two unfilled tiles. */
+@media (max-width: 27rem) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .stat {
   display: flex;
   flex-direction: column;

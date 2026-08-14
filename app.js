@@ -4134,10 +4134,19 @@ const Scene = (() => {
       landform(ctx, w, h, crest(w, h * 0.42, h * 0.12, r, 10), pal, 0.95, { rimAlpha: 0.3 })
       mist(ctx, w, h, pal, h * 0.47, h * 0.1, 0.3)
 
+      /* `rimA` falls away far faster than the depth does, and that is the whole
+         difference between a canopy and a row of bubbles.
+
+         A rim is light from behind catching an edge, so it only exists where
+         there is something bright behind the edge to catch. The far band has
+         the sky behind it; the near band has nothing behind it but more forest,
+         and giving its almost-black crowns the same bright edge drew a
+         high-contrast outline around every one of them. An outlined dome is a
+         circle, whatever the fill inside it is doing. */
       const bands = [
-        { base: 0.56, depth: 0.48, size: 0.05, mistA: 0.2 },
-        { base: 0.72, depth: 0.2, size: 0.07, mistA: 0.12 },
-        { base: 0.94, depth: 0.02, size: 0.1, mistA: 0 },
+        { base: 0.56, depth: 0.48, size: 0.05, mistA: 0.2, rimA: 0.3 },
+        { base: 0.72, depth: 0.2, size: 0.07, mistA: 0.12, rimA: 0.13 },
+        { base: 0.94, depth: 0.02, size: 0.1, mistA: 0, rimA: 0.045 },
       ]
       for (const b of bands) {
         ctx.fillStyle = layer(pal, b.depth)
@@ -4169,15 +4178,21 @@ const Scene = (() => {
           // Light on the top of this crown, drawn now rather than in a second
           // pass: a rim laid over the whole band afterwards floats on top of
           // the crowns in front of it, which reads as scratches on the plate.
+          /* And it runs across the shoulder rather than around the whole
+             crown. Traced from one foot to the other it is an outline, and an
+             outline closes the shape into a circle no matter how lopsided the
+             fill underneath it is. Light does not do that: it catches the top
+             and the side facing the sun and stops. */
           ctx.save()
-          ctx.strokeStyle = rimGrad(ctx, w, pal, 0.34 * (1 - b.depth * 0.4))
+          ctx.strokeStyle = rimGrad(ctx, w, pal, b.rimA)
           ctx.lineWidth = Math.max(0.8, h * 0.005)
+          ctx.lineCap = 'round'
           ctx.beginPath()
-          ctx.moveTo(x - rad * 0.92, cy - rad * 0.05)
+          ctx.moveTo(x - rad * (0.5 + skew * 0.3), cy - rad * (0.42 + skew * 0.3))
           ctx.bezierCurveTo(
-            x - rad * (0.8 + skew), cy - rad * (0.55 + skew * 0.5),
-            x + rad * (0.65 - skew), cy - rad * (0.95 - skew * 0.4),
-            x + rad * 0.92, cy + rad * 0.02
+            x - rad * (0.24 + skew), cy - rad * (0.78 + skew * 0.4),
+            x + rad * (0.34 - skew), cy - rad * (0.92 - skew * 0.4),
+            x + rad * 0.66, cy - rad * (0.42 - skew * 0.3)
           )
           ctx.stroke()
           ctx.restore()
