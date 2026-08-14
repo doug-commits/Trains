@@ -186,9 +186,10 @@ const MapView = (() => {
       canvas.width = Math.max(1, Math.round(rect.width * dpr))
       canvas.height = Math.max(1, Math.round(rect.height * dpr))
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      // The baked sea and vignette are sized in device pixels, so they are no
-      // longer the right size. backdrops() rebuilds on its own key.
+      // The baked sea, vignette and shelf are sized in device pixels, so they
+      // are no longer the right size. Each rebuilds on its own key.
       backdrop = null
+      shelf = null
     }
 
     function size() {
@@ -271,6 +272,7 @@ const MapView = (() => {
      * map put together — a third of the frame. Painted once into a bitmap and
      * blitted, they cost a copy. */
     let backdrop = null
+    let shelf = null
 
     function backdrops() {
       const key = [canvas.width, canvas.height, colors.sea, colors.seaDeep].join('|')
@@ -311,9 +313,95 @@ const MapView = (() => {
       return backdrop
     }
 
+    /* Bathymetry: the shallows, drawn as bands stepping out from every coast.
+     *
+     * This is the difference between a map and a chart. A single flat fill
+     * across two thirds of the frame says "here is water" and nothing else; a
+     * shelf says where the water gets deep, which is the first thing a real
+     * chart tells you and the reason the Malacca Strait and the Java Sea look
+     * like different places rather than the same blue.
+     *
+     * Three passes of a blurred silhouette, widest and faintest first, then the
+     * land knocked back out so what remains is only what fell in the water.
+     * shadowBlur rather than ctx.filter because filter on a canvas is Safari 17
+     * and this app supports iOS 15 — a blur that silently does nothing on a
+     * fifth of the phones is worse than no blur at all.
+     *
+     * Baked against the view rather than the canvas, because it moves with the
+     * coastline, and skipped entirely while a gesture is in flight — thirteen
+     * thousand points blurred three times is the most expensive thing on the
+     * map by a distance, and nobody has ever studied the continental shelf on a
+     * map that is sliding under their thumb. */
+    /* Two bands, not three. The third sat between the other two and cost a
+       third of the layer to say something they had already said — visible in a
+       difference blend and nowhere else. Radii are in the small canvas's own
+       pixels and get multiplied by the scale-up, so these are roughly 70 and 24
+       once they land. */
+    const SHELF_BANDS = [
+      [24, 0.52],
+      [8, 0.46],
+    ]
+
+    /* Half resolution, and the coarse coastline.
+     *
+     * Both are free here in a way they are nowhere else on this map. The
+     * narrowest band is a six pixel blur; at half scale that is three, and
+     * scaling the result back up blurs it again. Nothing in a picture whose
+     * every edge is already soft survives being sharpened, so there is nothing
+     * to lose. A blurred picture drawn small and scaled up is the same blurred
+     * picture; drawn at full size it was eighty milliseconds on the frame a
+     * gesture settles on, against eighty-eight for everything else on the map
+     * put together. */
+    const SHELF_SCALE = 0.34
+
+    function shelfLayer() {
+      const key = [
+        canvas.width, canvas.height,
+        Math.round(view.dx), Math.round(view.dy), view.scale.toFixed(3),
+        colors.coast,
+      ].join('|')
+      if (shelf && shelf.key === key) return shelf.c
+
+      const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round(canvas.width * SHELF_SCALE))
+      c.height = Math.max(1, Math.round(canvas.height * SHELF_SCALE))
+      const g = c.getContext('2d')
+      g.scale(c.width / view.w, c.height / view.h)
+
+      for (const [blur, alpha] of SHELF_BANDS) {
+        g.save()
+        g.globalAlpha = alpha
+        g.shadowColor = colors.coast
+        g.shadowBlur = blur
+        /* The shape itself is painted opaque and removed below; only its
+           shadow is wanted. Offsetting the shape off-canvas would be the
+           cheaper trick and gives a shadow on one side only, which is a
+           drop shadow and not a shelf. */
+        g.fillStyle = '#000'
+        g.transform(view.scale, 0, 0, view.scale, view.dx, view.dy)
+        g.fill(world.rough)
+        g.restore()
+      }
+
+      /* Knocked out with the full-resolution coastline even though the bands
+         were cast by the coarse one. The edge where the shelf meets the land is
+         the one place the difference between the two paths would show, because
+         it is the only hard edge in the layer. */
+      g.save()
+      g.globalCompositeOperation = 'destination-out'
+      g.transform(view.scale, 0, 0, view.scale, view.dx, view.dy)
+      g.fill(world.all)
+      g.restore()
+
+      shelf = { key, c }
+      return c
+    }
+
     function drawBasemap() {
       const baked = backdrops()
       ctx.drawImage(baked.sea, 0, 0, view.w, view.h)
+
+      if (!moving) ctx.drawImage(shelfLayer(), 0, 0, view.w, view.h)
 
       drawGraticule()
 
@@ -362,6 +450,51 @@ const MapView = (() => {
         for (const path of world.outlines) ctx.stroke(path)
       }
       ctx.restore()
+
+      /* And light on the land, from the north-west.
+       *
+       * Flat fill to flat fill across a continent reads as paper, not ground.
+       * This is not terrain — there is no elevation data in this project and
+       * inventing some would be a lie told in pixels — it is a single raking
+       * gradient over the whole landmass, which is enough to stop the interior
+       * reading as a hole cut in the sea. Clipped to the land so not a pixel of
+       * it touches the water the shelf just spent three passes describing. */
+      if (!moving) {
+        ctx.save()
+        ctx.transform(view.scale, 0, 0, view.scale, view.dx, view.dy)
+        ctx.clip(world.all)
+
+        /* The strand: a pale band just inside every coast, the mirror of the
+         * shelf just outside it.
+         *
+         * This is what makes land read as land rather than as the shape left
+         * over when you cut the sea out. In the dark theme the two fills are
+         * four points apart in value and Sumatra was arriving as a hole; a lit
+         * rim along its edge is the whole difference. Stroked rather than
+         * blurred because the clip already does the hard edge on one side and
+         * a wide soft stroke does the rest — the shelf can afford a blur
+         * because it is baked once, and this cannot because it is not. */
+        for (const width of [11, 5]) {
+          ctx.strokeStyle = colors.landEdge
+          ctx.globalAlpha = width > 8 ? 0.1 : 0.16
+          ctx.lineWidth = width / view.scale
+          for (const path of world.outlines) ctx.stroke(path)
+        }
+        ctx.globalAlpha = 1
+
+        /* And a rake of light across the whole landmass, north-west to
+         * south-east. Not terrain: there is no elevation data in this project
+         * and inventing some would be a lie told in pixels. It is one gradient,
+         * and it is enough to stop a continent reading as flat paper. */
+        ctx.setTransform(backing, 0, 0, backing, 0, 0)
+        const lit = ctx.createLinearGradient(0, 0, view.w * 0.55, view.h)
+        lit.addColorStop(0, 'rgba(255,255,255,0.075)')
+        lit.addColorStop(0.55, 'rgba(255,255,255,0)')
+        lit.addColorStop(1, 'rgba(0,0,0,0.14)')
+        ctx.fillStyle = lit
+        ctx.fillRect(0, 0, view.w, view.h)
+        ctx.restore()
+      }
     }
 
     /** Ferries arc; land legs run straight between stations. */
