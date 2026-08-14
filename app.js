@@ -1825,6 +1825,26 @@ const GUIDES = [
   { from: 'cebu', to: 'dumaguete', slug: 'cebu-to-dumaguete-by-ferry',
     h1: 'Cebu to Dumaguete by ferry',
     intent: 'Island-hopping down through Bohol and Siquijor, against the four-hour bus most people take instead — both are here.' },
+
+  /* Indonesia, where there was less left to write than expected.
+   *
+   * The corridors people search for — Jakarta to Bali, Singapore to Bali —
+   * already have pages, and a second page for a pair that has one is the
+   * doorway pattern this file exists to avoid. What was genuinely missing is
+   * four crossings, two of them into Sumatra on services that suspend and
+   * resume, which is exactly the sort of thing worth a page that says so. */
+  { from: 'denpasar', to: 'gili', slug: 'bali-to-gili-islands-by-boat',
+    h1: 'Bali to the Gili Islands by boat',
+    intent: 'Padangbai, the Lombok Strait and the public boat out of Bangsal — the slow way, against the fast boats that skip it.' },
+  { from: 'georgetown', to: 'medan', slug: 'penang-to-medan-by-ferry',
+    h1: 'Penang to Medan by ferry',
+    intent: 'Five hours across the strait to Sumatra when it is running, which it has not always been — and how to tell before you book.' },
+  { from: 'melaka', to: 'dumai', slug: 'melaka-to-dumai-by-ferry',
+    h1: 'Melaka to Dumai by ferry',
+    intent: 'The elegant Malaysia-to-Sumatra crossing, three hours over the strait — and the Port Klang sailing to fall back on when it is suspended.' },
+  { from: 'batam', to: 'dumai', slug: 'batam-to-dumai-by-ferry',
+    h1: 'Batam to Dumai by ferry',
+    intent: 'Six hours through the Riau islands onto the Sumatran mainland, on schedules that change more often than anyone admits.' },
 ]
 
 
