@@ -1233,6 +1233,72 @@ function check(label, condition, detail = '') {
   check('every other route is one hop away', missing.length === 0,
     missing.join(' ') || 'all reachable')
 
+  /* Every page reachable from the homepage by following links, and how far.
+   *
+   * This is the check that was missing, and its absence cost real indexing.
+   * The homepage is the planner — an application whose corridor cards are
+   * drawn by JavaScript and point at /#from=…&to=…, a fragment of itself. So
+   * the deployed homepage carried exactly one link, to the Play listing, and
+   * none to any of the sixty-eight written pages. The guides linked to each
+   * other, so from any one of them a crawler reached all of them; nothing
+   * reached the first one. The cluster was an island the sitemap knew about
+   * and no page vouched for, which is what Search Console reports as
+   * "Discovered — currently not indexed": it had the addresses and no reason
+   * to spend a crawl on them. Sixteen of sixty-nine were indexed.
+   *
+   * Measured on the built HTML with script and style stripped, because what a
+   * crawler does with the page is exactly this: read the markup, follow the
+   * hrefs. A link a script would have drawn is not a link. */
+  {
+    const files = readdirSync(pub).filter(f => f.endsWith('.html'))
+    const has = new Set(files.map(f => f.replace(/\.html$/, '')))
+    // The deploy copies the built index.html into public/; the smoke build
+    // does not, so read it from where it is actually written.
+    const source = name =>
+      readFileSync(name === 'index' ? join(root, 'index.html') : join(pub, `${name}.html`), 'utf8')
+        .replace(/<style[\s\S]*?<\/style>/g, '')
+        .replace(/<script[\s\S]*?<\/script>/g, '')
+
+    const links = name => {
+      const out = new Set()
+      for (const m of source(name).matchAll(/href="\/([^"#?]*)"/g)) {
+        const t = m[1].replace(/\.html$/, '') || 'index'
+        if (has.has(t) && t !== name) out.add(t)
+      }
+      return out
+    }
+
+    const depth = new Map([['index', 0]])
+    const queue = ['index']
+    while (queue.length) {
+      const at = queue.shift()
+      for (const to of links(at)) {
+        if (depth.has(to)) continue
+        depth.set(to, depth.get(at) + 1)
+        queue.push(to)
+      }
+    }
+
+    const stranded = [...has].filter(s => !depth.has(s))
+    check('every page is reachable from the homepage by following links',
+      stranded.length === 0, stranded.slice(0, 6).join(' ') || `${has.size} pages`)
+
+    // One link out of the application and one index is all it takes, so
+    // nothing has an excuse to sit deeper than that.
+    const deep = [...depth].filter(([, d]) => d > 2).map(([s]) => s)
+    check('and none of them is more than two clicks away',
+      deep.length === 0, deep.slice(0, 6).join(' ') || 'max depth 2')
+
+    check('the homepage itself links into the written pages',
+      links('index').size > 0, `${links('index').size} links`)
+
+    /* The app is one file with no network permission, so a link to a page that
+       only exists on the website is a dead end reachable from every screen. */
+    const appHtml = readFileSync(join(root, 'dist/app.html'), 'utf8')
+    check('but the app does not carry that link, having no such page',
+      !/<nav class="topnav"/.test(appHtml) && !/href="\/routes"/.test(appHtml))
+  }
+
   check('sitemap lists every page',
     existsSync(join(pub, 'sitemap.xml')) &&
       slugs.every(s => readFileSync(join(pub, 'sitemap.xml'), 'utf8').includes(`/${s}<`)))

@@ -221,7 +221,17 @@ const css = read('src/app.css')
  * It goes into the app's own build too, and does nothing there: the script
  * that reveals it checks the document mark this build sets. Cheaper than a
  * second shell, and it means the two documents cannot drift. */
-const shell = read('src/shell.html').replace('<!--APPBANNER-->', read('src/appbanner.html'))
+/* <!--WEB-->…<!--/WEB--> is cut out of the app's copy.
+ *
+ * The shell is shared, and almost everything in it should be — that sharing is
+ * why the app and the site cannot drift. But a link to /routes is a link to a
+ * document that exists on the website and does not exist inside the app: the
+ * app is one HTML file with no network permission, so the link would be a dead
+ * end reachable from every screen. Marked rather than conditionally assembled,
+ * so the exception is visible in the markup it applies to. */
+const shell = read('src/shell.html')
+  .replace('<!--APPBANNER-->', read('src/appbanner.html'))
+  .replace(/<!--WEB-->[\s\S]*?<!--\/WEB-->/g, m => (APP ? '' : m))
 
 /* Affiliate ids come from the environment, never from the repo. An empty id
  * still produces a working link — it just earns nothing — so a clone without

@@ -183,14 +183,145 @@ function related(current, pages) {
   )
 }
 
+/* One topbar, four pages, and now a link on it.
+ *
+ * It was copied out four times, and the copies had no navigation at all — the
+ * brand went home and nothing went anywhere else. A site whose homepage is an
+ * application needs one ordinary link into its written pages, or those pages
+ * are reachable only by already knowing their address. */
+const TOPBAR = `<header class="topbar">
+  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
+    <span class="brandtext">Overland<b>SEA</b></span></a>
+  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
+  <nav class="topnav" aria-label="Site"><a href="/routes">All routes</a></nav>
+</header>`
+
+/* The index of everything written up here.
+ *
+ * This page exists because of a measurable fault, not because a site ought to
+ * have one. The planner is the homepage, and the planner is an application:
+ * its corridor cards are drawn by JavaScript and point at `/#from=…&to=…`,
+ * which is one document with a fragment, not sixty-eight documents. So the
+ * homepage — the only page on this site anything links to from outside —
+ * carried exactly one link, to the Play listing, and none at all to the guides.
+ *
+ * The guides link to each other heavily, so from any one of them a crawler
+ * reaches all of them. But nothing reached the first one. The whole cluster was
+ * an island that only the sitemap knew about, and a URL that a sitemap
+ * mentions and no page links to is precisely what Google files under
+ * "Discovered — currently not indexed": it has the address and no reason to
+ * spend a crawl on it.
+ *
+ * Grouped by where the journey starts, because that is how somebody with a
+ * flight into Bangkok and three weeks actually reads a list like this — not
+ * alphabetically, which is how a list looks when it was written for a crawler
+ * rather than a reader.
+ */
+function routesPage({ built, crossings, css }) {
+  const url = ORIGIN ? `${ORIGIN}/routes` : null
+  const title = `Every overland route, written up — ${TITLE_SUFFIX}`
+  const desc =
+    `All ${built.length} overland journeys and ${crossings.length} border ` +
+    `crossings covered here, grouped by where they start: trains, ferries and ` +
+    `the road legs in between, across Southeast Asia.`
+
+  /* Through the shared helper, so this page says "the Philippines" like every
+     other line on the site does rather than inventing its own grammar. */
+  const countryOf = slug => {
+    const st = NETWORK.stations[slug]
+    return st ? UI.countryName(NETWORK, st.country) : 'elsewhere'
+  }
+
+  const groups = new Map()
+  for (const r of built) {
+    const k = countryOf(r.from)
+    if (!groups.has(k)) groups.set(k, [])
+    groups.get(k).push(r)
+  }
+  // Biggest first, so the countries most of this network is about lead.
+  const ordered = [...groups].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+
+  const section = (heading, items) =>
+    `<nav class="more" aria-label="${esc(heading)}"><h2>${esc(heading)}</h2><ul>` +
+    items.join('') +
+    `</ul></nav>`
+
+  const body =
+    ordered
+      .map(([country, rs]) =>
+        section(
+          `Starting in ${country}`,
+          rs.map(
+            r =>
+              `<li><a href="/${r.slug}">${esc(r.h1)}</a> <span>${esc(r.summary)}</span></li>`
+          )
+        )
+      )
+      .join('') +
+    section(
+      'Border crossings, one page each',
+      crossings.map(
+        c =>
+          `<li><a href="/${BORDER_SLUG(c.id)}">${esc(c.b.name)}</a> ` +
+          `<span>${esc(c.b.countries || '')}</span></li>`
+      )
+    )
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+${url ? `<link rel="canonical" href="${esc(url)}">` : ''}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
+<style>${css}</style>
+</head>
+<body class="doc">
+${APPBANNER}
+${TOPBAR}
+
+<main class="docwrap">
+  <article>
+    <h1>Every route, written up</h1>
+    <p class="lede">${esc(built.length)} journeys and ${esc(crossings.length)}
+    border crossings, each with the legs, the frontier mechanics and the
+    connection buffers that actually hold. Grouped by where they start.</p>
+    <p class="facts">
+      <b>${built.length}</b> routes · <b>${crossings.length}</b> crossings ·
+      network reviewed <b>${esc(NETWORK.reviewed)}</b>
+    </p>
+    <p class="plan-cta">
+      <a class="cta" href="/">Plan a journey of your own</a>
+      <span>Any two stations on the network, not just the ones written up here.</span>
+    </p>
+
+    <div class="panel doc-panel">${body}</div>
+  </article>
+</main>
+
+${DOCFOOT}
+</body>
+</html>
+`
+}
+
 /* Shared by every page here, so the privacy policy is reachable from anywhere
  * on the site rather than only from the Play listing that is obliged to carry
  * a link to it. */
 const DOCFOOT = `<footer class="docfoot">
   <p>Overland SEA plans journeys that stay on rails as far as the rails go,
   put a boat where the land ends, and use a road vehicle only where neither
-  exists. <a href="/">Open the planner</a> · <a href="/support">Support</a> ·
-  <a href="/privacy">Privacy</a>.</p>
+  exists. <a href="/">Open the planner</a> · <a href="/routes">All routes</a> ·
+  <a href="/support">Support</a> · <a href="/privacy">Privacy</a>.</p>
 </footer>`
 
 /* The crossings a route passes through, linked out to their own pages.
@@ -285,11 +416,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 </head>
 <body class="doc">
 ${APPBANNER}
-<header class="topbar">
-  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
-    <span class="brandtext">Overland<b>SEA</b></span></a>
-  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-</header>
+${TOPBAR}
 
 <main class="docwrap">
   <article>
@@ -471,11 +598,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 </head>
 <body class="doc">
 ${APPBANNER}
-<header class="topbar">
-  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
-    <span class="brandtext">Overland<b>SEA</b></span></a>
-  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-</header>
+${TOPBAR}
 
 <main class="docwrap">
   <article>
@@ -734,11 +857,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 </head>
 <body class="doc">
 ${APPBANNER}
-<header class="topbar">
-  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
-    <span class="brandtext">Overland<b>SEA</b></span></a>
-  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-</header>
+${TOPBAR}
 
 <main class="docwrap">
   <article>
@@ -958,11 +1077,7 @@ ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
 </head>
 <body class="doc">
 ${APPBANNER}
-<header class="topbar">
-  <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
-    <span class="brandtext">Overland<b>SEA</b></span></a>
-  <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-</header>
+${TOPBAR}
 
 <main class="docwrap">
   <article>
@@ -1055,7 +1170,8 @@ for (const r of ROUTES) {
     ...r,
     plan,
     summary:
-      `${plan.totals.legs} legs · ` +
+      // "1 legs" appeared on the index and in the related block of every page.
+      `${plan.totals.legs} leg${plan.totals.legs === 1 ? '' : 's'} · ` +
       `${plan.totals.daysWorst > plan.totals.days ? `${plan.totals.days}–${plan.totals.daysWorst}` : plan.totals.days}d · ` +
       `$${Math.round(plan.totals.totalUsd)}`,
   })
@@ -1085,6 +1201,7 @@ for (const c of CROSSINGS) {
   writeFileSync(join(OUT, `${BORDER_SLUG(c.id)}.html`), borderPage({ ...c, css }))
 }
 
+writeFileSync(join(OUT, 'routes.html'), routesPage({ built, crossings: CROSSINGS, css }))
 writeFileSync(join(OUT, 'support.html'), supportPage(css))
 writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
 
@@ -1209,12 +1326,16 @@ if (!ORIGIN) {
   // page a crawler should be able to find, not because anyone searches for it.
   urls = [
     '',
+    'routes',
     ...built.map(r => r.slug),
     ...CROSSINGS.map(c => BORDER_SLUG(c.id)),
     'support',
     'privacy',
   ]
-  const priority = u => (u === '' ? '1.0' : u === 'privacy' || u === 'support' ? '0.3' : '0.8')
+  // The index sits just under the planner: it is the one page that vouches for
+  // every other, and the only route into them from the homepage.
+  const priority = u =>
+    u === '' ? '1.0' : u === 'routes' ? '0.9' : u === 'privacy' || u === 'support' ? '0.3' : '0.8'
   writeFileSync(
     join(OUT, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

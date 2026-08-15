@@ -1175,5 +1175,5 @@ const UI = (() => {
       </footer>`
   }
 
-  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL, borderSlug }
+  return { itinerary, idle, unreachable, esc, hours, money, MODE_LABEL, borderSlug, countryName }
 })()

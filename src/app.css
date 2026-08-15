@@ -363,7 +363,35 @@ body {
   white-space: nowrap;
 }
 
-.topbar-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+/* Site navigation. One link, so it is set as a link and not as a menu — a
+   single item dressed as a nav bar looks like the other four fell off. It
+   takes the space to the right of the tagline and hands what is left to the
+   controls, which is why the auto margin moves here from .topbar-actions. */
+.topnav {
+  margin-left: auto;
+  display: flex;
+  gap: 1rem;
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+}
+.topnav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t-tap) var(--ease), border-color var(--t-tap) var(--ease);
+}
+.topnav a:hover { color: var(--ink); border-bottom-color: var(--rail); }
+.topnav a:focus-visible { outline: 2px solid var(--rail); outline-offset: 3px; border-radius: 2px; }
+
+/* The tagline is the first thing to go: it is a description, and a description
+   is worth less than the way out of the page. */
+@media (max-width: 46rem) {
+  .tagline { display: none; }
+}
+
+.topbar-actions { margin-left: 1.1rem; display: flex; gap: 0.5rem; }
 
 /* Nothing to start over from until a route exists. */
 .app[data-active='false'] #startover { display: none; }

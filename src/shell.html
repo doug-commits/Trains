@@ -52,6 +52,20 @@
 
     <p class="tagline">Rail-first journey planning across Southeast Asia</p>
 
+    <!-- The one ordinary link on this page, and it had to be added.
+
+         Everything else here is the application: the corridor cards are drawn
+         by JavaScript and point at /#from=…&to=…, which is this document with
+         a fragment rather than another document. So to anything that reads
+         HTML — a crawler, a reader with scripting off — this page linked
+         nowhere at all except the Play listing, and the sixty-eight written
+         guides were reachable only by already knowing their addresses.
+
+         That is what "Discovered — currently not indexed" means in Search
+         Console: the sitemap gave Google the addresses, and no page on the
+         site gave it a reason to spend a crawl on any of them. -->
+    <!--WEB--><nav class="topnav" aria-label="Site"><a href="/routes">All routes</a></nav><!--/WEB-->
+
     <div class="topbar-actions">
       <button type="button" id="theme" class="btn-icon" aria-live="polite">
         <svg class="ic ic-auto" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
