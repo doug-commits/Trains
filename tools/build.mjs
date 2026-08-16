@@ -69,6 +69,21 @@ const headMeta = () => {
     `<meta property="og:title" content="${TITLE}">`,
     `<meta property="og:description" content="${DESCRIPTION}">`,
     ORIGIN ? `<meta property="og:url" content="${ORIGIN}/">` : '',
+    /* The image the card was already promising.
+     *
+     * summary_large_image was declared here and no image was ever supplied, so
+     * every share of this site rendered as a blank rectangle — the markup
+     * promises a picture and then has none, which does not read as plain, it
+     * reads as broken. Absolute because every scraper requires it; omitted
+     * rather than guessed when the host is unknown, on the same rule as
+     * canonical. */
+    ORIGIN ? `<meta property="og:image" content="${ORIGIN}/og/default.jpg">` : '',
+    ORIGIN ? `<meta property="og:image:width" content="1200">` : '',
+    ORIGIN ? `<meta property="og:image:height" content="630">` : '',
+    ORIGIN
+      ? `<meta property="og:image:alt" content="A chart of Southeast Asia with the Kunming to Singapore rail corridor drawn on it">`
+      : '',
+    ORIGIN ? `<meta name="twitter:image" content="${ORIGIN}/og/default.jpg">` : '',
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta name="twitter:title" content="${TITLE}">`,
     `<meta name="twitter:description" content="${DESCRIPTION}">`,

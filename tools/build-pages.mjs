@@ -21,7 +21,7 @@
  * entirely, which is the right answer when the host is genuinely unknown.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -145,6 +145,9 @@ function jsonLd(r, plan, url) {
     name: r.h1,
     description: description(r, plan),
     ...(url ? { url, '@id': url } : {}),
+    // Google's rich results want an image on the entity, not only in the
+    // Open Graph tags — those are read by social scrapers and not by Search.
+    ...(ogUrl(r.slug) ? { image: ogUrl(r.slug) } : {}),
     touristType: 'Overland and rail travellers',
     itinerary: {
       '@type': 'ItemList',
@@ -182,6 +185,38 @@ function related(current, pages) {
     `</ul></nav>`
   )
 }
+
+/* The share card, and the tags that point at it.
+ *
+ * Every page here declared `twitter:card = summary_large_image` and supplied
+ * no image, so every share rendered as a blank rectangle with a headline under
+ * it. The markup promised a picture and had none, which does not read as plain
+ * — it reads as broken, and a broken card is not passed on. For a site with no
+ * backlinks, shares are where the first ones come from.
+ *
+ * Route pages get a chart of their own journey, drawn by tools/build-og.mjs.
+ * Everything else — the crossings, the index, support, privacy — gets the
+ * default. A crossing is a point rather than a line and would make a card of
+ * one dot; better an honest general picture than a literal empty one.
+ *
+ * Absolute URLs, because every scraper requires them, and omitted rather than
+ * guessed when the host is unknown — the same rule canonical follows. */
+const ogTags = (slug, alt) => {
+  const file = slug && existsSync(join(root, `data/og/${slug}.jpg`)) ? slug : 'default'
+  if (!ORIGIN) return ''
+  return [
+    `<meta property="og:image" content="${ORIGIN}/og/${file}.jpg">`,
+    `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`,
+    `<meta property="og:image:alt" content="${esc(alt)}">`,
+    `<meta name="twitter:image" content="${ORIGIN}/og/${file}.jpg">`,
+  ].join('\n')
+}
+
+const ogUrl = slug =>
+  ORIGIN
+    ? `${ORIGIN}/og/${slug && existsSync(join(root, `data/og/${slug}.jpg`)) ? slug : 'default'}.jpg`
+    : null
 
 /* One topbar, four pages, and now a link on it.
  *
@@ -280,6 +315,8 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : ''}
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="twitter:card" content="summary_large_image">
+${ogTags(null, 'A chart of Southeast Asia with the Kunming to Singapore rail corridor drawn on it')}
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
@@ -405,6 +442,7 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="${esc(r.h1)}">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+${ogTags(r.slug, `A chart of Southeast Asia with the ${r.h1} route drawn on it`)}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(r.h1)}">
 <meta name="twitter:description" content="${esc(desc)}">
@@ -591,6 +629,8 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="Support">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="twitter:card" content="summary_large_image">
+${ogTags(null, 'Overland SEA — rail-first journey planning across Southeast Asia')}
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
@@ -850,6 +890,8 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="Privacy">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="twitter:card" content="summary_large_image">
+${ogTags(null, 'Overland SEA — rail-first journey planning across Southeast Asia')}
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
@@ -1070,6 +1112,8 @@ ${url ? `<link rel="canonical" href="${esc(url)}">` : '<!-- no canonical: SITE_O
 <meta property="og:title" content="${esc(h1)}">
 <meta property="og:description" content="${esc(desc)}">
 ${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="twitter:card" content="summary_large_image">
+${ogTags(null, `${h1} — a border crossing on the Southeast Asian overland network`)}
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
