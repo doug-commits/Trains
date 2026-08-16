@@ -1409,6 +1409,58 @@ function check(label, condition, detail = '') {
   check('sitemap lists every page',
     existsSync(join(pub, 'sitemap.xml')) &&
       slugs.every(s => readFileSync(join(pub, 'sitemap.xml'), 'utf8').includes(`/${s}<`)))
+  /* The sitemap offers only URLs that are served directly, in the form the
+   * page itself claims.
+   *
+   * Search Console reports a URL that answers with a 301 as "Page with
+   * redirect" and declines to index it, and the two ways a site does that to
+   * itself are a sitemap that lists one form while the page canonicalises to
+   * another, and a sitemap that lists a form the host rewrites. `cleanUrls` is
+   * on for this deploy, so `/foo.html` and `/foo/` both redirect to `/foo`;
+   * either in the sitemap would put every page on the site into that report.
+   *
+   * Checked as an identity — sitemap entry, canonical tag and og:url must be
+   * the same string — because that is the property that matters and it cannot
+   * be satisfied by accident. */
+  {
+    const sm = readFileSync(join(pub, 'sitemap.xml'), 'utf8')
+    const locs = [...sm.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
+
+    const malformed = locs.filter(u => {
+      const path = u.replace(/^https?:\/\/[^/]+/, '')
+      return /\.html$/.test(path) || /\?/.test(path) || (path !== '/' && path.endsWith('/'))
+    })
+    check('the sitemap offers no URL the host would redirect',
+      malformed.length === 0, malformed.slice(0, 5).join(' ') || `${locs.length} urls`)
+
+    /* Compared by path, and the host checked separately for being one host.
+       Production feeds both builders from a single SITE_ORIGIN, so they cannot
+       disagree there; this suite deliberately rebuilds the guide pages under a
+       test origin while index.html keeps the real one, and comparing whole URLs
+       would fail on that and on nothing else. The path is where the redirect
+       lives — `.html`, a trailing slash, a different slug — so the path is what
+       has to match. */
+    const pathOf = u => u.replace(/^https?:\/\/[^/]+/, '')
+    const hosts = new Set(locs.map(u => (u.match(/^https?:\/\/[^/]+/) || [])[0]))
+    check('the sitemap speaks of exactly one host',
+      hosts.size === 1, [...hosts].join(' '))
+
+    const disagree = []
+    for (const loc of locs) {
+      const path = pathOf(loc)
+      const file = path === '/' ? join(root, 'index.html') : join(pub, `${path.slice(1)}.html`)
+      if (!existsSync(file)) { disagree.push(`${loc} (no page)`); continue }
+      const html = readFileSync(file, 'utf8')
+      const can = (html.match(/<link rel="canonical" href="([^"]+)"/) || [])[1]
+      const og = (html.match(/<meta property="og:url" content="([^"]+)"/) || [])[1]
+      if (!can || !og || pathOf(can) !== path || pathOf(og) !== path) {
+        disagree.push(`${path} -> canonical ${can}, og ${og}`)
+      }
+    }
+    check('and every page it lists points back at the same address',
+      disagree.length === 0, disagree.slice(0, 4).join(' | ') || `${locs.length} agree`)
+  }
+
   check('robots points at the sitemap',
     /Sitemap: https:\/\/example\.test\/sitemap\.xml/.test(readFileSync(join(pub, 'robots.txt'), 'utf8')))
 
