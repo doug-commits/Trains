@@ -1233,6 +1233,51 @@ function check(label, condition, detail = '') {
   check('every other route is one hop away', missing.length === 0,
     missing.join(' ') || 'all reachable')
 
+  /* The pan clamp anchors on the map you can see, not on the canvas.
+   *
+   * The canvas runs the full width of the stage and the itinerary panel is
+   * drawn over its right-hand end, so the canvas centre is not the centre of
+   * anything visible: at 1400px with a 470px panel it is 700, while the strip
+   * the reader has runs 0..930 and centres on 465.
+   *
+   * Anchored at 700, dragging east stopped 235px early and the easternmost
+   * islands — the whole of the Philippines at high zoom — stayed under the
+   * panel with no drag left to recover them. Checked as arithmetic rather than
+   * through the browser because it is arithmetic: it wants no map, no route and
+   * no waiting, and it names the number that was wrong. */
+  {
+    const Proj = new Function(
+      readFileSync(join(root, 'src/proj.js'), 'utf8') + '; return Proj'
+    )()
+    const inset = { left: 0, right: 470, top: 0, bottom: 0 }
+    const bbox = { west: 90, east: 130, south: -10, north: 25 }
+
+    // A scale at which the region is far wider than the canvas, then dragged
+    // east until the clamp refuses to go further.
+    const scale = 320
+    let view = { w: 1400, h: 900, scale, baseScale: 34, dx: 0, dy: 0 }
+    for (let i = 0; i < 400; i++) view = Proj.clamp(Proj.pan(view, -400, 0), bbox, inset)
+
+    const eastEdge = bbox.east * view.scale + view.dx
+    const visibleCentre = (0 + (1400 - 470)) / 2
+
+    check('panning east stops at the middle of the visible map, not the canvas',
+      Math.abs(eastEdge - visibleCentre) < 1,
+      `east edge rests at ${Math.round(eastEdge)}, visible centre ${visibleCentre}`)
+
+    // And the clamp still refuses to lose the map altogether.
+    check('and it still will not let the region be dragged off screen',
+      eastEdge > 0 && eastEdge < 1400 - inset.right,
+      `${Math.round(eastEdge)} is inside 0..${1400 - inset.right}`)
+
+    /* With no overlays the two centres coincide, so the phone and the share
+       card must be unaffected by any of this. */
+    let plain = { w: 1400, h: 900, scale, baseScale: 34, dx: 0, dy: 0 }
+    for (let i = 0; i < 400; i++) plain = Proj.clamp(Proj.pan(plain, -400, 0), bbox)
+    check('and with nothing overlaying it, the canvas centre is still the answer',
+      Math.abs(bbox.east * plain.scale + plain.dx - 700) < 1)
+  }
+
   /* Every page reachable from the homepage by following links, and how far.
    *
    * This is the check that was missing, and its absence cost real indexing.

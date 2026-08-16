@@ -1376,12 +1376,26 @@ const MapView = (() => {
       panBy(dx, dy) {
         const fromX = view.dx
         const fromY = view.dy
-        view = Proj.clamp(Proj.pan(view, dx, dy), reach)
+        view = Proj.clamp(Proj.pan(view, dx, dy), reach, inset)
         schedule()
         return { dx: view.dx - fromX, dy: view.dy - fromY }
       },
+      /* Zoom about the middle of the visible map, for the +/- buttons.
+       *
+       * A pinch or a wheel has a point the reader is pointing at, and that
+       * point should stay put. A button has none, so it used the centre of the
+       * canvas — which is behind the itinerary panel's half of the stage, and
+       * so drifted whatever was being looked at rightwards, under the panel, a
+       * little further with every press. */
+      zoomCentre(factor) {
+        if (!view) return
+        const x = (inset.left + (view.w - inset.right)) / 2
+        const y = (inset.top + (view.h - inset.bottom)) / 2
+        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach, inset)
+        schedule()
+      },
       zoomAt(x, y, factor) {
-        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach)
+        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach, inset)
         schedule()
       },
       resetView() {

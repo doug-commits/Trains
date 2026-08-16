@@ -856,7 +856,7 @@
   )
 
   const zoomStep = factor => () => {
-    map.zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, factor)
+    map.zoomCentre(factor)
     hideTip()
   }
   $('#zoomin').addEventListener('click', zoomStep(1.3))

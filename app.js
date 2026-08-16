@@ -2010,29 +2010,47 @@ const Proj = (() => {
   /* Keep the region on screen. Without this the map can be dragged into empty
    * ocean until nothing is left to navigate by, and the only way back is Reset
    * view. The rule: the projected bbox must always cover the middle of the
-   * canvas, so there is never a drag that loses the map. */
-  function clamp(view, bbox) {
+   * visible map, so there is never a drag that loses it.
+   *
+   * Visible, not the canvas. The canvas runs the full width of the stage with
+   * the itinerary panel drawn on top of its right-hand end, so its middle is
+   * not the middle of anything anyone can see — on a 1400px window the canvas
+   * centre is 700 and the panel starts at 928, which puts the anchor two
+   * thirds of the way across the strip the reader actually has.
+   *
+   * That is why the Philippines could not be reached. Dragging east moves the
+   * region left until its eastern edge hits the anchor and stops; anchored at
+   * the canvas centre, the stop came 236px short, and the last islands stayed
+   * under the panel with no drag left to recover them. Every other placement
+   * on this map already respects the inset — this one did not. */
+  function clamp(view, bbox, inset = { left: 0, right: 0, top: 0, bottom: 0 }) {
     const left = bbox.west * view.scale + view.dx
     const right = bbox.east * view.scale + view.dx
     const top = screenY(bbox.north) * view.scale + view.dy
     const bottom = screenY(bbox.south) * view.scale + view.dy
 
-    // Once the region is smaller than the canvas it may sit anywhere inside it;
-    // beyond that it must not be dragged clear of the centre.
-    const cx = view.w / 2
-    const cy = view.h / 2
+    // The window the overlays leave, and its middle.
+    const vx0 = inset.left
+    const vx1 = Math.max(vx0 + 1, view.w - inset.right)
+    const vy0 = inset.top
+    const vy1 = Math.max(vy0 + 1, view.h - inset.bottom)
+    const cx = (vx0 + vx1) / 2
+    const cy = (vy0 + vy1) / 2
+
+    // Once the region is smaller than that window it may sit anywhere inside
+    // it; beyond that it must not be dragged clear of the centre.
     let dx = view.dx
     let dy = view.dy
-    if (right - left <= view.w) {
-      if (left < 0) dx += -left
-      if (right > view.w) dx -= right - view.w
+    if (right - left <= vx1 - vx0) {
+      if (left < vx0) dx += vx0 - left
+      if (right > vx1) dx -= right - vx1
     } else {
       if (left > cx) dx -= left - cx
       if (right < cx) dx += cx - right
     }
-    if (bottom - top <= view.h) {
-      if (top < 0) dy += -top
-      if (bottom > view.h) dy -= bottom - view.h
+    if (bottom - top <= vy1 - vy0) {
+      if (top < vy0) dy += vy0 - top
+      if (bottom > vy1) dy -= bottom - vy1
     } else {
       if (top > cy) dy -= top - cy
       if (bottom < cy) dy += cy - bottom
@@ -6602,12 +6620,26 @@ const MapView = (() => {
       panBy(dx, dy) {
         const fromX = view.dx
         const fromY = view.dy
-        view = Proj.clamp(Proj.pan(view, dx, dy), reach)
+        view = Proj.clamp(Proj.pan(view, dx, dy), reach, inset)
         schedule()
         return { dx: view.dx - fromX, dy: view.dy - fromY }
       },
+      /* Zoom about the middle of the visible map, for the +/- buttons.
+       *
+       * A pinch or a wheel has a point the reader is pointing at, and that
+       * point should stay put. A button has none, so it used the centre of the
+       * canvas — which is behind the itinerary panel's half of the stage, and
+       * so drifted whatever was being looked at rightwards, under the panel, a
+       * little further with every press. */
+      zoomCentre(factor) {
+        if (!view) return
+        const x = (inset.left + (view.w - inset.right)) / 2
+        const y = (inset.top + (view.h - inset.bottom)) / 2
+        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach, inset)
+        schedule()
+      },
       zoomAt(x, y, factor) {
-        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach)
+        view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach, inset)
         schedule()
       },
       resetView() {
@@ -8664,7 +8696,7 @@ const UI = (() => {
   )
 
   const zoomStep = factor => () => {
-    map.zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, factor)
+    map.zoomCentre(factor)
     hideTip()
   }
   $('#zoomin').addEventListener('click', zoomStep(1.3))
