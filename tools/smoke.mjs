@@ -1233,6 +1233,95 @@ function check(label, condition, detail = '') {
   check('every other route is one hop away', missing.length === 0,
     missing.join(' ') || 'all reachable')
 
+  /* The homepage says what it is before any script runs, and says the same
+   * thing afterwards.
+   *
+   * The panel was empty in the markup and filled by app.js, so the entire
+   * thesis of this site — what it does, what it refuses to do — existed only
+   * after JavaScript. A crawler saw 775 characters of button labels. Google
+   * renders JS but defers it; most other crawlers do not render it at all, and
+   * one of them reviewed the site and reported, correctly, that the homepage
+   * explains nothing.
+   *
+   * The second half matters as much as the first. Static text that differed
+   * from the text a reader is shown would be cloaking, not a fallback, so both
+   * copies are held to the same sentences. */
+  {
+    const shell = readFileSync(join(root, 'src/shell.html'), 'utf8')
+    const ui = readFileSync(join(root, 'src/ui.js'), 'utf8')
+    const home = readFileSync(join(root, 'index.html'), 'utf8')
+
+    const thesis = [
+      'Southeast Asia',
+      'without flying',
+      'optimises for speed',
+      'puts a boat where the land',
+      'border mechanics',
+    ]
+    const missing = thesis.filter(t => !home.includes(t))
+    check('the homepage states its case in markup, before any script runs',
+      missing.length === 0, missing.join(' | ') || `${thesis.length} phrases present`)
+
+    const drifted = thesis.filter(t => shell.includes(t) !== ui.includes(t))
+    check('and the static copy matches the one the script renders',
+      drifted.length === 0, drifted.join(' | ') || 'shell and ui agree')
+
+    // Measured the way a crawler measures it.
+    const text = home
+      .slice(home.indexOf('<body'))
+      .replace(/<script[\s\S]*?<\/script>/g, '')
+      .replace(/<style[\s\S]*?<\/style>/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    check('and there is enough of it to be worth indexing',
+      text.length > 1200, `${text.length} characters`)
+  }
+
+  /* Somebody's name is on it.
+   *
+   * There was no about page and nobody was named anywhere, so a reader landing
+   * on a border-crossing page had no way to answer the only question that
+   * matters about border advice — who checked this, and when. */
+  {
+    const about = join(pub, 'about.html')
+    check('there is a page saying who makes this', existsSync(about))
+    if (existsSync(about)) {
+      const html = readFileSync(about, 'utf8')
+      check('and it names a person rather than a company voice',
+        /Doug/.test(html), 'named')
+      check('and it dates the data from the network rather than from prose',
+        html.includes(NETWORK.reviewed), NETWORK.reviewed)
+      check('and it discloses the affiliate links',
+        /affiliate/i.test(html))
+      /* The claim that routing cannot see the affiliates has to stay true, or
+         the disclosure becomes a lie told confidently. */
+      const router = readFileSync(join(root, 'src/router.js'), 'utf8')
+      check('and that disclosure is still true — routing cannot see them',
+        !/PARTNERS|affiliate|BOOKING_AID|SAFETYWING/i.test(router))
+    }
+    const pages = readdirSync(pub).filter(f => f.endsWith('.html'))
+    const linked = pages.filter(f => readFileSync(join(pub, f), 'utf8').includes('href="/about"'))
+    check('and every page links to it', linked.length === pages.length,
+      `${linked.length}/${pages.length}`)
+    check('including the homepage',
+      readFileSync(join(root, 'index.html'), 'utf8').includes('href="/about"'))
+  }
+
+  /* One contact address on the whole site.
+   *
+   * It was doug@mukbangshow.ae — a working mailbox, and also the name of an
+   * unrelated restaurant company. On a site whose proposition is "trust these
+   * border notes", a contact address belonging to a different business is the
+   * detail that makes a careful reader wonder what they are looking at. */
+  {
+    const pages = readdirSync(pub).filter(f => f.endsWith('.html'))
+    const stale = pages.filter(f => /mukbangshow\.ae/i.test(readFileSync(join(pub, f), 'utf8')))
+    check('the site gives one contact address, and it is its own',
+      stale.length === 0, stale.slice(0, 4).join(' ') || 'hello@slowasia.com throughout')
+  }
+
   /* The pan clamp anchors on the map you can see, not on the canvas.
    *
    * The canvas runs the full width of the stage and the itinerary panel is
@@ -1383,7 +1472,7 @@ function check(label, condition, detail = '') {
        and the two are indistinguishable from the markup alone. */
     const generic = [...named]
       .filter(([f]) => f !== 'index.html' && !f.includes('border-crossing') &&
-        !['support.html', 'privacy.html', 'routes.html'].includes(f))
+        !['support.html', 'privacy.html', 'routes.html', 'about.html'].includes(f))
       .filter(([f, u]) => !u.endsWith(`/${f.replace(/\.html$/, '')}.jpg`))
       .map(([f]) => f)
     check('and a route page shows its own route, not the general card',

@@ -218,6 +218,15 @@ const ogUrl = slug =>
     ? `${ORIGIN}/og/${slug && existsSync(join(root, `data/og/${slug}.jpg`)) ? slug : 'default'}.jpg`
     : null
 
+/* One address for the whole site.
+ *
+ * It was doug@mukbangshow.ae, which is a working mailbox and also the name of
+ * an unrelated restaurant company. On a site whose whole proposition is "trust
+ * these border notes", a contact address belonging to a different business is
+ * the sort of detail that makes a careful reader stop and wonder what they are
+ * actually looking at. */
+const CONTACT = 'hello@slowasia.com'
+
 /* One topbar, four pages, and now a link on it.
  *
  * It was copied out four times, and the copies had no navigation at all — the
@@ -228,8 +237,150 @@ const TOPBAR = `<header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
   <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-  <nav class="topnav" aria-label="Site"><a href="/routes">All routes</a></nav>
+  <nav class="topnav" aria-label="Site"><a href="/routes">All routes</a><a href="/about">About</a></nav>
 </header>`
+
+/* Who makes this, and on what authority.
+ *
+ * There was no page like this and nobody was named anywhere on the site. A
+ * reader arriving on a border-crossing page had no way to answer the only
+ * question that matters about border advice — who checked it, and when — and a
+ * site that will not say is a site you would be right not to act on. That gap
+ * is also why the domain reads as anonymous to anyone deciding whether to link
+ * to it.
+ *
+ * Everything here is either checkable against this repository (the counts, the
+ * review date, the absence of trackers and permissions) or is a plain statement
+ * of how the data is made. Nothing claims an endorsement, an affiliation or a
+ * qualification, because there is none to claim.
+ */
+function aboutPage({ built, crossings, css }) {
+  const url = ORIGIN ? `${ORIGIN}/about` : null
+  const title = `Who makes this — ${TITLE_SUFFIX}`
+  const desc =
+    'Who compiles the routes and border notes on Overland SEA, where the data ' +
+    'comes from, what is measured against what is estimated, and how to report ' +
+    'something that has changed.'
+
+  const legs = NETWORK.legs.length
+  const countries = Object.keys(NETWORK.countryNames || {}).length
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+${url ? `<link rel="canonical" href="${esc(url)}">` : ''}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+${url ? `<meta property="og:url" content="${esc(url)}">` : ''}
+<meta name="twitter:card" content="summary_large_image">
+${ogTags(null, 'A chart of Southeast Asia with the Kunming to Singapore rail corridor drawn on it')}
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
+<style>${css}</style>
+</head>
+<body class="doc">
+${APPBANNER}
+${TOPBAR}
+
+<main class="docwrap">
+  <article>
+    <h1>Who makes this</h1>
+    <p class="lede">Overland SEA is made by one person, Doug. I have travelled most of
+    what is on this map — the corridors, the ferries and the frontiers — and the rest is
+    compiled from the operators' own publications and corrected by readers who have just
+    come through.</p>
+    <p class="facts">
+      <b>${Object.keys(NETWORK.stations).length}</b> stations ·
+      <b>${legs}</b> legs · <b>${crossings.length}</b> crossings ·
+      <b>${countries}</b> countries ·
+      reviewed <b>${esc(NETWORK.reviewed)}</b>
+    </p>
+
+    <div class="panel doc-panel">
+      <div class="block">
+        <h2>Why it exists</h2>
+        <p>Every mainstream planner optimises for speed, so it answers "Vientiane to Kuala
+        Lumpur" with a flight. Nothing was answering the question I actually had, which was
+        how to get there while staying on the ground. The operators in this region share no
+        timetable and several publish nothing at all in English, so the answer was never one
+        lookup — it was a fortnight of cross-referencing, and then a border post where the
+        thing you read turned out not to be how it works.</p>
+        <p>This is that fortnight, done once and written down. ${built.length} journeys and
+        ${crossings.length} frontiers, each with the mechanics rather than the brochure.</p>
+      </div>
+
+      <div class="block">
+        <h2>What is measured, and what is estimated</h2>
+        <p>The distinction matters more than any single number here, so it is worth being
+        exact about it.</p>
+        <p><b>Structural</b> — which stations exist, which gauge the line is, which side of a
+        frontier stamps you out and which stamps you in, whether a through service runs at
+        all. These are facts about the network. They change rarely, and when they are wrong
+        they are wrong in a way that can be corrected.</p>
+        <p><b>Indicative</b> — durations and fares. Durations are typical scheduled running
+        times, not promises. Fares move with the season, the class and the exchange rate, and
+        are there to tell you whether a journey costs twenty dollars or two hundred, not what
+        you will pay.</p>
+        <p>The one thing this site will not do is invent a departure time. The operators do
+        not share a timetable, several do not publish one, and a plausible-looking 14:05 that
+        does not exist is worse than useless at a border at night. You get frequencies and the
+        connection buffers that actually hold.</p>
+      </div>
+
+      <div class="block">
+        <h2>How it is kept current</h2>
+        <p>The network was last reviewed in <b>${esc(NETWORK.reviewed)}</b>, and that date is
+        generated from the data rather than typed into this sentence, so it cannot drift away
+        from the truth while nobody is looking.</p>
+        <p>Things change here faster than anywhere I have travelled — a ferry operator folds,
+        a line reopens, a crossing changes its visa rules with a fortnight's notice. If
+        something here does not match what you found on the ground, that is the single most
+        useful thing anyone can send me:
+        <a href="mailto:${CONTACT}">${CONTACT}</a>. Tell me the date you crossed and I will
+        take your word over whatever the operator's website says.</p>
+      </div>
+
+      <div class="block">
+        <h2>What it costs you to use</h2>
+        <p>Nothing, and that is not a trial. There is no account, no newsletter, no cookie
+        banner and no analytics of any kind. The page makes no network requests at all once it
+        has loaded — no fetch, no beacon, nothing reporting back. The Android build ships with
+        an empty permission list, including no internet permission, which is the only honest
+        way to say it works at a border with no signal.</p>
+        <p>Some booking links are affiliate links. Where one is, it is a link to the operator
+        or agent I would have sent you to anyway, and it never changes which route the planner
+        recommends — the routing code cannot see them. The <a href="/privacy">privacy
+        policy</a> says what is stored on your device, which is four settings and no
+        identifier.</p>
+      </div>
+
+      <div class="block">
+        <h2>Who it is not</h2>
+        <p>Overland SEA is not affiliated with, endorsed by or acting for any railway,
+        ferry operator, tourist board or booking agent. Nobody pays for placement and nobody
+        has ever asked to. When a service is bad I say so on the page for it.</p>
+      </div>
+    </div>
+
+    <p class="plan-cta">
+      <a class="cta" href="/routes">Read the route guides</a>
+      <span>Or <a href="/">open the planner</a> and give it two places of your own.</span>
+    </p>
+  </article>
+</main>
+
+${DOCFOOT}
+</body>
+</html>
+`
+}
 
 /* The index of everything written up here.
  *
@@ -358,7 +509,8 @@ const DOCFOOT = `<footer class="docfoot">
   <p>Overland SEA plans journeys that stay on rails as far as the rails go,
   put a boat where the land ends, and use a road vehicle only where neither
   exists. <a href="/">Open the planner</a> · <a href="/routes">All routes</a> ·
-  <a href="/support">Support</a> · <a href="/privacy">Privacy</a>.</p>
+  <a href="/about">About</a> · <a href="/support">Support</a> ·
+  <a href="/privacy">Privacy</a>.</p>
 </footer>`
 
 /* The crossings a route passes through, linked out to their own pages.
@@ -510,7 +662,7 @@ function supportPage(css) {
     'Help with Overland SEA: why it gives frequencies rather than departure ' +
     'times, how to report a leg that has changed, how current the network is, ' +
     'and how to get in touch.'
-  const EMAIL = 'doug@mukbangshow.ae'
+  const EMAIL = CONTACT
 
   const faqs = [
     ['It will not give me a departure time',
@@ -874,7 +1026,7 @@ function privacyPage(css) {
   <section class="block">
     <h2>Contact</h2>
     <p>Questions about any of this, including anything above you would like
-    shown rather than asserted: <a href="mailto:doug@mukbangshow.ae">doug@mukbangshow.ae</a>.</p>
+    shown rather than asserted: <a href="mailto:${CONTACT}">${CONTACT}</a>.</p>
   </section>`
 
   return `<!doctype html>
@@ -1246,6 +1398,7 @@ for (const c of CROSSINGS) {
 }
 
 writeFileSync(join(OUT, 'routes.html'), routesPage({ built, crossings: CROSSINGS, css }))
+writeFileSync(join(OUT, 'about.html'), aboutPage({ built, crossings: CROSSINGS, css }))
 writeFileSync(join(OUT, 'support.html'), supportPage(css))
 writeFileSync(join(OUT, 'privacy.html'), privacyPage(css))
 
@@ -1371,6 +1524,7 @@ if (!ORIGIN) {
   urls = [
     '',
     'routes',
+    'about',
     ...built.map(r => r.slug),
     ...CROSSINGS.map(c => BORDER_SLUG(c.id)),
     'support',
@@ -1379,7 +1533,7 @@ if (!ORIGIN) {
   // The index sits just under the planner: it is the one page that vouches for
   // every other, and the only route into them from the homepage.
   const priority = u =>
-    u === '' ? '1.0' : u === 'routes' ? '0.9' : u === 'privacy' || u === 'support' ? '0.3' : '0.8'
+    u === '' ? '1.0' : u === 'routes' ? '0.9' : u === 'about' ? '0.6' : u === 'privacy' || u === 'support' ? '0.3' : '0.8'
   writeFileSync(
     join(OUT, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

@@ -64,7 +64,7 @@
          That is what "Discovered — currently not indexed" means in Search
          Console: the sitemap gave Google the addresses, and no page on the
          site gave it a reason to spend a crawl on any of them. -->
-    <!--WEB--><nav class="topnav" aria-label="Site"><a href="/routes">All routes</a></nav><!--/WEB-->
+    <!--WEB--><nav class="topnav" aria-label="Site"><a href="/routes">All routes</a><a href="/about">About</a></nav><!--/WEB-->
 
     <div class="topbar-actions">
       <button type="button" id="theme" class="btn-icon" aria-live="polite">
@@ -218,7 +218,34 @@
       </div>
     </form>
 
-    <aside id="panel" class="panel" aria-live="polite"></aside>
+    <aside id="panel" class="panel" aria-live="polite">
+      <!-- The same words the idle panel renders, present before any script runs.
+
+           The panel was empty in the markup and filled by app.js, so everything
+           this site says about itself — what it is, what it refuses to do, why
+           it exists — existed only after JavaScript. To anything that reads HTML
+           the homepage was 775 characters of button labels: no thesis, no
+           explanation, nothing to trust. Google renders JS, but on a deferred
+           second pass; most other crawlers do not render it at all.
+
+           app.js replaces this wholesale on its first paint, and it must keep
+           saying the same thing as src/ui.js idle() — text here that differed
+           from the text a reader sees would be cloaking rather than a
+           fallback. tools/smoke.mjs holds the two to the same sentences. -->
+      <header class="head">
+        <p class="eyebrow">Rail-first overland planning</p>
+        <h1>Southeast Asia<br>without flying</h1>
+        <p class="lede">Every mainstream planner optimises for speed, so it answers
+        “Vientiane to Kuala Lumpur” with a flight. This one optimises for continuity on the
+        ground: it keeps you on rails as far as the rails go, puts a boat where the land
+        ends, and uses a road vehicle only where neither exists.</p>
+        <p class="sub">Pick two stations above, or point at anywhere on the map and choose
+        whether to start or finish there. Every itinerary comes with the border mechanics, the
+        connection buffers that actually hold, and a way to book each leg.</p>
+      </header>
+      <!--WEB--><p class="sub"><a href="/routes">Every route, written up</a> ·
+      <a href="/about">Who makes this</a></p><!--/WEB-->
+    </aside>
       </div>
     </div>
   </div>
