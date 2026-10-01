@@ -1016,7 +1016,7 @@ function check(label, condition, detail = '') {
  * the overlays, taps on stations reaching the planner, the canvas map kept
  * until the swap and kept for good if Google never arrives. */
 const FAKE_GOOGLE = () => {
-  const made = { lines: [], fits: [], styles: null, zoom: 5 }
+  const made = { lines: [], circles: [], fits: [], styles: null, zoom: 5 }
   const listeners = new Map()
   const on = (obj, ev, fn) => {
     const k = obj.__id + ':' + ev
@@ -1051,13 +1051,17 @@ const FAKE_GOOGLE = () => {
     setMap(m) { if (!m) this.o.map = null }
     addListener(ev, fn) { return on(this, ev, fn) }
   }
+  class Circle {
+    constructor(o) { this.o = o; made.circles.push(this) }
+    setMap(m) { if (!m) this.o.map = null }
+  }
   class OverlayView {
     setMap() {}
     getProjection() { return { fromLatLngToContainerPixel: () => ({ x: 200, y: 200 }) } }
   }
   window.google = {
     maps: {
-      Map: FakeMap, Polyline, LatLng, LatLngBounds, OverlayView,
+      Map: FakeMap, Polyline, Circle, LatLng, LatLngBounds, OverlayView,
       SymbolPath: { CIRCLE: 0 },
       event: {
         addListenerOnce(obj, ev, fn) { setTimeout(fn, 50); return { remove() {} } },
@@ -1125,6 +1129,26 @@ const FAKE_GOOGLE = () => {
   await page.click('#zoomin')
   const z1 = await page.evaluate(() => window.__fakeMaps.zoom)
   check('the zoom buttons drive the Google map a whole step at a time', z1 === z0 + 1, `${z0} -> ${z1}`)
+
+  // Where you are, on Google: a dot, and a ring as wide as the fix is unsure.
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: 13.7563, longitude: 100.5018, accuracy: 300 })
+  const fits = await page.evaluate(() => window.__fakeMaps.fits.length)
+  await page.click('#locate')
+  await page.waitForFunction(() => !document.getElementById('youchip').hidden)
+  const you = await page.evaluate(() => {
+    const blue = getComputedStyle(document.documentElement).getPropertyValue('--you').trim()
+    const ring = window.__fakeMaps.circles.filter(c => c.o.map)
+    const dot = window.__fakeMaps.lines.filter(l => l.o.map && l.o.zIndex === 12)
+    return { ring: ring.map(c => c.o.radius), dot: dot.length, blue: dot.some(l => l.o.icons[0].icon.fillColor === blue), fits: window.__fakeMaps.fits.length }
+  })
+  check('a located reader is drawn on the Google map as a blue dot with its accuracy ring',
+    you.dot === 1 && you.blue && you.ring.length === 1 && you.ring[0] === 300, JSON.stringify(you))
+  check('and the map moves to show them', you.fits > fits, `${fits} -> ${you.fits} fits`)
+  await page.click('#locate')
+  const gone = await page.evaluate(() =>
+    window.__fakeMaps.circles.filter(c => c.o.map).length + window.__fakeMaps.lines.filter(l => l.o.map && l.o.zIndex === 12).length)
+  check('and taken off it again when they stop', gone === 0, `${gone} left`)
   await context.close()
 }
 
@@ -1171,6 +1195,79 @@ const FAKE_GOOGLE = () => {
   execFileSync('node', [join(root, 'tools/build-pages.mjs')], { cwd: root, env: bare, stdio: 'pipe' })
   check('and without one, the about page makes the stronger claim again',
     /makes no network requests at all/.test(readFileSync(join(root, 'public/about.html'), 'utf8')))
+}
+
+/* ------------------------------------------------------------- where you are
+ * Location is asked for when the reader taps the button and not before, and
+ * the answer is a distance to a named station, labelled as the straight line
+ * it is — a planner that knows the rail network must not imply it knows the
+ * walk. A refusal says how to undo it rather than failing silently. */
+{
+  const here = { latitude: 13.7563, longitude: 100.5018, accuracy: 60 } // central Bangkok
+  const { page, context } = await newPage({
+    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+    geolocation: here, permissions: ['geolocation'],
+  })
+  await page.addInitScript(() => {
+    window.__asked = 0
+    const g = navigator.geolocation
+    for (const k of ['getCurrentPosition', 'watchPosition']) {
+      const f = g[k].bind(g)
+      g[k] = (...a) => { window.__asked++; return f(...a) }
+    }
+  })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.waitForTimeout(500)
+  check('the planner never asks where you are until you tap the button',
+    await page.evaluate(() => window.__asked === 0 && document.getElementById('youchip').hidden))
+
+  await page.click('#locate')
+  await page.waitForFunction(() => /station/.test(document.getElementById('youchip').textContent))
+  const idle = (await page.textContent('#youchip')).replace(/\s+/g, ' ').trim()
+  check('with no route, it names the nearest station and how far it is',
+    /^Nearest station: Hua Lamphong, [\d.]+ km away · straight line$/.test(idle), idle)
+  check('and the button says it is on',
+    (await page.getAttribute('#locate', 'aria-pressed')) === 'true')
+
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.reload()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.click('#locate')
+  await page.waitForFunction(() => /journey starts/.test(document.getElementById('youchip').textContent))
+  const routed = (await page.textContent('#youchip')).replace(/\s+/g, ' ').trim()
+  check('with a route, it measures to where the journey starts instead',
+    /^Krung Thep Aphiwat, where this journey starts, is [\d.]+ km away · straight line$/.test(routed), routed)
+
+  await page.click('#locate')
+  check('a second tap stops it and clears the chip',
+    await page.evaluate(() => document.getElementById('youchip').hidden &&
+      document.getElementById('locate').getAttribute('aria-pressed') === 'false'))
+  await context.close()
+}
+
+{
+  const { page, context } = await newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  await page.click('#locate')
+  await page.waitForFunction(() => /blocked/.test(document.getElementById('youchip').textContent))
+  const said = (await page.textContent('#youchip')).trim()
+  check('a refused permission says how to allow it, rather than doing nothing',
+    /blocked for this site/.test(said) && /site settings/.test(said), said)
+  await context.close()
+}
+
+{
+  const { page, context } = await newPage({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true })
+  await page.goto('file://' + join(root, 'dist/app.html'))
+  await page.waitForFunction(() => document.querySelector('#panel h1'))
+  check('the apps show no location button, since neither asks for the permission',
+    !(await page.locator('#locate').isVisible()) && !(await page.locator('#youchip').isVisible()))
+  await context.close()
+  const priv = readFileSync(join(root, 'public/privacy.html'), 'utf8')
+  check('and the privacy policy says what happens to a position, and that it never leaves the device',
+    /Where you are\./.test(priv) && /Neither app asks for your location/.test(priv))
 }
 
 /* --------------------------------- the fragment, which has no assets beside it

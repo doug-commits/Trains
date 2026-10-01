@@ -976,6 +976,20 @@ ${
     : ''
 }
 
+    <p><b>Where you are.</b> The planner can show your position on the map and
+    how far you are from a station, but only after you tap the location button
+    and your browser asks your permission. Your position is worked out by your
+    device and used only on the page in front of you: it is never sent to
+    slowasia.com, never stored, and gone when you close the page. Tap the
+    button again and it stops.${
+      GMAPS
+        ? ` Because the map then moves to show where you are, Google's map
+    servers send the imagery for that area, so your approximate location
+    becomes visible to Google in the same way as any part of the map you look
+    at.`
+        : ''
+    } Neither app asks for your location.</p>
+
     <p>The route you plan lives in the part of the address after the
     <code>#</code>. Browsers do not send that fragment to the server, so an
     itinerary link you share carries the journey and reaches only the person

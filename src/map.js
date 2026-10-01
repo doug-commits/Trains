@@ -36,6 +36,7 @@ const MapView = (() => {
       grid: get('--grid'),
       halo: get('--label-halo'),
       coast: get('--coast'),
+      you: get('--you'),
     }
   }
 
@@ -48,6 +49,7 @@ const MapView = (() => {
       progress: 1,
       hover: null,
       focusLeg: null,
+      user: null, // {lat, lon, accuracy} once the reader has asked to be shown
     }
     let colors = themeColors(document.documentElement)
     let raf = null
@@ -1011,6 +1013,44 @@ const MapView = (() => {
       return { km, px, x, by, box: { x: x - 6, y: by - 26, w: px + 12, h: 34 } }
     }
 
+    /* The reader, as the blue dot every map has taught them to look for, with
+     * a faint disc for how sure the phone is. The disc is metres converted to
+     * pixels at the reader's own latitude, so it means the same thing at every
+     * zoom; under about nine pixels it would only be a halo, and is left out.
+     * Drawn above the labels, because "where am I" is the question it answers
+     * and a station name sitting on top of it would hide the answer. */
+    function drawUser() {
+      const u = state.user
+      if (!u) return
+      const p = Proj.project(view, u.lon, u.lat)
+      if (p.x < -60 || p.y < -60 || p.x > view.w + 60 || p.y > view.h + 60) return
+      const edge = Proj.project(view, u.lon, u.lat + (u.accuracy || 0) / 111320)
+      const r = Math.abs(p.y - edge.y)
+      const you = colors.you || '#1a73e8'
+      ctx.save()
+      if (r > 9) {
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+        ctx.globalAlpha = 0.14
+        ctx.fillStyle = you
+        ctx.fill()
+        ctx.globalAlpha = 0.45
+        ctx.lineWidth = 1
+        ctx.strokeStyle = you
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 7.5, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2)
+      ctx.fillStyle = you
+      ctx.fill()
+      ctx.restore()
+    }
+
     function drawScaleBar() {
       const bar = scaleBar()
       if (!bar) return
@@ -1179,6 +1219,7 @@ const MapView = (() => {
       drawRoute()
       drawRouteStations()
       drawLabels()
+      drawUser()
       drawScaleBar()
       buildHitTargets()
     }
@@ -1397,6 +1438,30 @@ const MapView = (() => {
       zoomAt(x, y, factor) {
         view = Proj.clamp(Proj.zoomAt(view, x, y, factor), reach, inset)
         schedule()
+      },
+      setUser(u) {
+        state.user = u
+        drawNow()
+      },
+      /* Frames the reader and the station they are measured against, together
+         and as close as the map allows — the question is "how far am I from
+         it", and that is a picture of two points, not of one. The offline map
+         stops at its own data's precision (about 3px a kilometre at most), so
+         two points a few kilometres apart sit close on it; that is the honest
+         limit of a map that works with no signal. */
+      frame(points) {
+        if (!view || !points.length) return
+        const rect = canvas.getBoundingClientRect()
+        const pad = rect.width < 700 ? 48 : 80
+        view = Proj.clamp(
+          fitVisible(rect, (strip, tall) =>
+            Proj.fitPoints({ ...view, w: strip, h: tall }, points, pad,
+              Proj.MAX_PX_PER_DEGREE / view.baseScale)
+          ),
+          reach,
+          inset
+        )
+        drawNow()
       },
       resetView() {
         view = baseView(canvas.getBoundingClientRect())

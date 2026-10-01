@@ -37,6 +37,8 @@ const GoogleMapView = (() => {
     let idle = []
     let drawn = []
     let legLines = []
+    let user = null
+    let you = []
 
     const everywhere = new g.LatLngBounds()
     for (const s of Object.values(network.stations)) everywhere.extend(ll(s))
@@ -242,6 +244,23 @@ const GoogleMapView = (() => {
       }
     }
 
+    /* The reader's own position: the blue dot, and a disc for how sure the
+       phone is. Circle is sized in metres, which is exactly what an accuracy
+       radius is, so it stays true at every zoom without any arithmetic. */
+    function drawUser() {
+      clear(you)
+      if (!user) return
+      const at = { lat: user.lat, lng: user.lon }
+      const c = tok('--you') || '#1a73e8'
+      if ((user.accuracy || 0) > 15) {
+        you.push(new g.Circle({
+          map, center: at, radius: user.accuracy, clickable: false, zIndex: 11,
+          fillColor: c, fillOpacity: 0.14, strokeColor: c, strokeOpacity: 0.45, strokeWeight: 1,
+        }))
+      }
+      you.push(dot(at, { fill: c, stroke: '#ffffff', scale: 7, z: 12 }))
+    }
+
     function fitRoute() {
       if (!route || !route.stationIds.length) return
       const b = new g.LatLngBounds()
@@ -297,6 +316,17 @@ const GoogleMapView = (() => {
       zoomAt(x, y, factor) {
         map.setZoom((map.getZoom() || 4) + (factor >= 1 ? 1 : -1))
       },
+      setUser(u) {
+        user = u
+        drawUser()
+      },
+      // The reader and their station together; maxZoom keeps two points a few
+      // metres apart from zooming to the pavement.
+      frame(points) {
+        const b = new g.LatLngBounds()
+        for (const p of points) b.extend({ lat: p.lat, lng: p.lon })
+        map.fitBounds(b, padding())
+      },
       resetView() {
         touched = false
         if (route) fitRoute()
@@ -310,6 +340,7 @@ const GoogleMapView = (() => {
         map.setOptions({ styles: styles(), backgroundColor: tok('--sea') })
         drawIdle()
         drawRoute()
+        drawUser()
       },
       get touched() {
         return touched

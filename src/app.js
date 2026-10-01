@@ -67,6 +67,9 @@
     between: (from, to) =>
       `https://www.google.com/maps/dir/?api=1&origin=${from}` +
       `&destination=${to}&travelmode=driving`,
+    // No origin: Google Maps starts from the device's own location, so the
+    // position never has to pass through this page to get there.
+    toHere: to => `https://www.google.com/maps/dir/?api=1&destination=${to}`,
   }
   const mapsLink = (href, text) =>
     `<a class="tip-map" href="${UI.esc(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`
@@ -87,7 +90,7 @@
    * has to know it happened. */
   const map = (() => {
     let impl = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
-    const last = { inset: null, route: null, focus: null }
+    const last = { inset: null, route: null, focus: null, user: null }
     return {
       get engine() {
         return impl.engine || 'canvas'
@@ -114,11 +117,17 @@
       resetView: () => impl.resetView(),
       pick: (x, y) => impl.pick(x, y),
       redraw: () => impl.redraw(),
+      setUser(u) {
+        last.user = u
+        return impl.setUser(u)
+      },
+      frame: points => impl.frame(points),
       swap(next) {
         impl = next
         if (last.inset) impl.setInset(last.inset)
         if (last.route) impl.setRoute(last.route, false)
         if (last.focus != null) impl.focusLeg(last.focus)
+        if (last.user) impl.setUser(last.user)
       },
     }
   })()
@@ -271,6 +280,11 @@
      Declared up here because resetScroll, far above the sheet code, clears it. */
   let raisedFrom = null
 
+  /* Where the reader is, once they have asked to be shown: {lat, lon,
+     accuracy}, or null. Held here and nowhere else — never stored, never
+     sent; closing the page is the end of it. */
+  let you = null
+
   function compute() {
     if (!state.from || !state.to || state.from === state.to) {
       state.plan = null
@@ -351,6 +365,7 @@
    * arriving while the sheet is down is worth raising it for, because the
    * alternative is an answer delivered off the bottom of the screen. */
   function resetScroll(toResult) {
+    if (you) describeYou()
     /* A new answer is not the reader scrolling back up. The list jumps to the
        top because its contents were replaced, and treating that as the
        return half of a scroll dropped the sheet straight back down — over
@@ -711,8 +726,13 @@
       `<b>${UI.esc(s.name)}</b><span>${UI.esc(s.city)}, ${UI.esc(COUNTRY_NAME[s.country])}${
         s.gauge ? ` · ${UI.esc(s.gauge)} gauge` : ''
       }</span>${s.warn ? `<em>${UI.esc(s.warn)}</em>` : ''}` +
+        (you
+          ? `<span class="tip-you">${distance(Proj.haversine(you, s))} from you · straight line</span>`
+          : '') +
         `<span class="tip-acts">${actions}</span>` +
-        `<span class="tip-links">${mapsLink(MAPS.at(stationQuery(s)), 'Show on Google Maps')}</span>`,
+        `<span class="tip-links">${mapsLink(MAPS.at(stationQuery(s)), 'Show on Google Maps')}${
+          you ? mapsLink(MAPS.toHere(stationQuery(s)), 'Directions from where you are') : ''
+        }</span>`,
       true
     )
   }
@@ -918,6 +938,137 @@
   }
   $('#zoomin').addEventListener('click', zoomStep(1.3))
   $('#zoomout').addEventListener('click', zoomStep(1 / 1.3))
+
+  /* ------------------------------------------------ where the reader is
+   *
+   * Asked for only when the reader taps the button — never on load, which is
+   * both rude and the fastest way to get "Block" pressed for good. The browser
+   * shows its own prompt, and the position is used here and only here: it is
+   * not stored and not sent anywhere. Tapping again stops it.
+   *
+   * Distances are straight lines and say so. They answer "how far am I from
+   * the station", not "how long is the walk"; the popup links out to Google
+   * Maps for the walk, where the answer is actually known.
+   *
+   * Hidden in the apps, which have no location permission yet: a button that
+   * can only fail is worse than no button. */
+  const locateBtn = $('#locate')
+  const youChip = $('#youchip')
+  let youWatch = null
+  let youCentred = false
+  const canLocate = 'geolocation' in navigator && !document.documentElement.dataset.app
+  if (!canLocate && locateBtn) locateBtn.hidden = true
+
+  const distance = km =>
+    km < 1
+      ? `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m`
+      : km < 10
+        ? `${km.toFixed(1)} km`
+        : `${Math.round(km).toLocaleString('en')} km`
+
+  function nearestStation(p) {
+    let best = null
+    let bestKm = Infinity
+    for (const [id, s] of Object.entries(NETWORK.stations)) {
+      const km = Proj.haversine(p, s)
+      if (km < bestKm) {
+        bestKm = km
+        best = id
+      }
+    }
+    return { id: best, km: bestKm }
+  }
+
+  function sayYou(html, kind = 'you') {
+    youChip.dataset.kind = kind
+    youChip.innerHTML = kind === 'you' ? `<i aria-hidden="true"></i><span>${html}</span>` : html
+    youChip.hidden = false
+  }
+
+  /* With a route open, the distance that matters is to where it starts. With
+     none, it is the nearest station — the answer to "where can I even begin
+     from here". */
+  function describeYou() {
+    if (!you || !youChip) return
+    const near = nearestStation(you)
+    if (near.km > 400) {
+      sayYou(`You're ${distance(near.km)} from the nearest station on this map`)
+      return
+    }
+    const start = state.plan && state.plan.stationIds ? state.plan.stationIds[0] : null
+    const target = start || near.id
+    const s = NETWORK.stations[target]
+    const km = Proj.haversine(you, s)
+    const name = `<b>${UI.esc(s.name)}</b>`
+    if (km < 0.25) {
+      sayYou(start ? `You're at ${name}, where this journey starts` : `You're at ${name}`)
+    } else if (start) {
+      sayYou(`${name}, where this journey starts, is ${distance(km)} away <small>· straight line</small>`)
+    } else {
+      sayYou(`Nearest station: ${name}, ${distance(km)} away <small>· straight line</small>`)
+    }
+  }
+
+  /* The reader and the station the readout names, in one view. Nothing moves
+     if the nearest station is more than 400km off: the map cannot show the
+     reader there, and dragging it to empty sea would help nobody. */
+  function frameYou() {
+    if (!you) return
+    const near = nearestStation(you)
+    if (near.km > 400) return
+    const start = state.plan && state.plan.stationIds ? state.plan.stationIds[0] : null
+    map.frame([you, NETWORK.stations[start || near.id]])
+  }
+
+  function stopLocating() {
+    if (youWatch != null) navigator.geolocation.clearWatch(youWatch)
+    youWatch = null
+    you = null
+    youCentred = false
+    map.setUser(null)
+    youChip.hidden = true
+    locateBtn.setAttribute('aria-pressed', 'false')
+    locateBtn.title = 'Show where I am'
+  }
+
+  if (canLocate && locateBtn) {
+    locateBtn.addEventListener('click', () => {
+      if (youWatch != null) return stopLocating()
+      locateBtn.setAttribute('aria-pressed', 'true')
+      locateBtn.title = 'Stop showing where I am'
+      sayYou('Finding where you are…', 'note')
+      youWatch = navigator.geolocation.watchPosition(
+        pos => {
+          you = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }
+          map.setUser(you)
+          // Brought into view once, on the first fix. After that the reader
+          // is free to look elsewhere; the readout brings them back.
+          if (!youCentred) {
+            youCentred = true
+            frameYou()
+          }
+          describeYou()
+        },
+        err => {
+          if (err.code === 1) {
+            stopLocating()
+            sayYou(
+              'Location is blocked for this site. Allow it in your browser’s site settings to be shown on the map.',
+              'note'
+            )
+          } else if (!you) {
+            sayYou('Your position could not be found yet. Location services may be off, or the signal weak.', 'note')
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+      )
+    })
+
+    youChip.addEventListener('click', () => {
+      if (you) frameYou()
+      else if (youChip.dataset.kind === 'note' && youWatch == null) youChip.hidden = true
+    })
+  }
 
   function showTip(x, y, html, interactive = false) {
     cancelHide()

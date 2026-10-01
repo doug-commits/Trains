@@ -280,7 +280,18 @@
           <button type="button" id="zoomout" class="btn-zoom" aria-label="Zoom the map out">−</button>
           <button type="button" id="zoomin" class="btn-zoom" aria-label="Zoom the map in">+</button>
         </div>
+        <button type="button" id="locate" class="btn-locate" aria-pressed="false"
+                aria-label="Show where I am on the map" title="Show where I am">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="10" cy="10" r="1.9" fill="currentColor"/>
+            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor"
+                  stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button type="button" id="reset" class="btn-ghost">Reset view</button>
+        <button type="button" id="youchip" class="youchip" hidden aria-live="polite"
+                title="Show me on the map"></button>
       </div>
     </div>
 
@@ -451,6 +462,7 @@
   color-scheme: dark;
 
   --sea: #0a191f;
+  --you: #5b9bff;
   --land: #1e373f;
   --land-edge: #335c69;
   --panel: #0d2028;
@@ -581,6 +593,7 @@
   :root {
     color-scheme: light;
     --sea: #d7e3e5;
+  --you: #1a73e8;
     --land: #f4f2eb;
     --label-halo: #fdfdfb;
     --land-edge: #d9d4c6;
@@ -636,7 +649,7 @@
    in both directions. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --sea: #0a191f; --land: #1e373f; --land-edge: #335c69;
+  --you: #5b9bff; --sea: #0a191f; --land: #1e373f; --land-edge: #335c69;
   --panel: #0d2028; --panel-solid: #0d2028; --panel-edge: #21414c; --raise: #122a33;
   --ink: #e7efea; --ink-soft: #c4d6d5; --muted: #7d9ba2;
   --rail: #e9a63e; --ferry: #57b6c8; --road: #978d7f; --alert: #e2615a;
@@ -660,7 +673,7 @@
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --sea: #d7e3e5; --land: #f4f2eb; --land-edge: #d9d4c6;
+  --you: #1a73e8; --sea: #d7e3e5; --land: #f4f2eb; --land-edge: #d9d4c6;
   /* Must be here as well as in the media query. This block is what the app
      uses — it sets data-theme explicitly — so a variable declared only under
      prefers-color-scheme falls back to the dark value on a light map, which is
@@ -1026,6 +1039,70 @@ body {
  * clipped the focus ring of whichever button was focused down to a stub, which
  * on the one control a keyboard user reaches for most is not a detail. The
  * children round their own outer corners instead. */
+/* "Show where I am": its own button rather than a third segment of the zoom
+   pair, because it is a different kind of act — it asks the browser for
+   something, where the zoom buttons only move the map. */
+.btn-locate {
+  display: grid;
+  place-items: center;
+  width: calc(var(--instr-h) - 2px);
+  height: var(--instr-h);
+  padding: 0;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  color: var(--ink-soft);
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
+  box-shadow: var(--lift-1), var(--sheen);
+  cursor: pointer;
+}
+.btn-locate svg { width: 1.15rem; height: 1.15rem; }
+.btn-locate:hover { color: var(--you); background: var(--raise); }
+.btn-locate[aria-pressed='true'] { color: var(--you); }
+.btn-locate:focus-visible { outline: 2px solid var(--rail); outline-offset: 2px; }
+/* The apps have no location permission yet; a button that can only ever fail
+   is worse than none. */
+[data-app='true'] .btn-locate, [data-app='true'] .youchip { display: none !important; }
+
+/* Where you are, and how far the station is. On its own line in the control
+   cluster: above the buttons on a desk, below them on a phone, where the
+   cluster sits at the top of the map. */
+.youchip {
+  order: -1;
+  flex-basis: 100%;
+  max-width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--ink);
+  background: var(--float);
+  backdrop-filter: var(--float-blur);
+  -webkit-backdrop-filter: var(--float-blur);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--r-sm);
+  box-shadow: var(--lift-1), var(--sheen);
+  cursor: pointer;
+}
+.youchip[hidden] { display: none; }
+.youchip > i {
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--you);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px color-mix(in srgb, var(--you) 40%, transparent);
+}
+.youchip small { color: var(--muted); font-size: 0.85em; }
+.youchip[data-kind='note'] > i { display: none; }
+.youchip:focus-visible { outline: 2px solid var(--rail); outline-offset: 2px; }
+
 .zoomers {
   display: flex;
   border: 1px solid var(--panel-edge);
@@ -1664,6 +1741,7 @@ body {
   bottom: 1rem;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   z-index: 3;
 }
@@ -1795,6 +1873,9 @@ body {
 .tip-go.on:hover { color: var(--rail); background: color-mix(in srgb, var(--rail) 12%, transparent); }
 .tip b { display: block; font-size: 1rem; font-weight: 600; }
 .tip span { display: block; font-size: 0.82rem; color: var(--muted); }
+/* How far the station is from the reader, in their own blue so it reads as
+   being about them rather than about the station. */
+.tip span.tip-you { margin-top: 0.25rem; color: var(--you); font-weight: 600; }
 /* The road gap between a sight and the railhead that serves it. Warm rather
    than alarming — it is a fact about the journey, not a warning. */
 .tip em.gap {
@@ -2653,6 +2734,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
     gap: 0.5rem;
     z-index: 20;
   }
+  .youchip { order: 99; }
   /* Wrapping means it can be taller than one instrument, so the fixed height
      has to become a floor rather than a measurement. */
   .legend {

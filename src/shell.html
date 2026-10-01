@@ -88,7 +88,18 @@
           <button type="button" id="zoomout" class="btn-zoom" aria-label="Zoom the map out">−</button>
           <button type="button" id="zoomin" class="btn-zoom" aria-label="Zoom the map in">+</button>
         </div>
+        <button type="button" id="locate" class="btn-locate" aria-pressed="false"
+                aria-label="Show where I am on the map" title="Show where I am">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="10" cy="10" r="1.9" fill="currentColor"/>
+            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor"
+                  stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button type="button" id="reset" class="btn-ghost">Reset view</button>
+        <button type="button" id="youchip" class="youchip" hidden aria-live="polite"
+                title="Show me on the map"></button>
       </div>
     </div>
 

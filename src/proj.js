@@ -193,5 +193,5 @@ const Proj = (() => {
     return 2 * R * Math.asin(Math.sqrt(s))
   }
 
-  return { create, project, unproject, zoomAt, pan, clamp, fitPoints, haversine, screenY }
+  return { create, project, unproject, zoomAt, pan, clamp, fitPoints, haversine, screenY, MAX_PX_PER_DEGREE }
 })()
