@@ -803,6 +803,95 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* ------------------------------------- scrolling up gives the map back
+ * Scrolling the itinerary raises the sheet to full; scrolling back to the top
+ * left it there, the map covered, with no way back short of the grip or a
+ * reload — and readers reloaded. Reported from a phone, reproduced here as the
+ * same gesture: down, then back up. */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+  })
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(600)
+  const snapNow = () => page.evaluate(() => document.getElementById('sheet').dataset.snap)
+  const scrollTo = y => page.evaluate(y => {
+    const el = document.getElementById('sheet-scroll')
+    el.scrollTop = y
+    el.dispatchEvent(new Event('scroll'))
+  }, y)
+
+  const before = await snapNow()
+  await scrollTo(700)
+  await page.waitForTimeout(400)
+  const raised = await snapNow()
+  await scrollTo(0)
+  await page.waitForTimeout(400)
+  const after = await snapNow()
+  check('scrolling the itinerary down raises the sheet',
+    raised === 'full', `${before} -> ${raised}`)
+  check('and scrolling back to the top lowers it again, so the map returns',
+    after === before, `${raised} -> ${after}`)
+
+  // A sheet put at full on purpose is not undone by scrolling.
+  await page.click('#grip')
+  await page.waitForTimeout(400)
+  const chosen = await snapNow()
+  await scrollTo(300)
+  await page.waitForTimeout(200)
+  await scrollTo(0)
+  await page.waitForTimeout(400)
+  check('but a sheet raised on purpose stays where it was put',
+    chosen === 'full' && (await snapNow()) === 'full', `${chosen} -> ${await snapNow()}`)
+  await context.close()
+}
+
+/* ----------------------------------------------- the bar fits on a phone
+ * Adding the site links broke the planner's bar on phones: "All routes" and
+ * "Start over" each wrapped onto two lines, and at 360px the bar ran off the
+ * right edge. Every label on one line, at the narrowest common width. */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true,
+  })
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  const bar = await page.evaluate(() => {
+    const el = document.querySelector('.topbar')
+    /* Lines are counted from the rendered text itself, not from the box:
+       the buttons are a fixed height taller than one line by design, and the
+       theme switch carries a label only screen readers get. */
+    const lines = x => {
+      const tops = new Set()
+      const walk = document.createTreeWalker(x, NodeFilter.SHOW_TEXT)
+      let n
+      while ((n = walk.nextNode())) {
+        if (!n.textContent.trim() || n.parentElement.closest('.sr')) continue
+        const r = document.createRange()
+        r.selectNodeContents(n)
+        for (const box of r.getClientRects()) if (box.width > 0) tops.add(Math.round(box.top))
+      }
+      return tops.size
+    }
+    const wrapped = [...el.querySelectorAll('a, button')]
+      .filter(x => x.offsetParent !== null && lines(x) > 1)
+      .map(x => x.textContent.trim())
+    return { overflow: el.scrollWidth > el.clientWidth + 1, wrapped }
+  })
+  check('the planner bar fits a 360px phone without running off the edge', !bar.overflow)
+  check('and no label in it wraps onto a second line',
+    bar.wrapped.length === 0, bar.wrapped.join(' | ') || 'all single-line')
+
+  // About left the bar on phones, so it has to be reachable from the panel.
+  await page.locator('#startover').click()
+  await page.waitForTimeout(500)
+  const about = await page.evaluate(() =>
+    [...document.querySelectorAll('a[href="/about"]')].filter(a => a.offsetParent !== null).length)
+  check('and with About gone from the bar, the panel still links to it', about > 0, `${about} visible`)
+  await context.close()
+}
+
 /* ------------------------------------------ the website's Google Maps engine
  * Google's servers are unreachable from where this suite runs, and a test that
  * needed them would test the network rather than the code. So the page gets a

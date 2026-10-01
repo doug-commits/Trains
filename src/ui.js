@@ -1135,6 +1135,8 @@ const UI = (() => {
           g =>
             `<li><a href="/${esc(g.slug)}">${esc(g.h1)}</a><span>${esc(g.summary)}</span></li>`
         ).join('')}</ul>
+        <p class="sub"><a href="/routes">Every route and crossing, by country</a> ·
+        <a href="/about">Who makes this, and how it is checked</a></p>
       </section>`
           : ''
       }

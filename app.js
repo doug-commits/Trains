@@ -8145,6 +8145,8 @@ const UI = (() => {
           g =>
             `<li><a href="/${esc(g.slug)}">${esc(g.h1)}</a><span>${esc(g.summary)}</span></li>`
         ).join('')}</ul>
+        <p class="sub"><a href="/routes">Every route and crossing, by country</a> ·
+        <a href="/about">Who makes this, and how it is checked</a></p>
       </section>`
           : ''
       }
@@ -9902,6 +9904,8 @@ const UI = (() => {
 
   let snap = 'half'
   let sheetY = null
+  // The snap a scroll raised the sheet from, so scrolling back can return it.
+  let raisedFrom = null
 
   function placeSheet(y, gliding) {
     sheetY = y
@@ -9941,6 +9945,9 @@ const UI = (() => {
   }
 
   function setSnap(next, glide = true) {
+    // Any move of the sheet other than the scroll-raise below is deliberate,
+    // and a deliberate position is not undone by scrolling.
+    raisedFrom = null
     snap = next
     sheet.dataset.snap = next
     const y = snapPoints()[next]
@@ -10040,9 +10047,24 @@ const UI = (() => {
 
   /* Reading on is a request for more room. Scrolling the itinerary while the
    * sheet is only part way up opens it the rest of the way, rather than making
-   * the reader put the list down, find the handle, and come back to it. */
+   * the reader put the list down, find the handle, and come back to it.
+   *
+   * And scrolling back to the top gives the room back. It used to work one
+   * way only: down raised the sheet to full, up left it there, and the map —
+   * the thing a reader scrolls back up to look at — stayed covered with no
+   * way back short of finding the grip or reloading the page. Readers did the
+   * latter. Only a raise this handler made is undone by it; a sheet someone
+   * dragged to full, or that the keyboard pushed there, stays where it was put.
+   */
   sheetScroll.addEventListener('scroll', () => {
-    if (onPhone() && snap !== 'full' && sheetScroll.scrollTop > 4) setSnap('full')
+    if (!onPhone()) return
+    if (snap !== 'full' && sheetScroll.scrollTop > 4) {
+      const was = snap
+      setSnap('full')
+      raisedFrom = was
+    } else if (snap === 'full' && raisedFrom && sheetScroll.scrollTop <= 1) {
+      setSnap(raisedFrom)
+    }
   })
 
   const endSheetDrag = e => {

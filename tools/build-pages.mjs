@@ -243,7 +243,7 @@ const TOPBAR = `<header class="topbar">
   <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>
     <span class="brandtext">Overland<b>SEA</b></span></a>
   <p class="tagline">Rail-first journey planning across Southeast Asia</p>
-  <nav class="topnav" aria-label="Site"><a href="/routes">All routes</a><a href="/about">About</a></nav>
+  <nav class="topnav" aria-label="Site"><a href="/routes">Routes</a><a href="/about">About</a></nav>
 </header>`
 
 /* Who makes this, and on what authority.
