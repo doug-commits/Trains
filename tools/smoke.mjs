@@ -3841,6 +3841,25 @@ const FAKE_GOOGLE = () => {
   await page.waitForTimeout(500)
 
   check('the app is the app', await page.evaluate(() => document.documentElement.dataset.app === 'true'))
+
+  /* The offline map draws the same station signs as the website's Google
+     map: Singapore's HarbourFront, where this route starts, is a pier, so
+     its sign is in the sea colour — and a sign, not a 3px dot. */
+  const sign = await page.evaluate(([lon, lat]) => {
+    const at = window.OverlandMap.locate(lon, lat)
+    if (!at) return { found: false }
+    const c = document.getElementById('map')
+    const k = c.width / c.getBoundingClientRect().width
+    const g = c.getContext('2d')
+    const rail = getComputedStyle(document.documentElement).getPropertyValue('--ferry').trim()
+    const [r, gg, b] = [1, 3, 5].map(i => parseInt(rail.slice(i, i + 2), 16))
+    let hits = 0
+    const d = g.getImageData(Math.round((at.x - 14) * k), Math.round((at.y - 14) * k), Math.round(28 * k), Math.round(28 * k)).data
+    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - r) + Math.abs(d[i + 1] - gg) + Math.abs(d[i + 2] - b) < 40) hits++
+    return { found: true, share: Math.round((hits / (d.length / 4)) * 100) / 100 }
+  }, [NETWORK.stations.singapore.lon, NETWORK.stations.singapore.lat])
+  check('and the map draws its stations as signs, a pier in the sea colour',
+    sign.found && sign.share > 0.2, JSON.stringify(sign))
   const cards = await page.evaluate(() => document.querySelectorAll('.way').length)
   check('and offers the other ways round as well', cards >= 2, `${cards} cards`)
   check('and says what stops running', await page.evaluate(() => !!document.querySelector('.clockblock')))

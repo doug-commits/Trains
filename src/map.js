@@ -734,17 +734,61 @@ const MapView = (() => {
       ctx.restore()
     }
 
+    /* Stations as small transit signs — a train, a boat or a bus on the
+       mode's colour — the same signs the website's Google map draws, from
+       the same description in badges.js. Stamped from sprites: two hundred
+       sets of paths with a ring and a shadow on every frame of a pan would be
+       the slowest thing on the map. */
+    const kind = Badges.kinds(network)
+    const TIER_ORDER = { minor: 0, std: 1, hub: 2 }
+    // Hubs drawn last, so where signs overlap the one that matters is on top.
+    const stationOrder = Object.keys(network.stations).sort(
+      (a, b) => TIER_ORDER[Badges.tierOf(network.stations[a])] - TIER_ORDER[Badges.tierOf(network.stations[b])]
+    )
+    // How big each station's sign was drawn this frame, so labels clear it.
+    let signSize = new Map()
+
+    /* Bands by real scale, pixels per degree, matching the Google map's
+       zoom levels 4, 5 and 7, so the two maps agree on when a stop gets its
+       pictogram. */
+    const band = () =>
+      view.scale <= 16 ? 'region' : view.scale <= 32 ? 'far' : view.scale <= 128 ? 'mid' : 'near'
+
+    function stamp(id, role, b) {
+      const s = network.stations[id]
+      const p = Proj.project(view, s.lon, s.lat)
+      if (p.x < -30 || p.y < -30 || p.x > view.w + 30 || p.y > view.h + 30) return
+      const tier = Badges.tierOf(s)
+      const px = Badges.size(tier, role, b)
+      if (!px) return
+      const k = kind[id] || 'rail'
+      const bg = colors[k] || colors.rail
+      const sp = Badges.sprite({
+        kind: k,
+        px,
+        bg,
+        ink: Badges.inkFor(bg, colors.sea),
+        ring: Badges.ringFor(colors.land, colors.sea),
+        ringW: role === 'end' ? 2.5 : 1.5,
+        round: Badges.plain(tier, role, b),
+        scale: Math.max(2, Math.ceil(window.devicePixelRatio || 1)),
+      })
+      ctx.drawImage(sp, p.x - sp.box / 2, p.y - sp.box / 2, sp.box, sp.box)
+      signSize.set(id, px)
+    }
+
     function drawIdleStations(routeSet) {
-      const zoom = view.scale / view.baseScale
-      for (const [id, s] of Object.entries(network.stations)) {
+      signSize = new Map()
+      const b = band()
+      // With a route on screen, every station off it steps back.
+      const role = state.route ? 'dim' : 'idle'
+      ctx.save()
+      if (state.route) ctx.globalAlpha = 0.55
+      for (const id of stationOrder) {
         if (routeSet.has(id)) continue
-        if (s.minor && zoom < 2.2) continue
-        const p = Proj.project(view, s.lon, s.lat)
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, s.hub ? 3 : 2, 0, Math.PI * 2)
-        ctx.fillStyle = colors.idleDot
-        ctx.fill()
+        stamp(id, role, b)
       }
+      ctx.restore()
     }
 
     /** Partial-length drawing so the route can animate in along its own length. */
@@ -785,37 +829,16 @@ const MapView = (() => {
       if (!state.route) return
       const stops = state.route.stopIds || state.route.stationIds
 
-      // Intermediate calls get a plain dot; the stations where you actually
-      // change vehicles get a ring, because those are the decisions.
+      // Passed through first, then the stations where you change vehicles,
+      // then the two ends on top: the order of how much each one matters.
+      const b = band()
       for (const id of state.route.stationIds) {
-        if (stops.includes(id)) continue
-        const s = network.stations[id]
-        const p = Proj.project(view, s.lon, s.lat)
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2)
-        ctx.fillStyle = colors.rail
-        ctx.fill()
+        if (!stops.includes(id)) stamp(id, 'pass', b)
       }
-
       stops.forEach((id, i) => {
-        const s = network.stations[id]
-        const p = Proj.project(view, s.lon, s.lat)
-        const terminal = i === 0 || i === stops.length - 1
-        const r = terminal ? 6.5 : 4.5
-
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2)
-        ctx.fillStyle = colors.sea
-        ctx.fill()
-
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-        ctx.fillStyle = terminal ? colors.rail : colors.panel
-        ctx.fill()
-        ctx.lineWidth = 2
-        ctx.strokeStyle = colors.rail
-        ctx.stroke()
+        if (i !== 0 && i !== stops.length - 1) stamp(id, 'stop', b)
       })
+      for (const id of new Set([stops[0], stops[stops.length - 1]])) stamp(id, 'end', b)
 
       // Border markers sit on top of everything, because they are the thing
       // most likely to end the journey.
@@ -1147,8 +1170,10 @@ const MapView = (() => {
         const text = c.priority <= 1 || sharedCities.has(s.city) ? s.name : s.city
         const w = ctx.measureText(text).width
         const h = fontSize + 4
-        const right = { x: p.x + 10, y: p.y - fontSize / 2 - 2, w: w + 6, h }
-        const left = { x: p.x - w - 14, y: right.y, w: w + 6, h }
+        // Clear of the station's sign, whatever size it was drawn at.
+        const r = (signSize.get(c.id) || 8) / 2
+        const right = { x: p.x + r + 5, y: p.y - fontSize / 2 - 2, w: w + 6, h }
+        const left = { x: p.x - w - r - 9, y: right.y, w: w + 6, h }
 
         // Prefer the right of the dot, fall back to the left, and skip the
         // label entirely rather than let it run off the canvas.

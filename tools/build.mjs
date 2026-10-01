@@ -107,6 +107,7 @@ const SCRIPTS = [
   'src/scene.js',
   'src/photos.js',
   'src/ask.js',
+  'src/badges.js',
   'src/map.js',
   'src/gmap.js',
   'src/ui.js',

@@ -1741,12 +1741,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 button.gpin { cursor: pointer; }
+.gpin[hidden] { display: none; }
 .gpin i { display: block; border-radius: 50%; transition: transform 0.12s ease; }
 button.gpin:hover i, button.gpin:active i { transform: scale(1.45); }
 
-/* Stations as small transit signs. Size follows the zoom (gmap.js sets
-   data-z on the layer) and the station's weight in the network, so the
-   region view is a scatter of hubs rather than a carpet of icons. */
+/* Stations as small transit signs (src/badges.js). gmap.js sets each one's
+   --s from the zoom and the station's weight in the network. */
 .gpin .gst {
   --s: 18px;
   display: grid; place-items: center;
@@ -1758,26 +1758,14 @@ button.gpin:hover i, button.gpin:active i { transform: scale(1.45); }
 .gpin .gst svg { display: block; width: 78%; height: 78%; }
 button.gpin:hover .gst, button.gpin:active .gst { transform: scale(1.2); }
 
-.gpins[data-z='far'] .gpin[data-tier='hub'] .gst { --s: 20px; }
-.gpins[data-z='far'] .gpin[data-tier='std'] .gst { --s: 14px; }
-.gpins[data-z='far'] .gpin[data-tier='minor'] .gst { --s: 9px; border-radius: 50%; }
-.gpins[data-z='far'] .gpin[data-tier='minor'] .gst svg { display: none; }
-.gpins[data-z='mid'] .gpin[data-tier='hub'] .gst { --s: 22px; }
-.gpins[data-z='mid'] .gpin[data-tier='std'] .gst { --s: 18px; }
-.gpins[data-z='mid'] .gpin[data-tier='minor'] .gst { --s: 14px; }
-.gpins[data-z='near'] .gpin[data-tier='hub'] .gst { --s: 26px; }
-.gpins[data-z='near'] .gpin[data-tier='std'] .gst { --s: 22px; }
-.gpins[data-z='near'] .gpin[data-tier='minor'] .gst { --s: 18px; }
+.gpin .gst.plain { border-radius: 50%; }
+.gpin .gst.plain svg { display: none; }
 
-/* On a route: the two ends are the biggest thing on the map, the stops
-   next, and every station off the route steps back. */
-.gpins[data-z] .gpin[data-role='end'] .gst {
-  --s: 28px; border-radius: 30%;
+/* On a route the two ends are the biggest thing on the map (sizes are in
+   badges.js), the stops next, and every station off the route steps back. */
+.gpin[data-role='end'] .gst {
   box-shadow: 0 0 0 2.5px var(--ring), 0 2px 6px rgb(0 0 0 / 0.4);
 }
-.gpins[data-z] .gpin[data-role='stop'] .gst { --s: 20px; border-radius: 28%; }
-.gpins[data-z] .gpin[data-role='end'] .gst svg,
-.gpins[data-z] .gpin[data-role='stop'] .gst svg { display: block; }
 .gpin[data-role='dim'] .gst { opacity: 0.5; filter: saturate(0.4); }
 button.gpin[data-role='dim']:hover .gst { opacity: 1; filter: none; }
 @media (prefers-reduced-motion: reduce) { .gpin i, .gpin .gst { transition: none; } }

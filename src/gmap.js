@@ -122,7 +122,10 @@ const GoogleMapView = (() => {
        the hubs keep their pictogram. */
     const setScale = () => {
       const z = map.getZoom() || 5
-      layer.dataset.z = z <= 5 ? 'far' : z <= 7 ? 'mid' : 'near'
+      const band = z <= 4 ? 'region' : z <= 5 ? 'far' : z <= 7 ? 'mid' : 'near'
+      if (layer.dataset.z === band) return
+      layer.dataset.z = band
+      for (const p of pins) if (p.el.dataset.tier) sizeBadge(p)
     }
     setScale()
     pinLayer.onAdd = () => pinLayer.getPanes().overlayMouseTarget.appendChild(layer)
@@ -247,60 +250,34 @@ const GoogleMapView = (() => {
       return pin(at, { z, inner: mark, hit: scale * 2 + 4 })
     }
 
-    /* What a station is, so its badge can say it: a railway station has a
-       gauge; a stop with none is a pier if a boat leaves from it and a road
-       stop otherwise — a border town, a bus station, the end of a transfer. */
-    const kind = {}
-    for (const [id, st] of Object.entries(network.stations)) kind[id] = st.gauge ? 'rail' : 'road'
-    for (const leg of network.legs) {
-      if (leg.mode !== 'ferry') continue
-      for (const id of [leg.from, leg.to]) if (kind[id] === 'road') kind[id] = 'ferry'
+    const kind = Badges.kinds(network)
+
+    /* A station as a small transit sign (badges.js). `role` is where it
+       stands relative to the route on screen; its size follows the zoom, so
+       it is set here and again whenever the zoom band changes. */
+    function sizeBadge(p) {
+      const { tier, role } = p.el.dataset
+      const band = layer.dataset.z
+      const px = Badges.size(tier, role, band)
+      const b = p.el.firstElementChild
+      b.style.setProperty('--s', px + 'px')
+      p.el.hidden = !px
+      b.classList.toggle('plain', Badges.plain(tier, role, band))
     }
 
-    // Pictograms on a 24 grid, in the badge's ink; the windows are cut in the
-    // badge's own colour so they read as glass rather than as more shape.
-    const ICONS = {
-      rail: (ink, bg) =>
-        `<rect x="5" y="2.5" width="14" height="15" rx="3.5" fill="${ink}"/>` +
-        `<rect x="7.3" y="5.3" width="9.4" height="5" rx="1.2" fill="${bg}"/>` +
-        `<circle cx="8.6" cy="14" r="1.25" fill="${bg}"/><circle cx="15.4" cy="14" r="1.25" fill="${bg}"/>` +
-        `<path d="M8.5 18 6.2 21.5M15.5 18l2.3 3.5" stroke="${ink}" stroke-width="1.9" stroke-linecap="round"/>`,
-      ferry: (ink, bg) =>
-        `<path d="M8 5.5h6.5l1.5 4.5H8z" fill="${ink}"/>` +
-        `<path d="M2.8 11.2h18.4l-2.6 5.6a2 2 0 0 1-1.8 1.2H7.2a2 2 0 0 1-1.8-1.2z" fill="${ink}"/>` +
-        `<path d="M3 21c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`,
-      road: (ink, bg) =>
-        `<rect x="4.5" y="3" width="15" height="15.5" rx="2.8" fill="${ink}"/>` +
-        `<rect x="6.6" y="5.8" width="10.8" height="5.4" rx="1" fill="${bg}"/>` +
-        `<circle cx="8.3" cy="14.8" r="1.2" fill="${bg}"/><circle cx="15.7" cy="14.8" r="1.2" fill="${bg}"/>` +
-        `<rect x="6.2" y="18" width="2.6" height="3" rx="0.8" fill="${ink}"/><rect x="15.2" y="18" width="2.6" height="3" rx="0.8" fill="${ink}"/>`,
-    }
-
-    // Light badge colours (the dark theme's) take dark ink; dark ones white.
-    const light = hex => {
-      const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
-      if (!m) return false
-      const n = parseInt(m[1], 16)
-      return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 150
-    }
-
-    /* A station as a small transit sign: a rounded square in its mode's
-       colour with a train, a boat or a bus on it — the shape every map app
-       has taught people to read as "you can board here". `role` is where it
-       stands relative to the route on screen. */
     function badge(id, role) {
       const st = network.stations[id]
       const k = kind[id] || 'rail'
       const bg = tok(`--${k}`) || tok('--rail')
-      const ink = light(bg) ? tok('--sea') || '#0a191f' : '#ffffff'
-      const ring = light(tok('--land')) ? '#ffffff' : tok('--sea') || '#0a191f'
+      const ink = Badges.inkFor(bg, tok('--sea'))
+      const ring = Badges.ringFor(tok('--land'), tok('--sea'))
       const b = document.createElement('i')
       b.className = 'gst'
       b.style.cssText = `background:${bg};--ring:${ring}`
-      b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k](ink, bg)}</svg>`
-      const tier = st.hub ? 'hub' : st.minor ? 'minor' : 'std'
+      b.innerHTML = Badges.svg(k, ink, bg)
+      const tier = Badges.tierOf(st)
       const z = { end: 10, stop: 8, pass: 7, idle: 3, dim: 2 }[role] + (tier === 'hub' ? 0.5 : tier === 'minor' ? -0.5 : 0)
-      return pin(ll(st), {
+      const p = pin(ll(st), {
         id,
         z: Math.round(z * 2),
         hit: role === 'end' ? 40 : 32,
@@ -308,6 +285,8 @@ const GoogleMapView = (() => {
         inner: b,
         data: { tier, role, kind: k },
       })
+      sizeBadge(p)
+      return p
     }
 
     const clear = list => {
