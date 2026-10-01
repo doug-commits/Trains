@@ -33,23 +33,40 @@
 </head>
 <body>
 <script>
-  /* Runs during parse, ahead of the stylesheet below, so a stored preference
-     never shows as a flash of the other theme. The full control lives in
-     src/app.js; this is only the part that has to happen first. */
-  try {
+  /* The theme, decided before anything is painted. Shared by the planner and
+     every written page, so the two can never open in different colours.
+
+     Light unless the reader has chosen otherwise. A route chart is read in
+     daylight more often than not, and readers asked for it: on a phone set to
+     dark the site used to open dark, which nobody had chosen. "Follow the
+     system" is still on offer, and is now stored as a choice like the other
+     two — it used to be stored as the absence of one, which with a light
+     default would have quietly reset everybody who picked it.
+
+     The browser's own toolbar follows the page rather than the phone, so a
+     light page is not capped by a dark address bar. Each theme-color tag keeps
+     its original colour in data-c, so the page can switch back later. */
+  (function () {
     var root = document.documentElement
-    var m = localStorage.getItem('overlandsea:theme')
-    if (m === 'light' || m === 'dark') root.setAttribute('data-theme', m)
-    /* The app opens light unless told otherwise. The website follows the
-       system, which is right for something you arrive at inside a browser
-       already set the way you like it; an app is opened on its own and a chart
-       is read in daylight more often than not. The toggle still wins, and once
-       used it is remembered — this is only the starting point. */
-    else if (root.dataset.app) root.setAttribute('data-theme', 'light')
-  } catch (e) {
-    /* private mode, or storage disabled — fall through to the system setting */
-  }
+    var mode = null
+    try { mode = localStorage.getItem('overlandsea:theme') } catch (e) {}
+    if (mode !== 'light' && mode !== 'dark' && mode !== 'auto') mode = 'light'
+    if (mode === 'auto') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', mode)
+
+    var dark = mode === 'dark' ||
+      (mode === 'auto' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+    var metas = document.querySelectorAll('meta[name="theme-color"]')
+    var want = null
+    for (var i = 0; i < metas.length; i++) {
+      var m = metas[i]
+      if (!m.getAttribute('data-c')) m.setAttribute('data-c', m.getAttribute('content') || '')
+      if ((m.getAttribute('media') || '').indexOf(dark ? 'dark' : 'light') >= 0) want = m.getAttribute('data-c')
+    }
+    if (want) for (var j = 0; j < metas.length; j++) metas[j].setAttribute('content', want)
+  })()
 </script>
+
 <!-- The launch screen, and only in the app: a website that paints a curtain
      over itself before showing anything is a website nobody waits for. Here
      there is a second or so of work to do before the map exists, and the choice
@@ -2680,11 +2697,16 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 
   /* The whole strip is the handle, not just the bar drawn in it — a 6px
      target is a miss on a moving train. */
+  /* 44px of target, not 22. The handle is the sheet's only visible
+     affordance, and at 22px a thumb found it about one swipe in three. The bar
+     drawn inside it stays the same size; only the part that answers a touch
+     grew. */
   .sheet-grip {
     display: block;
     flex: none;
     width: 100%;
-    padding: 0.65rem 0 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.85rem 0 0;
     background: none;
     border: 0;
     cursor: grab;

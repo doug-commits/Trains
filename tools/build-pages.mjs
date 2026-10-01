@@ -290,6 +290,7 @@ ${ogTags(null, 'A chart of Southeast Asia with the Kunming to Singapore rail cor
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -486,6 +487,7 @@ ${ogTags(null, 'A chart of Southeast Asia with the Kunming to Singapore rail cor
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -617,6 +619,7 @@ ${ogTags(r.slug, `A chart of Southeast Asia with the ${r.h1} route drawn on it`)
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <script type="application/ld+json">${jsonLd(r, plan, url)}</script>
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -801,6 +804,7 @@ ${ogTags(null, 'Overland SEA — rail-first journey planning across Southeast As
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -1079,6 +1083,7 @@ ${ogTags(null, 'Overland SEA — rail-first journey planning across Southeast As
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -1301,6 +1306,7 @@ ${ogTags(null, `${h1} — a border crossing on the Southeast Asian overland netw
 <meta name="theme-color" content="#0a191f" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#d7e3e5" media="(prefers-color-scheme: light)">
 <style>${css}</style>
+${THEME_BOOT}
 </head>
 <body class="doc">
 ${APPBANNER}
@@ -1351,6 +1357,9 @@ const css = read('src/app.css') + '\n' + read('src/doc.css')
  * more: a guide page is where a search lands, and someone reading how the
  * Nong Khai crossing works on a phone is exactly who wants it offline. */
 const APPBANNER = read('src/appbanner.html')
+// The same startup script the planner runs, so a page and the planner never
+// open in different themes.
+const THEME_BOOT = read('src/themeboot.html')
 
 /* An intent line that counts the boats has to count them correctly.
  *

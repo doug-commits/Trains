@@ -8461,6 +8461,10 @@ const UI = (() => {
 
   /* ----------------------------------------------------------------- plan */
 
+  /* The snap a scroll raised the sheet from, so scrolling back can return it.
+     Declared up here because resetScroll, far above the sheet code, clears it. */
+  let raisedFrom = null
+
   function compute() {
     if (!state.from || !state.to || state.from === state.to) {
       state.plan = null
@@ -8541,6 +8545,11 @@ const UI = (() => {
    * arriving while the sheet is down is worth raising it for, because the
    * alternative is an answer delivered off the bottom of the screen. */
   function resetScroll(toResult) {
+    /* A new answer is not the reader scrolling back up. The list jumps to the
+       top because its contents were replaced, and treating that as the
+       return half of a scroll dropped the sheet straight back down — over
+       the very result that had just been brought up to read. */
+    raisedFrom = null
     panel.scrollTop = 0
     if (sheetScroll) sheetScroll.scrollTop = 0
     window.scrollTo({ top: 0 })
@@ -9625,14 +9634,15 @@ const UI = (() => {
     dark: 'Theme: dark. Follow your system instead.',
   }
 
-  /* Nothing chosen yet: the website follows the system, the app opens light.
+  /* Nothing chosen yet: light, on the website and in the app alike.
    *
-   * A website is arrived at inside a browser already set the way its reader
-   * likes it, so following along is the polite default. An app is opened on
-   * its own, and a chart is read in daylight more often than not. Either way
-   * this is only the starting point — the toggle still offers all three, and
-   * the moment one is picked it is remembered and this stops applying. */
-  const firstTheme = () => (document.documentElement.dataset.app ? 'light' : 'auto')
+   * The website used to follow the system, on the grounds that a browser is
+   * already set the way its reader likes it. Readers disagreed: on a phone
+   * set to dark the planner opened dark, which nobody had picked, and a route
+   * chart is read in daylight more often than not. src/themeboot.html makes
+   * the same decision before first paint; this has to agree with it. The
+   * toggle still offers all three, and a choice once made is remembered. */
+  const firstTheme = () => 'light'
 
   function readTheme() {
     try {
@@ -9644,10 +9654,21 @@ const UI = (() => {
     }
   }
 
-  function applyTheme(mode) {
+  /* The browser's toolbar follows the page, not the phone. Each theme-color
+     tag carries its original colour in data-c, stashed by themeboot.html. */
+  function syncThemeColor(mode) {
+    const dark = mode === 'dark' || (mode === 'auto' && systemDark.matches)
+    const metas = [...document.querySelectorAll('meta[name="theme-color"]')]
+    const pick = metas.find(m => (m.getAttribute('media') || '').includes(dark ? 'dark' : 'light'))
+    const colour = pick && (pick.dataset.c || pick.getAttribute('content'))
+    if (colour) for (const m of metas) m.setAttribute('content', colour)
+  }
+
+  function applyTheme(mode, chosen = false) {
     const root = document.documentElement
     if (mode === 'auto') root.removeAttribute('data-theme')
     else root.setAttribute('data-theme', mode)
+    syncThemeColor(mode)
 
     const btn = $('#theme')
     btn.dataset.mode = mode
@@ -9656,11 +9677,17 @@ const UI = (() => {
     // the current state and what pressing it will do.
     btn.setAttribute('aria-label', THEME_TEXT[mode])
     $('#theme-label').textContent = THEME_TEXT[mode]
-    try {
-      if (mode === 'auto') localStorage.removeItem(THEME_KEY)
-      else localStorage.setItem(THEME_KEY, mode)
-    } catch {
-      /* nothing to persist to; the choice still holds for this visit */
+    /* Written only when the reader actually chooses, and every choice is
+       written — "follow the system" included. It used to be stored as the
+       absence of a value, which meant the default; with light as the default
+       that would have quietly undone the choice on the next visit. A first
+       visit stores nothing at all. */
+    if (chosen) {
+      try {
+        localStorage.setItem(THEME_KEY, mode)
+      } catch {
+        /* nothing to persist to; the choice still holds for this visit */
+      }
     }
 
     tellTheShell()
@@ -9693,7 +9720,7 @@ const UI = (() => {
 
   $('#theme').addEventListener('click', () => {
     themeMode = THEME_ORDER[(THEME_ORDER.indexOf(themeMode) + 1) % THEME_ORDER.length]
-    applyTheme(themeMode)
+    applyTheme(themeMode, true)
   })
 
   /* The map is drawn on a canvas, so it does not inherit a palette the way the
@@ -9703,7 +9730,10 @@ const UI = (() => {
     attributes: true,
     attributeFilter: ['data-theme', 'class', 'style'],
   })
-  systemDark.addEventListener('change', redraw)
+  systemDark.addEventListener('change', () => {
+    redraw()
+    syncThemeColor(themeMode)
+  })
 
   /* The Google map's box ends where the panel or the sheet begins, so its
      logo and attribution stay visible as its terms require. Set on the one
@@ -9880,7 +9910,11 @@ const UI = (() => {
   const sheet = $('#sheet')
   const sheetScroll = $('#sheet-scroll')
   const gripEl = $('#grip')
-  const PEEK = 118 // enough for the grip and the first field
+  /* Enough for the grip and the first field, measured rather than fixed. It
+     was 118, sized for a 22px grip; growing the grip to a 44px target left
+     the field 22px short and pushed the list off the bottom of the screen. */
+  const PEEK_FIELD = 96
+  const peekHeight = () => Math.max(22, gripEl.getBoundingClientRect().height) + PEEK_FIELD
 
   const onPhone = () => !window.matchMedia('(min-width: 60.0625rem)').matches
   /* Zero unless the install strip is showing, and measured rather than assumed
@@ -9893,7 +9927,7 @@ const UI = (() => {
     return {
       full: Math.round(h * 0.06) + bannerH(),
       half: Math.round(h * 0.55),
-      peek: h - PEEK,
+      peek: h - peekHeight(),
     }
   }
   const nearestSnap = (y, bias = 0) => {
@@ -9904,8 +9938,6 @@ const UI = (() => {
 
   let snap = 'half'
   let sheetY = null
-  // The snap a scroll raised the sheet from, so scrolling back can return it.
-  let raisedFrom = null
 
   function placeSheet(y, gliding) {
     sheetY = y
@@ -10026,6 +10058,30 @@ const UI = (() => {
     startSheetDrag(e, true)
   })
 
+  /* A downward swipe at the top of the list belongs to the sheet, and the
+   * browser has to be told before it decides otherwise.
+   *
+   * Pointer events cannot stop a native scroll: by the time a pointermove
+   * arrives the browser has already chosen to pan, and it says so by
+   * cancelling the pointer. That cancel is what made pulling the sheet down
+   * take three tries — a swipe on the list moved the sheet a little, was
+   * cancelled, and sprang back. Measured with real touch input it worked 0
+   * times in 5; only a swipe that happened to land on the 22px grip got
+   * through. A non-passive touchmove can refuse the pan, so the list keeps the
+   * gesture whenever it is at the top and the finger is going down, from the
+   * first move — before the browser commits. Upwards is left alone; that is
+   * the list scrolling, and the browser is better at that than we are. */
+  let touchY = null
+  sheetScroll.addEventListener('touchstart', e => {
+    touchY = e.touches.length === 1 ? e.touches[0].clientY : null
+  }, { passive: true })
+  sheetScroll.addEventListener('touchmove', e => {
+    if (touchY == null || !onPhone() || !e.cancelable) return
+    const down = e.touches[0].clientY - touchY > 0
+    if (down && sheetScroll.scrollTop <= 0 && sheetDrag && sheetDrag.fromContent) e.preventDefault()
+  }, { passive: false })
+  sheetScroll.addEventListener('touchend', () => { touchY = null }, { passive: true })
+
   const moveSheet = e => {
     if (!sheetDrag) return
     const dy = e.clientY - sheetDrag.y
@@ -10084,7 +10140,17 @@ const UI = (() => {
 
   window.addEventListener('pointermove', moveSheet, { passive: false })
   window.addEventListener('pointerup', endSheetDrag)
-  window.addEventListener('pointercancel', () => { sheetDrag = null; setSnap(snap) })
+  /* If the browser does take a drag away part-way, land where the sheet was
+     going rather than springing back to where it started — the spring-back is
+     what made a half-successful pull feel like a failed one. And only for a
+     drag that exists: a cancel anywhere else on the page (a pan on the map)
+     is not the sheet's business. */
+  window.addEventListener('pointercancel', () => {
+    if (!sheetDrag) return
+    const held = sheetDrag
+    sheetDrag = null
+    setSnap(held.took ? nearestSnap(sheetY, 0) : snap)
+  })
 
   // The grip is a button, so it answers a keyboard too.
   gripEl.addEventListener('click', () => {

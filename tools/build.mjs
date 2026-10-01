@@ -247,6 +247,7 @@ const css = read('src/app.css')
  * so the exception is visible in the markup it applies to. */
 const shell = read('src/shell.html')
   .replace('<!--APPBANNER-->', read('src/appbanner.html'))
+  .replace('<!--THEMEBOOT-->', read('src/themeboot.html'))
   .replace(/<!--WEB-->[\s\S]*?<!--\/WEB-->/g, m => (APP ? '' : m))
 
 /* Affiliate ids come from the environment, never from the repo. An empty id

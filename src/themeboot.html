@@ -1,0 +1,34 @@
+<script>
+  /* The theme, decided before anything is painted. Shared by the planner and
+     every written page, so the two can never open in different colours.
+
+     Light unless the reader has chosen otherwise. A route chart is read in
+     daylight more often than not, and readers asked for it: on a phone set to
+     dark the site used to open dark, which nobody had chosen. "Follow the
+     system" is still on offer, and is now stored as a choice like the other
+     two — it used to be stored as the absence of one, which with a light
+     default would have quietly reset everybody who picked it.
+
+     The browser's own toolbar follows the page rather than the phone, so a
+     light page is not capped by a dark address bar. Each theme-color tag keeps
+     its original colour in data-c, so the page can switch back later. */
+  (function () {
+    var root = document.documentElement
+    var mode = null
+    try { mode = localStorage.getItem('overlandsea:theme') } catch (e) {}
+    if (mode !== 'light' && mode !== 'dark' && mode !== 'auto') mode = 'light'
+    if (mode === 'auto') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', mode)
+
+    var dark = mode === 'dark' ||
+      (mode === 'auto' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+    var metas = document.querySelectorAll('meta[name="theme-color"]')
+    var want = null
+    for (var i = 0; i < metas.length; i++) {
+      var m = metas[i]
+      if (!m.getAttribute('data-c')) m.setAttribute('data-c', m.getAttribute('content') || '')
+      if ((m.getAttribute('media') || '').indexOf(dark ? 'dark' : 'light') >= 0) want = m.getAttribute('data-c')
+    }
+    if (want) for (var j = 0; j < metas.length; j++) metas[j].setAttribute('content', want)
+  })()
+</script>

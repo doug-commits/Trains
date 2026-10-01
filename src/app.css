@@ -2258,11 +2258,16 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
 
   /* The whole strip is the handle, not just the bar drawn in it — a 6px
      target is a miss on a moving train. */
+  /* 44px of target, not 22. The handle is the sheet's only visible
+     affordance, and at 22px a thumb found it about one swipe in three. The bar
+     drawn inside it stays the same size; only the part that answers a touch
+     grew. */
   .sheet-grip {
     display: block;
     flex: none;
     width: 100%;
-    padding: 0.65rem 0 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.85rem 0 0;
     background: none;
     border: 0;
     cursor: grab;

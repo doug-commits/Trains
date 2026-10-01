@@ -847,6 +847,122 @@ function check(label, condition, detail = '') {
   await context.close()
 }
 
+/* -------------------------------------- pulling the sheet down, by finger
+ * Pulling the sheet down to see the map took three tries. A swipe on the list
+ * was taken by the browser as its own scroll, which cancels the pointer, and
+ * the cancel sprang the sheet back; only a swipe that landed on the 22px grip
+ * got through. Driven here with real touch input, since a synthetic pointer
+ * never meets the browser's gesture logic and so cannot show the bug. */
+{
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+  })
+  const cdp = await context.newCDPSession(page)
+  await page.goto(url + '#from=bkk_aphiwat&to=singapore')
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(600)
+
+  const swipe = async (x, y0, y1) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] })
+    for (let i = 1; i <= 14; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + ((y1 - y0) * i) / 14 }] })
+      await page.waitForTimeout(16)
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await page.waitForTimeout(600)
+  }
+  const toFull = () => page.evaluate(() => {
+    const g = document.getElementById('grip')
+    while (document.getElementById('sheet').dataset.snap !== 'full') g.click()
+  })
+  const sheet = () => page.evaluate(() => ({
+    snap: document.getElementById('sheet').dataset.snap,
+    scroll: Math.round(document.getElementById('sheet-scroll').scrollTop),
+  }))
+
+  let pulled = 0
+  for (let t = 0; t < 5; t++) {
+    await toFull()
+    await page.waitForTimeout(400)
+    const y = await page.evaluate(() => document.getElementById('sheet-scroll').getBoundingClientRect().top + 120)
+    await swipe(206, y, y + 380)
+    if ((await sheet()).snap !== 'full') pulled++
+  }
+  check('a swipe down on the list pulls the sheet down, first time, every time',
+    pulled === 5, `${pulled}/5`)
+
+  // And the list still scrolls: up scrolls it, down mid-list scrolls it back.
+  await toFull()
+  await page.waitForTimeout(400)
+  const y = await page.evaluate(() => document.getElementById('sheet-scroll').getBoundingClientRect().top + 300)
+  await swipe(206, y + 200, y - 200)
+  const up = await sheet()
+  await swipe(206, y - 100, y + 100)
+  const back = await sheet()
+  check('while a swipe up still scrolls the list', up.snap === 'full' && up.scroll > 100, JSON.stringify(up))
+  check('and a swipe down mid-list scrolls it back rather than moving the sheet',
+    back.snap === 'full' && back.scroll < up.scroll && back.scroll > 0, JSON.stringify(back))
+
+  const grip = await page.evaluate(() => document.getElementById('grip').getBoundingClientRect().height)
+  check('the grip is a 44px target, not a 22px one', grip >= 44, `${Math.round(grip)}px`)
+  await context.close()
+}
+
+/* ------------------------------------------------- light, unless chosen
+ * The website opened dark on any phone set to dark, which nobody had picked.
+ * Light is the default now, on the planner and every written page alike, and
+ * a first visit stores nothing. "Follow the system" is stored as a choice:
+ * stored as the absence of one, it would be undone by the next visit. Served
+ * over http, because file:// pages do not share storage with each other. */
+{
+  const { createServer } = await import('node:http')
+  const { extname } = await import('node:path')
+  /* Laid out the way the deploy is: the repository root first, then public/
+     for what the deploy serves from there — the manifest, the share cards,
+     anything a written page asks for by absolute path. */
+  const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
+    '.webmanifest': 'application/manifest+json', '.jpg': 'image/jpeg', '.png': 'image/png' }
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent(req.url.split('?')[0].split('#')[0])
+    const tryAt = [join(root, path), join(root, 'public', path), join(root, 'data', path)]
+    const f = tryAt.find(x => x.startsWith(root) && existsSync(x) && !statSync(x).isDirectory())
+    if (!f) return res.writeHead(404).end()
+    res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' })
+    res.end(readFileSync(f))
+  })
+  await new Promise(r => server.listen(0, r))
+  const base = `http://127.0.0.1:${server.address().port}`
+  const { page, context } = await newPage({
+    viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, colorScheme: 'dark',
+  })
+  const look = async path => {
+    await page.goto(base + path)
+    await page.waitForTimeout(700)
+    return page.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-theme') || 'auto',
+      bar: document.querySelector('meta[name="theme-color"]').getAttribute('content'),
+      stored: localStorage.getItem('overlandsea:theme'),
+    }))
+  }
+  const first = await look('/index.html')
+  const guide = await look('/public/bangkok-to-singapore-by-train.html')
+  check('on a phone set to dark, the planner opens light', first.theme === 'light', JSON.stringify(first))
+  check('and so does a written page', guide.theme === 'light', JSON.stringify(guide))
+  check('and the browser bar matches the page, not the phone', first.bar === guide.bar && first.bar !== '#0a191f', first.bar)
+  check('and a first visit stores nothing', first.stored === null && guide.stored === null)
+
+  await page.goto(base + '/index.html')
+  await page.waitForTimeout(500)
+  await page.click('#theme') // light -> dark
+  await page.click('#theme') // dark -> follow the system
+  const auto = await look('/index.html')
+  const autoGuide = await look('/public/bangkok-to-singapore-by-train.html')
+  check('choosing to follow the system survives a reload', auto.stored === 'auto' && auto.theme === 'auto', JSON.stringify(auto))
+  check('and the written pages follow it too', autoGuide.theme === 'auto', JSON.stringify(autoGuide))
+  await context.close()
+  server.close()
+}
+
 /* ----------------------------------------------- the bar fits on a phone
  * Adding the site links broke the planner's bar on phones: "All routes" and
  * "Start over" each wrapped onto two lines, and at 360px the bar ran off the
@@ -1219,7 +1335,8 @@ const FAKE_GOOGLE = () => {
     }))
 
   const start = await readTheme()
-  check('opens following the system', start.mode === 'auto' && start.attr === null, start.mode)
+  // Light by default even on a system set to dark — readers asked for it.
+  check('opens light, even on a system set to dark', start.mode === 'light' && start.attr === 'light', start.mode)
 
   const seen = [start]
   for (let i = 0; i < 3; i++) {
@@ -1227,10 +1344,10 @@ const FAKE_GOOGLE = () => {
     await page.waitForTimeout(450)
     seen.push(await readTheme())
   }
-  check('the button cycles auto → light → dark → auto',
-    seen.map(x => x.mode).join(' → ') === 'auto → light → dark → auto',
+  check('the button cycles light → dark → system → light',
+    seen.map(x => x.mode).join(' → ') === 'light → dark → auto → light',
     seen.map(x => x.mode).join(' → '))
-  check('light actually changes the palette', seen[1].sea !== seen[0].sea,
+  check('switching actually changes the palette', seen[1].sea !== seen[0].sea,
     `${seen[0].sea} → ${seen[1].sea}`)
   check('and the map canvas repaints with it', seen[1].pixel !== seen[0].pixel,
     `${seen[0].pixel} → ${seen[1].pixel}`)
@@ -1239,11 +1356,13 @@ const FAKE_GOOGLE = () => {
   // A choice has to survive a reload, or it is not a preference.
   await page.click('#theme')
   await page.waitForTimeout(300)
+  const chose = (await readTheme()).mode
   await page.reload()
   await page.waitForFunction(() => document.querySelector('#panel h1'))
   await page.waitForTimeout(700)
   const after = await readTheme()
-  check('the choice survives a reload', after.mode === 'light' && after.attr === 'light', after.mode)
+  check('the choice survives a reload', chose === 'dark' && after.mode === 'dark' && after.attr === 'dark',
+    `${chose} -> ${after.mode}`)
 
   await page.screenshot({ path: join(outDir, '27-theme-light.png') })
   await context.close()
