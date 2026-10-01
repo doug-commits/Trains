@@ -1055,9 +1055,27 @@ const FAKE_GOOGLE = () => {
     constructor(o) { this.o = o; made.circles.push(this) }
     setMap(m) { if (!m) this.o.map = null }
   }
+  /* Behaves as Google's does in the part that matters: setMap(map) calls
+     onAdd then draw, and the panes are real elements inside the map's box.
+     The projection is a plain linear one, so the dots land apart. */
+  const toPx = ll => ({ x: (ll.lng() - 92) * 40, y: (28 - ll.lat()) * 40 })
   class OverlayView {
-    setMap() {}
-    getProjection() { return { fromLatLngToContainerPixel: () => ({ x: 200, y: 200 }) } }
+    setMap(m) {
+      if (!m) { this.onRemove && this.onRemove(); return }
+      this.__map = m
+      if (!m.__panes) {
+        const pane = document.createElement('div')
+        pane.style.cssText = 'position:absolute;left:0;top:0'
+        m.el.appendChild(pane)
+        m.__panes = { overlayMouseTarget: pane, overlayLayer: pane, floatPane: pane }
+      }
+      this.onAdd && this.onAdd()
+      this.draw && this.draw()
+    }
+    getPanes() { return this.__map && this.__map.__panes }
+    getProjection() {
+      return this.__map ? { fromLatLngToContainerPixel: toPx, fromLatLngToDivPixel: toPx } : null
+    }
   }
   window.google = {
     maps: {
@@ -1104,7 +1122,8 @@ const FAKE_GOOGLE = () => {
       routeLines: route.length,
       rail: route.some(l => colour(l) === css('--rail') && !l.o.icons),
       lastFit: window.__fakeMaps.fits[window.__fakeMaps.fits.length - 1],
-      stations: live.filter(l => l.o.clickable).length,
+      stations: document.querySelectorAll('#gmap .gpin[data-id]').length,
+      lines: live.filter(l => l.o.clickable).length,
     }
   })
   check('a planned route is drawn as Google polylines, rail in the rail colour',
@@ -1112,13 +1131,42 @@ const FAKE_GOOGLE = () => {
   check('and fitted with room for the overlays',
     drawn.lastFit && drawn.lastFit.left > 24, JSON.stringify(drawn.lastFit))
   check('and every station is a tappable dot', drawn.stations === Object.keys(NETWORK.stations).length, `${drawn.stations} stations`)
+  check('drawn as buttons on the map, not as symbols on a line Google drops',
+    drawn.lines === 0, `${drawn.lines} clickable lines`)
+  const sized = await page.evaluate(() => [...document.querySelectorAll('#gmap .gpin[data-id]')].map(b => {
+    const r = b.getBoundingClientRect()
+    const d = b.firstElementChild.getBoundingClientRect()
+    return { hit: Math.round(Math.min(r.width, r.height)), dot: Math.round(d.width * 10) / 10, placed: b.style.transform.startsWith('translate') }
+  }))
+  check('each one a visible dot inside a target a finger can find',
+    sized.every(x => x.dot >= 6 && x.hit >= 28 && x.placed),
+    JSON.stringify(sized.find(x => !(x.dot >= 6 && x.hit >= 28 && x.placed)) || sized[0]))
 
   // A mouse click on a station reaches the planner exactly as the canvas did.
   await page.locator('#startover').click().catch(() => {})
   await page.waitForTimeout(200)
+  // A tap gets the popup that asks which end; a mouse hover gets it too.
+  const tapped = await page.evaluate(() => {
+    const b = document.querySelector('#gmap .gpin[data-id="bkk_hualamphong"]') || document.querySelector('#gmap .gpin[data-id]')
+    b.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }))
+    b.click()
+    const tip = document.getElementById('tip')
+    return { open: !tip.hidden, text: tip.textContent, from: document.querySelector('#from').value }
+  })
+  check('tapping a station on the Google map opens its popup, without choosing for you',
+    tapped.open && /Directions from here/.test(tapped.text) && !tapped.from, JSON.stringify(tapped).slice(0, 160))
+  await page.evaluate(() => document.getElementById('tip').hidden = true)
+  const hovered = await page.evaluate(() => {
+    const b = document.querySelector('#gmap .gpin[data-id]')
+    b.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }))
+    return !document.getElementById('tip').hidden
+  })
+  check('and a mouse hovering one gets it as well, as on the canvas map', hovered)
+
   const picked = await page.evaluate(() => {
-    const dot = window.__fakeMaps.lines.find(l => l.o.map && l.o.clickable)
-    window.__fakeFire(dot, 'click', { latLng: new google.maps.LatLng(0, 0), domEvent: { pointerType: 'mouse' } })
+    const b = document.querySelector('#gmap .gpin[data-id]')
+    b.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'mouse', bubbles: true }))
+    b.click()
     const f = document.querySelector('#from-q')
     return f ? f.value : 'no field'
   })
@@ -1139,15 +1187,19 @@ const FAKE_GOOGLE = () => {
   const you = await page.evaluate(() => {
     const blue = getComputedStyle(document.documentElement).getPropertyValue('--you').trim()
     const ring = window.__fakeMaps.circles.filter(c => c.o.map)
-    const dot = window.__fakeMaps.lines.filter(l => l.o.map && l.o.zIndex === 12)
-    return { ring: ring.map(c => c.o.radius), dot: dot.length, blue: dot.some(l => l.o.icons[0].icon.fillColor === blue), fits: window.__fakeMaps.fits.length }
+    const dot = [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '12')
+    const probe = document.createElement('i')
+    probe.style.background = blue
+    const want = probe.style.background
+    return { ring: ring.map(c => c.o.radius), dot: dot.length, blue: dot.some(el => el.firstElementChild.style.background === want), fits: window.__fakeMaps.fits.length }
   })
   check('a located reader is drawn on the Google map as a blue dot with its accuracy ring',
     you.dot === 1 && you.blue && you.ring.length === 1 && you.ring[0] === 300, JSON.stringify(you))
   check('and the map moves to show them', you.fits > fits, `${fits} -> ${you.fits} fits`)
   await page.click('#locate')
   const gone = await page.evaluate(() =>
-    window.__fakeMaps.circles.filter(c => c.o.map).length + window.__fakeMaps.lines.filter(l => l.o.map && l.o.zIndex === 12).length)
+    window.__fakeMaps.circles.filter(c => c.o.map).length +
+      [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '12').length)
   check('and taken off it again when they stop', gone === 0, `${gone} left`)
   await context.close()
 }

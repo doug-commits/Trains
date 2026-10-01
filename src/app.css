@@ -1281,6 +1281,20 @@ body {
 .app[data-map='google'] #gmap { opacity: 1; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { #gmap { transition: none; } }
 
+/* Station dots on the Google map: page elements, not map symbols (gmap.js
+   says why). The button is the tap target; the <i> inside is the dot. */
+.gpins { position: absolute; left: 0; top: 0; }
+.gpin {
+  position: absolute; left: 0; top: 0;
+  display: grid; place-items: center;
+  padding: 0; border: 0; background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button.gpin { cursor: pointer; }
+.gpin i { display: block; border-radius: 50%; transition: transform 0.12s ease; }
+button.gpin:hover i, button.gpin:active i { transform: scale(1.45); }
+@media (prefers-reduced-motion: reduce) { .gpin i { transition: none; } }
+
 /* On a desk the legend sits in the bottom-left corner, which is exactly where
    Google puts its logo. Lifted clear of it, rather than covering it. */
 .app[data-map='google'] .mapfoot { bottom: 2.6rem; }

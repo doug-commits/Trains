@@ -2259,6 +2259,9 @@
         updateInset()
         const g = GoogleMapView.create(host, NETWORK, RAILS, {
           onStation: stationTapped,
+          onHover: (id, x, y) => {
+            if (tipStation !== id) showStationTip(x, y, id)
+          },
           onMove: hideTip,
           onEmpty: hideTip,
         })

@@ -14,9 +14,14 @@
  * Google cannot load. A blank grey rectangle where the map should be is the
  * one outcome worse than either map.
  *
- * Overlays are polylines throughout, including the station dots: a symbol on a
- * one-point line keeps a fixed pixel size at every zoom and needs no Map ID,
- * where Circle is sized in metres and AdvancedMarkerElement requires one.
+ * Lines are Google polylines. Dots — stations, crossings, the reader — are
+ * page elements on one OverlayView of our own. They began as symbols on a
+ * one-point polyline, which keeps a fixed pixel size and needs no Map ID, and
+ * on a real phone nobody could see them: a line a centimetre long is below a
+ * pixel at any zoom a reader uses, Google drops it, and its symbol goes with
+ * it. Where one did survive, the thing that took the tap was that centimetre
+ * of line, not the dot. An element is drawn because we drew it, is exactly
+ * as big as we say, and its tap target is a size a finger can find.
  */
 
 const GoogleMapView = (() => {
@@ -97,6 +102,25 @@ const GoogleMapView = (() => {
       return p ? { x: p.x, y: p.y } : null
     }
 
+    /* The dots' layer. Google moves its panes with the map while it pans, so
+       the elements only need placing again when the projection changes —
+       which is when Google calls draw. overlayMouseTarget is the pane that
+       receives pointer events, and it sits above every polyline. */
+    const pins = new Set()
+    const layer = document.createElement('div')
+    layer.className = 'gpins'
+    layer.setAttribute('aria-hidden', 'true')
+    const pinLayer = new g.OverlayView()
+    const place = pin => {
+      const proj = pinLayer.getProjection()
+      const p = proj && proj.fromLatLngToDivPixel(new g.LatLng(pin.at.lat, pin.at.lng))
+      if (p) pin.el.style.transform = `translate(${p.x}px,${p.y}px)`
+    }
+    pinLayer.onAdd = () => pinLayer.getPanes().overlayMouseTarget.appendChild(layer)
+    pinLayer.draw = () => pins.forEach(place)
+    pinLayer.onRemove = () => layer.remove()
+    pinLayer.setMap(map)
+
     /* The inset app.js reports is measured against the full stage, as the
        canvas needs. This map's box already stops short of the panel and the
        sheet, so whatever of the inset its own edges already exclude is not
@@ -149,35 +173,59 @@ const GoogleMapView = (() => {
       return new g.Polyline(o)
     }
 
-    // A fixed-pixel dot at one point, as a symbol on a one-point line.
+    /* A fixed-pixel dot at one point. `scale` is its radius, as it was for
+       the symbol it replaces. A station gets a button at least 28px across
+       around a dot that may be 5px, so the dot stays small enough not to
+       bury the basemap and the target stays big enough to hit. */
     function dot(at, { fill, stroke, scale, z, id, shape }) {
-      const p = new g.Polyline({
-        path: [at, { lat: at.lat + 1e-7, lng: at.lng }],
-        map,
-        strokeOpacity: 0,
-        clickable: Boolean(id),
-        zIndex: z,
-        icons: [{
-          icon: {
-            path: shape || g.SymbolPath.CIRCLE,
-            fillColor: fill,
-            fillOpacity: 1,
-            strokeColor: stroke,
-            strokeWeight: stroke ? 1.6 : 0,
-            scale,
-          },
-          offset: '0',
-        }],
-      })
+      const el = document.createElement(id ? 'button' : 'span')
+      el.className = 'gpin'
+      const hit = id ? Math.max(28, scale * 2 + 14) : scale * 2 + 4
+      el.style.cssText = `width:${hit}px;height:${hit}px;margin:${-hit / 2}px 0 0 ${-hit / 2}px;z-index:${z}`
+      const mark = document.createElement('i')
+      // A diamond's points are `scale` from its centre, so its sides are
+      // shorter by root two before it is turned.
+      const d = shape === 'diamond' ? (scale * 2) / Math.SQRT2 : scale * 2
+      mark.style.cssText =
+        `width:${d}px;height:${d}px;background:${fill};` +
+        (stroke ? `box-shadow:0 0 0 1.6px ${stroke};` : '') +
+        (shape === 'diamond' ? 'border-radius:1px;transform:rotate(45deg)' : '')
+      el.appendChild(mark)
+      const pin = { el, at, setMap: m => { if (!m) { pins.delete(pin); el.remove() } } }
+
       if (id) {
-        p.addListener('click', e => {
-          const at = toPixel(e.latLng)
-          const de = e.domEvent || {}
-          const touch = de.pointerType === 'touch' || String(de.type || '').startsWith('touch')
-          opts.onStation && opts.onStation(id, at ? at.x : 0, at ? at.y : 0, touch)
+        const s = network.stations[id]
+        el.type = 'button'
+        el.tabIndex = -1
+        el.dataset.id = id
+        el.setAttribute('aria-label', s ? s.name : id)
+        // The map's own click would read this as a tap on empty ground and
+        // close the popup the tap has just opened.
+        if (g.OverlayView.preventMapHitsFrom) g.OverlayView.preventMapHitsFrom(el)
+        let down = null
+        const where = () => toPixel(new g.LatLng(at.lat, at.lng)) || { x: 0, y: 0 }
+        el.addEventListener('pointerdown', e => {
+          down = { x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' }
+        })
+        el.addEventListener('click', e => {
+          e.stopPropagation()
+          // A drag that began on a dot is a pan, not a choice.
+          if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return
+          const p = where()
+          opts.onStation && opts.onStation(id, p.x, p.y, down ? down.touch : false)
+          down = null
+        })
+        // A mouse gets the popup on hover, as it does on the canvas map.
+        el.addEventListener('pointerenter', e => {
+          if (e.pointerType !== 'mouse' || !opts.onHover) return
+          const p = where()
+          opts.onHover(id, p.x, p.y)
         })
       }
-      return p
+      pins.add(pin)
+      layer.appendChild(el)
+      place(pin)
+      return pin
     }
 
     const clear = list => {
@@ -195,7 +243,7 @@ const GoogleMapView = (() => {
       const on = new Set(route ? route.stationIds : [])
       for (const [id, s] of Object.entries(network.stations)) {
         if (on.has(id)) continue
-        idle.push(dot(ll(s), { fill: tok('--idle-dot'), scale: s.hub ? 3.6 : 2.6, z: 3, id }))
+        idle.push(dot(ll(s), { fill: tok('--idle-dot'), stroke: tok('--sea'), scale: s.hub ? 4.2 : 3.2, z: 3, id }))
       }
     }
 
@@ -221,7 +269,7 @@ const GoogleMapView = (() => {
             const b = network.stations[step.to]
             mine.push(dot({ lat: (a.lat + b.lat) / 2, lng: (a.lon + b.lon) / 2 }, {
               fill: tok('--alert'), stroke: tok('--sea'), scale: 5.5, z: 9,
-              shape: 'M 0,-1 1,0 0,1 -1,0 z',
+              shape: 'diamond',
             }))
           }
         }
@@ -239,7 +287,7 @@ const GoogleMapView = (() => {
           drawn.push(dot(ll(s), { fill: tok('--sea'), stroke: tok('--rail'), scale: 5, z: 8, id }))
         } else {
           // Passed through without stopping: still a station, still tappable.
-          drawn.push(dot(ll(s), { fill: tok('--rail'), scale: 2.6, z: 7, id }))
+          drawn.push(dot(ll(s), { fill: tok('--rail'), stroke: tok('--sea'), scale: 3, z: 7, id }))
         }
       }
     }
