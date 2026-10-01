@@ -1592,6 +1592,35 @@ body {
 
 /* --------------------------------------------------------------- mapfoot */
 
+/* The website's Google map, over the canvas map it replaces.
+ *
+ * Invisible and untouchable until app.js marks it live, so a tap during the
+ * seconds Google spends loading still lands on the canvas map the reader can
+ * see. Then the two cross-fade; the canvas stays underneath, idle.
+ *
+ * Its right and bottom edges are set by app.js to the edge of what the panel
+ * or the sheet leaves visible, rather than running under them the way the
+ * canvas does. Google's terms require its logo and attribution to stay in
+ * view, and both sit in the bottom corners. */
+#gmap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: var(--sea);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s var(--ease, ease);
+}
+.app[data-map='google'] #gmap { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { #gmap { transition: none; } }
+
+/* On a desk the legend sits in the bottom-left corner, which is exactly where
+   Google puts its logo. Lifted clear of it, rather than covering it. */
+.app[data-map='google'] .mapfoot { bottom: 2.6rem; }
+
 .mapfoot {
   position: absolute;
   left: 1.1rem;
@@ -2581,7 +2610,7 @@ tr.leg[data-mode='road'] td.num { border-left-color: var(--road); }
   .mapfoot {
     left: max(0.6rem, env(safe-area-inset-left));
     right: max(0.6rem, env(safe-area-inset-right));
-    bottom: auto;
+    bottom: auto !important;
     top: calc(var(--banner-h) + var(--topbar-h) + env(safe-area-inset-top) + 0.5rem);
     flex-wrap: wrap;
     gap: 0.5rem;

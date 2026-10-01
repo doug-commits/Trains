@@ -108,6 +108,7 @@ const SCRIPTS = [
   'src/photos.js',
   'src/ask.js',
   'src/map.js',
+  'src/gmap.js',
   'src/ui.js',
   'src/app.js',
 ]
@@ -255,7 +256,27 @@ const partnerIds =
   `PARTNERS.booking.id = ${JSON.stringify(process.env.BOOKING_AID || '')};\n` +
   `PARTNERS.insurance.id = ${JSON.stringify(process.env.SAFETYWING_REF || '')};`
 
+/* The Google Maps key: the website's build only, and never the app's.
+ *
+ * The app has no network permission and works with no signal; a key in its
+ * copy would invite exactly the code path that cannot work there. So APP=1
+ * drops it even when the environment sets it, and tools/smoke.mjs fails the
+ * build if the app bundle ever carries one.
+ *
+ * It is not a secret in the usual sense — a Maps JavaScript key ships to every
+ * browser that loads the page, by design. What protects it is the HTTP
+ * referrer restriction set on it in the Google Cloud console, limiting it to
+ * slowasia.com. A key without that restriction is a bill anyone can run up.
+ *
+ * Placed ahead of every script rather than after them like the affiliate ids,
+ * because app.js reads it as it runs, not later. */
+const GMAPS_KEY = APP ? '' : (process.env.GOOGLE_MAPS_KEY || '').trim()
+const mapsKey = GMAPS_KEY
+  ? `window.OVERLAND_GMAPS_KEY = ${JSON.stringify(GMAPS_KEY)};`
+  : '/* no Google Maps key in this build: the canvas map is the map */'
+
 const sources =
+  `\n/* ===== maps key (build-time) ===== */\n${mapsKey}\n` +
   SCRIPTS.map(p => `\n/* ===== ${p} ===== */\n${read(p)}`).join('\n') +
   `\n/* ===== affiliate ids (build-time) ===== */\n${partnerIds}\n`
 

@@ -77,7 +77,51 @@
   const panel = $('#panel')
   const tooltip = $('#tip')
 
-  const map = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
+  /* One map interface, two engines behind it.
+   *
+   * The canvas map paints first, everywhere, with no network — and in the app
+   * it is the only map there is. On the website it is upgraded to Google Maps
+   * once that has loaded, if a key was built in. Everything here talks to
+   * `map` and never to an engine directly, so the swap replays the state that
+   * matters (the route, the focused leg, the overlay inset) and nothing else
+   * has to know it happened. */
+  const map = (() => {
+    let impl = MapView.create(canvas, NETWORK, BASEMAP, LANDMARKS, RAILS)
+    const last = { inset: null, route: null, focus: null }
+    return {
+      get engine() {
+        return impl.engine || 'canvas'
+      },
+      resize: () => impl.resize(),
+      locate: (lon, lat) => impl.locate(lon, lat),
+      viewSignature: () => impl.viewSignature(),
+      setInset(next) {
+        last.inset = next
+        return impl.setInset(next)
+      },
+      setRoute(route, animate) {
+        last.route = route
+        last.focus = null
+        return impl.setRoute(route, animate)
+      },
+      focusLeg(i) {
+        last.focus = i
+        return impl.focusLeg(i)
+      },
+      panBy: (dx, dy) => impl.panBy(dx, dy),
+      zoomCentre: f => impl.zoomCentre(f),
+      zoomAt: (x, y, f) => impl.zoomAt(x, y, f),
+      resetView: () => impl.resetView(),
+      pick: (x, y) => impl.pick(x, y),
+      redraw: () => impl.redraw(),
+      swap(next) {
+        impl = next
+        if (last.inset) impl.setInset(last.inset)
+        if (last.route) impl.setRoute(last.route, false)
+        if (last.focus != null) impl.focusLeg(last.focus)
+      },
+    }
+  })()
   // The only handle the page offers on the live view. Used by tools/smoke.mjs
   // to point the real pointer at a real place instead of sweeping the canvas.
   window.OverlandMap = map
@@ -800,27 +844,31 @@
 
     const found = map.pick(e.offsetX, e.offsetY)
     if (!found || found.type !== 'station') return hideTip()
+    stationTapped(found.id, e.offsetX, e.offsetY, e.pointerType === 'touch')
+  })
 
-    /* A finger has no hover, so a tap gets the popup rather than the cycle —
-       otherwise touch users are the only ones who never see the choice, and
-       they are the ones for whom guessing wrong is most annoying to undo. */
-    if (e.pointerType === 'touch') {
-      showStationTip(e.offsetX, e.offsetY, found.id)
+  /* A station was chosen on the map, by whichever engine is drawing it.
+   *
+   * A finger has no hover, so a tap gets the popup rather than the cycle —
+   * otherwise touch users are the only ones who never see the choice, and they
+   * are the ones for whom guessing wrong is most annoying to undo. Mouse keeps
+   * the shortcut: first click sets the origin, second the destination, then it
+   * cycles. The popup is the deliberate version. */
+  function stationTapped(id, x, y, touch) {
+    if (touch) {
+      showStationTip(x, y, id)
       return
     }
-
-    // Mouse keeps the shortcut: first click sets the origin, second the
-    // destination, then it cycles. The popup is the deliberate version.
     if (!state.from || (state.from && state.to)) {
-      state.from = found.id
+      state.from = id
       state.to = null
     } else {
-      state.to = found.id
+      state.to = id
     }
     hideTip()
     renderControls()
     compute()
-  })
+  }
 
   canvas.addEventListener('pointerleave', e => {
     touches.delete(e.pointerId)
@@ -1463,6 +1511,17 @@
   })
   systemDark.addEventListener('change', redraw)
 
+  /* The Google map's box ends where the panel or the sheet begins, so its
+     logo and attribution stay visible as its terms require. Set on the one
+     element directly — not through a variable the whole page inherits — and
+     only from here, which runs when the sheet settles, never per drag frame. */
+  function fitGoogleBox(right, bottom) {
+    const host = document.getElementById('gmap')
+    if (!host) return
+    host.style.right = `${Math.max(0, Math.round(right))}px`
+    host.style.bottom = `${Math.max(0, Math.round(bottom))}px`
+  }
+
   function updateInset() {
     /* On a phone the map is the whole screen and the overlays are on top of
      * it: the bar along the top and the sheet coming up from the bottom. What
@@ -1471,6 +1530,7 @@
     if (!window.matchMedia('(min-width: 60.0625rem)').matches) {
       const bar = document.querySelector('.topbar').getBoundingClientRect()
       const covered = Math.max(0, window.innerHeight - (sheetY ?? window.innerHeight))
+      fitGoogleBox(0, covered)
       return map.setInset({
         left: 0,
         right: 0,
@@ -1481,6 +1541,7 @@
       })
     }
     const controls = document.querySelector('.controls').getBoundingClientRect()
+    fitGoogleBox(panel.getBoundingClientRect().width, 0)
     map.setInset({
       // The controls only cover the top corner, so reserving their full width
       // would waste half the map. Half of it keeps endpoints clear.
@@ -1937,5 +1998,48 @@
       map.redraw()
       paintScenes()
     })
+  }
+
+  /* Google Maps, on the website only, and only if a key was built in.
+   *
+   * Never in the app: the app has no network permission and works at a border
+   * with no signal, which a map that fetches tiles cannot do. The build leaves
+   * the key out of the app's copy entirely, and this checks the document mark
+   * as well, so the two would both have to fail for the app to try.
+   *
+   * The canvas map stays visible until Google has drawn its first tiles, then
+   * the two cross-fade. If the script fails, the key is refused, or nothing
+   * arrives within the timeout, the canvas map simply stays: the reader never
+   * sees an empty grey box, which is the one outcome worse than either map. */
+  const key = window.OVERLAND_GMAPS_KEY
+  if (key && !document.documentElement.dataset.app && typeof GoogleMapView !== 'undefined') {
+    GoogleMapView.load(key)
+      .then(() => {
+        const host = document.createElement('div')
+        host.id = 'gmap'
+        host.setAttribute('aria-label', canvas.getAttribute('aria-label') || 'Map')
+        canvas.after(host)
+        updateInset()
+        const g = GoogleMapView.create(host, NETWORK, RAILS, {
+          onStation: stationTapped,
+          onMove: hideTip,
+          onEmpty: hideTip,
+        })
+        let shown = false
+        const show = () => {
+          if (shown) return
+          shown = true
+          map.swap(g)
+          app.dataset.map = 'google'
+        }
+        google.maps.event.addListenerOnce(g.map, 'tilesloaded', show)
+        // Tiles that never report in still beat a canvas we have stopped
+        // updating; past this, show whatever Google has.
+        setTimeout(show, 6000)
+      })
+      .catch(err => {
+        app.dataset.map = 'canvas'
+        console.warn(String(err && err.message ? err.message : err))
+      })
   }
 })()

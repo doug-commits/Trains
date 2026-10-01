@@ -772,9 +772,14 @@ function check(label, condition, detail = '') {
 }
 
 /* --------------------------------------------- nothing is fetched at runtime
- * The premise the whole thing rests on: it works at a border post with no
- * signal, and inside a strict-CSP artifact. Linking out to Google Maps is fine;
- * loading it would end both. This is the guard on that decision. */
+ * The app works at a border post with no signal, and the published planner
+ * runs inside a strict-CSP artifact; neither may load anything. The website's
+ * planner may load Google Maps — that was decided deliberately, for a smoother
+ * map on phones — but only when a key is built in, and only the website.
+ *
+ * This build has no key, so it must fetch nothing, exactly as before. The
+ * checks after this block hold the rest of the rule: the app's bundle can
+ * never carry a key, and a website with one says so on its privacy page. */
 {
   const { page, context } = await newPage()
   const external = []
@@ -796,6 +801,171 @@ function check(label, condition, detail = '') {
   )
   check('external hosts appear only as links', linked.length > 0, `${linked.length} linked hosts`)
   await context.close()
+}
+
+/* ------------------------------------------ the website's Google Maps engine
+ * Google's servers are unreachable from where this suite runs, and a test that
+ * needed them would test the network rather than the code. So the page gets a
+ * stand-in `google.maps` that records what it is asked to draw, and the
+ * adapter is held to what matters: the route drawn in its modes, fitted around
+ * the overlays, taps on stations reaching the planner, the canvas map kept
+ * until the swap and kept for good if Google never arrives. */
+const FAKE_GOOGLE = () => {
+  const made = { lines: [], fits: [], styles: null, zoom: 5 }
+  const listeners = new Map()
+  const on = (obj, ev, fn) => {
+    const k = obj.__id + ':' + ev
+    ;(listeners.get(k) || listeners.set(k, []).get(k)).push(fn)
+    return { remove() {} }
+  }
+  let n = 0
+  class LatLng {
+    constructor(lat, lng) { this._lat = lat; this._lng = lng }
+    lat() { return this._lat }
+    lng() { return this._lng }
+  }
+  class LatLngBounds { extend() { return this } }
+  class FakeMap {
+    constructor(el, opts) {
+      this.__id = 'map' + n++
+      this.el = el
+      made.styles = opts.styles
+      made.gesture = opts.gestureHandling
+      made.mapObj = this
+    }
+    addListener(ev, fn) { return on(this, ev, fn) }
+    fitBounds(b, pad) { made.fits.push(pad) }
+    getZoom() { return made.zoom }
+    setZoom(z) { made.zoom = z }
+    panBy() {}
+    getCenter() { return new LatLng(10, 105) }
+    setOptions(o) { if (o.styles) made.styles = o.styles }
+  }
+  class Polyline {
+    constructor(o) { this.__id = 'pl' + n++; this.o = o; made.lines.push(this) }
+    setMap(m) { if (!m) this.o.map = null }
+    addListener(ev, fn) { return on(this, ev, fn) }
+  }
+  class OverlayView {
+    setMap() {}
+    getProjection() { return { fromLatLngToContainerPixel: () => ({ x: 200, y: 200 }) } }
+  }
+  window.google = {
+    maps: {
+      Map: FakeMap, Polyline, LatLng, LatLngBounds, OverlayView,
+      SymbolPath: { CIRCLE: 0 },
+      event: {
+        addListenerOnce(obj, ev, fn) { setTimeout(fn, 50); return { remove() {} } },
+      },
+    },
+  }
+  window.__fakeMaps = made
+  window.__fakeFire = (obj, ev, arg) => (listeners.get(obj.__id + ':' + ev) || []).forEach(f => f(arg))
+  window.OVERLAND_GMAPS_KEY = 'test-key'
+}
+
+{
+  const { page, context } = await newPage()
+  await page.addInitScript(FAKE_GOOGLE)
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('.app').dataset.map === 'google', null, { timeout: 15000 })
+  check('with a key, the website swaps to the Google engine once its tiles arrive',
+    await page.evaluate(() => window.OverlandMap.engine === 'google'))
+
+  check('and one finger pans it, rather than two',
+    await page.evaluate(() => window.__fakeMaps.gesture === 'greedy'))
+
+  const box = await page.evaluate(() => {
+    const g = document.getElementById('gmap').getBoundingClientRect()
+    const p = document.getElementById('panel').getBoundingClientRect()
+    return { gRight: Math.round(g.right), pLeft: Math.round(p.left) }
+  })
+  check("and its box stops at the panel, so Google's attribution stays visible",
+    Math.abs(box.gRight - box.pLeft) <= 2, `map ends ${box.gRight}, panel starts ${box.pLeft}`)
+
+  await page.locator('.corridor').first().click()
+  await page.waitForFunction(() => document.querySelector('.route tbody tr'))
+  await page.waitForTimeout(300)
+  const drawn = await page.evaluate(() => {
+    const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim()
+    const live = window.__fakeMaps.lines.filter(l => l.o.map)
+    const route = live.filter(l => l.o.zIndex === 6)
+    const colour = l => l.o.icons ? l.o.icons[0].icon.strokeColor || l.o.icons[0].icon.fillColor : l.o.strokeColor
+    return {
+      routeLines: route.length,
+      rail: route.some(l => colour(l) === css('--rail') && !l.o.icons),
+      lastFit: window.__fakeMaps.fits[window.__fakeMaps.fits.length - 1],
+      stations: live.filter(l => l.o.clickable).length,
+    }
+  })
+  check('a planned route is drawn as Google polylines, rail in the rail colour',
+    drawn.routeLines > 0 && drawn.rail, `${drawn.routeLines} route lines`)
+  check('and fitted with room for the overlays',
+    drawn.lastFit && drawn.lastFit.left > 24, JSON.stringify(drawn.lastFit))
+  check('and every station is a tappable dot', drawn.stations === Object.keys(NETWORK.stations).length, `${drawn.stations} stations`)
+
+  // A mouse click on a station reaches the planner exactly as the canvas did.
+  await page.locator('#startover').click().catch(() => {})
+  await page.waitForTimeout(200)
+  const picked = await page.evaluate(() => {
+    const dot = window.__fakeMaps.lines.find(l => l.o.map && l.o.clickable)
+    window.__fakeFire(dot, 'click', { latLng: new google.maps.LatLng(0, 0), domEvent: { pointerType: 'mouse' } })
+    const f = document.querySelector('#from-q')
+    return f ? f.value : 'no field'
+  })
+  check('and clicking one sets the origin, as a click on the canvas map does',
+    picked && picked !== 'no field', picked)
+
+  const z0 = await page.evaluate(() => window.__fakeMaps.zoom)
+  await page.click('#zoomin')
+  const z1 = await page.evaluate(() => window.__fakeMaps.zoom)
+  check('the zoom buttons drive the Google map a whole step at a time', z1 === z0 + 1, `${z0} -> ${z1}`)
+  await context.close()
+}
+
+{
+  /* A key that cannot load — blocked, refused, offline — must leave the reader
+     with the canvas map, never an empty box. */
+  const { page, context } = await newPage()
+  await page.addInitScript(() => { window.OVERLAND_GMAPS_KEY = 'test-key' })
+  await page.route('**/maps.googleapis.com/**', r => r.abort())
+  await page.goto(url)
+  await page.waitForFunction(() => document.querySelector('.app').dataset.map === 'canvas', null, { timeout: 15000 })
+  check('if Google cannot load, the canvas map stays and works',
+    await page.evaluate(() => window.OverlandMap.engine === 'canvas' && !document.querySelector('#gmap')))
+  await context.close()
+}
+
+/* The app must never carry a key, whatever the environment says. */
+{
+  const { execFileSync } = await import('node:child_process')
+  const env = { ...process.env, GOOGLE_MAPS_KEY: 'AIza-test-key-0000' }
+  execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: { ...env, APP: '1' }, stdio: 'pipe' })
+  const appBundle = readFileSync(join(root, 'dist/app.html'), 'utf8') +
+    (existsSync(join(root, 'dist/app.js')) ? readFileSync(join(root, 'dist/app.js'), 'utf8') : '')
+  check('the app build never carries a Maps key, even when one is set',
+    !appBundle.includes('AIza-test-key-0000') && !/OVERLAND_GMAPS_KEY\s*=/.test(appBundle))
+
+  execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env, stdio: 'pipe' })
+  check('while the website build does carry it',
+    readFileSync(join(root, 'app.js'), 'utf8').includes('AIza-test-key-0000') ||
+      readFileSync(join(root, 'index.html'), 'utf8').includes('AIza-test-key-0000'))
+
+  execFileSync('node', [join(root, 'tools/build-pages.mjs')], { cwd: root, env, stdio: 'pipe' })
+  const priv = readFileSync(join(root, 'public/privacy.html'), 'utf8')
+  const about = readFileSync(join(root, 'public/about.html'), 'utf8')
+  check('and with one, the privacy policy says what Google receives',
+    /planner&#39;s map is Google Maps|planner's map is Google Maps/.test(priv) && /policies\.google\.com/.test(priv))
+  check('and the about page stops claiming the site fetches nothing',
+    !/makes no network requests at all/.test(about))
+
+  // Back to the keyless build the rest of this suite assumes.
+  const bare = { ...process.env, GOOGLE_MAPS_KEY: '' }
+  execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: bare, stdio: 'pipe' })
+  execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: { ...bare, APP: '1' }, stdio: 'pipe' })
+  execFileSync('node', [join(root, 'tools/build-pages.mjs')], { cwd: root, env: bare, stdio: 'pipe' })
+  check('and without one, the about page makes the stronger claim again',
+    /makes no network requests at all/.test(readFileSync(join(root, 'public/about.html'), 'utf8')))
 }
 
 /* --------------------------------- the fragment, which has no assets beside it

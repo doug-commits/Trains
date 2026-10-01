@@ -218,6 +218,12 @@ const ogUrl = slug =>
     ? `${ORIGIN}/og/${slug && existsSync(join(root, `data/og/${slug}.jpg`)) ? slug : 'default'}.jpg`
     : null
 
+/* Whether the website's planner uses Google Maps. It does when, and only
+ * when, the build has a key — the same condition tools/build.mjs uses to put
+ * one in the page — so the pages that describe what the site sends where can
+ * never disagree with what it actually sends. */
+const GMAPS = Boolean((process.env.GOOGLE_MAPS_KEY || '').trim())
+
 /* One address for the whole site.
  *
  * It was doug@mukbangshow.ae, which is a working mailbox and also the name of
@@ -350,10 +356,18 @@ ${TOPBAR}
       <div class="block">
         <h2>What it costs you to use</h2>
         <p>Nothing, and that is not a trial. There is no account, no newsletter, no cookie
-        banner and no analytics of any kind. The page makes no network requests at all once it
+        banner and no analytics of any kind. ${
+          GMAPS
+            ? `On this website the planner's map is Google Maps, so opening the planner
+        fetches map imagery from Google and Google receives those requests — the
+        <a href="/privacy">privacy policy</a> says exactly what that means. Nothing else
+        reports back, and the written route pages load nothing from anyone. The Android
+        app draws its own map and ships with an empty permission list, including no
+        internet permission`
+            : `The page makes no network requests at all once it
         has loaded — no fetch, no beacon, nothing reporting back. The Android build ships with
-        an empty permission list, including no internet permission, which is the only honest
-        way to say it works at a border with no signal.</p>
+        an empty permission list, including no internet permission`
+        }, which is the only honest way to say it works at a border with no signal.</p>
         <p>Some booking links are affiliate links. Where one is, it is a link to the operator
         or agent I would have sent you to anyway, and it never changes which route the planner
         recommends — the routing code cannot see them. The <a href="/privacy">privacy
@@ -939,7 +953,24 @@ function privacyPage(css) {
 
     <p>Fonts and photographs are served from slowasia.com itself rather than
     from Google Fonts or a CDN, so opening a page here does not announce your
-    visit to a third party as a side effect of loading the design.</p>
+    visit to a third party as a side effect of loading the design.${
+      GMAPS ? ' The planner is the one exception, below.' : ''
+    }</p>
+${
+  GMAPS
+    ? `
+    <p><b>The planner's map is Google Maps.</b> Opening the planner loads
+    Google's map script and map imagery from Google's servers, so Google
+    receives those requests — your IP address, your browser's standard request
+    details, and which part of the map is on screen — and handles them under
+    <a href="https://policies.google.com/privacy">Google's privacy policy</a>.
+    What you type is not sent to Google: the route is still worked out on your
+    device. But the map moves to show the route it finds, so the imagery Google
+    serves does reveal the region you are looking at, and you should treat that
+    as known to Google. The written route pages do not load Google Maps, and
+    neither does either app.</p>`
+    : ''
+}
 
     <p>The route you plan lives in the part of the address after the
     <code>#</code>. Browsers do not send that fragment to the server, so an
