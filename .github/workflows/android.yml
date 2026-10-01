@@ -53,7 +53,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Without `packages` the action also asks for "tools", the SDK Tools
+      # package Google retired years ago. Newer runner images ship command-line
+      # tools that no longer resolve it, and the job died here in twenty
+      # seconds with "Failed to find package 'tools'". Gradle fetches the
+      # platform and build-tools it needs on its own once licences are
+      # accepted, which this step still does.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       # Builds its own page: dist/app.html, with no photographs and none of the
       # website-only sections. It does not use the site's index.html.
