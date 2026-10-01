@@ -1,6 +1,6 @@
 {
   "name": "overland-sea",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "private": true,
   "description": "Rail-first overland journey planner for Southeast Asia, drawn on a map",
   "type": "module",
