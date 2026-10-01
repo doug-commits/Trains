@@ -1138,6 +1138,13 @@ const FAKE_GOOGLE = () => {
     const d = b.firstElementChild.getBoundingClientRect()
     return { hit: Math.round(Math.min(r.width, r.height)), dot: Math.round(d.width * 10) / 10, placed: b.style.transform.startsWith('translate') }
   }))
+  const kinds = await page.evaluate(() => Object.fromEntries(['kunming', 'kualaperlis', 'rantaupanjang']
+    .map(id => [id, (document.querySelector(`#gmap .gpin[data-id="${id}"]`) || { dataset: {} }).dataset.kind])))
+  check('each station is a sign for how you board there: a train, a boat, a bus',
+    kinds.kunming === 'rail' && kinds.kualaperlis === 'ferry' && kinds.rantaupanjang === 'road', JSON.stringify(kinds))
+  check('and the ones off the planned route step back',
+    await page.evaluate(() => document.querySelectorAll('#gmap .gpin[data-role="dim"]').length > 100 &&
+      document.querySelectorAll('#gmap .gpin[data-role="end"]').length === 2))
   check('each one a visible dot inside a target a finger can find',
     sized.every(x => x.dot >= 6 && x.hit >= 28 && x.placed),
     JSON.stringify(sized.find(x => !(x.dot >= 6 && x.hit >= 28 && x.placed)) || sized[0]))
@@ -1187,7 +1194,7 @@ const FAKE_GOOGLE = () => {
   const you = await page.evaluate(() => {
     const blue = getComputedStyle(document.documentElement).getPropertyValue('--you').trim()
     const ring = window.__fakeMaps.circles.filter(c => c.o.map)
-    const dot = [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '12')
+    const dot = [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '30')
     const probe = document.createElement('i')
     probe.style.background = blue
     const want = probe.style.background
@@ -1199,7 +1206,7 @@ const FAKE_GOOGLE = () => {
   await page.click('#locate')
   const gone = await page.evaluate(() =>
     window.__fakeMaps.circles.filter(c => c.o.map).length +
-      [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '12').length)
+      [...document.querySelectorAll('#gmap span.gpin')].filter(el => el.style.zIndex === '30').length)
   check('and taken off it again when they stop', gone === 0, `${gone} left`)
   await context.close()
 }

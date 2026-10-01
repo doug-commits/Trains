@@ -6842,6 +6842,15 @@ const GoogleMapView = (() => {
       const p = proj && proj.fromLatLngToDivPixel(new g.LatLng(pin.at.lat, pin.at.lng))
       if (p) pin.el.style.transform = `translate(${p.x}px,${p.y}px)`
     }
+    /* How big the station badges are depends on how far out the map is: at
+       the whole-region view two hundred full badges would be a carpet with
+       Bangkok buried under it, so the small stations shrink to dots and only
+       the hubs keep their pictogram. */
+    const setScale = () => {
+      const z = map.getZoom() || 5
+      layer.dataset.z = z <= 5 ? 'far' : z <= 7 ? 'mid' : 'near'
+    }
+    setScale()
     pinLayer.onAdd = () => pinLayer.getPanes().overlayMouseTarget.appendChild(layer)
     pinLayer.draw = () => pins.forEach(place)
     pinLayer.onRemove = () => layer.remove()
@@ -6870,7 +6879,10 @@ const GoogleMapView = (() => {
       touched = true
       opts.onMove && opts.onMove()
     })
-    map.addListener('zoom_changed', () => opts.onMove && opts.onMove())
+    map.addListener('zoom_changed', () => {
+      setScale()
+      opts.onMove && opts.onMove()
+    })
     map.addListener('click', () => opts.onEmpty && opts.onEmpty())
 
     /* The real alignment where the data has one, in whichever direction it is
@@ -6899,25 +6911,18 @@ const GoogleMapView = (() => {
       return new g.Polyline(o)
     }
 
-    /* A fixed-pixel dot at one point. `scale` is its radius, as it was for
-       the symbol it replaces. A station gets a button at least 28px across
-       around a dot that may be 5px, so the dot stays small enough not to
-       bury the basemap and the target stays big enough to hit. */
-    function dot(at, { fill, stroke, scale, z, id, shape }) {
+    /* One element on the map at one point, placed and kept placed by the
+       layer. With an id it is a station: a button that a tap, a click or a
+       hover reaches the planner through, with a target at least 32px across
+       whatever is drawn inside it. */
+    function pin(at, { z, id, inner, hit, cls = '', data = {} }) {
       const el = document.createElement(id ? 'button' : 'span')
-      el.className = 'gpin'
-      const hit = id ? Math.max(28, scale * 2 + 14) : scale * 2 + 4
-      el.style.cssText = `width:${hit}px;height:${hit}px;margin:${-hit / 2}px 0 0 ${-hit / 2}px;z-index:${z}`
-      const mark = document.createElement('i')
-      // A diamond's points are `scale` from its centre, so its sides are
-      // shorter by root two before it is turned.
-      const d = shape === 'diamond' ? (scale * 2) / Math.SQRT2 : scale * 2
-      mark.style.cssText =
-        `width:${d}px;height:${d}px;background:${fill};` +
-        (stroke ? `box-shadow:0 0 0 1.6px ${stroke};` : '') +
-        (shape === 'diamond' ? 'border-radius:1px;transform:rotate(45deg)' : '')
-      el.appendChild(mark)
-      const pin = { el, at, setMap: m => { if (!m) { pins.delete(pin); el.remove() } } }
+      el.className = 'gpin' + (cls ? ' ' + cls : '')
+      const size = id ? Math.max(32, hit || 0) : hit
+      el.style.cssText = `width:${size}px;height:${size}px;margin:${-size / 2}px 0 0 ${-size / 2}px;z-index:${z}`
+      for (const [k, v] of Object.entries(data)) el.dataset[k] = v
+      el.appendChild(inner)
+      const p = { el, at, setMap: m => { if (!m) { pins.delete(p); el.remove() } } }
 
       if (id) {
         const s = network.stations[id]
@@ -6935,23 +6940,100 @@ const GoogleMapView = (() => {
         })
         el.addEventListener('click', e => {
           e.stopPropagation()
-          // A drag that began on a dot is a pan, not a choice.
+          // A drag that began on a station is a pan, not a choice.
           if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return
-          const p = where()
-          opts.onStation && opts.onStation(id, p.x, p.y, down ? down.touch : false)
+          const q = where()
+          opts.onStation && opts.onStation(id, q.x, q.y, down ? down.touch : false)
           down = null
         })
         // A mouse gets the popup on hover, as it does on the canvas map.
         el.addEventListener('pointerenter', e => {
           if (e.pointerType !== 'mouse' || !opts.onHover) return
-          const p = where()
-          opts.onHover(id, p.x, p.y)
+          const q = where()
+          opts.onHover(id, q.x, q.y)
         })
       }
-      pins.add(pin)
+      pins.add(p)
       layer.appendChild(el)
-      place(pin)
-      return pin
+      place(p)
+      return p
+    }
+
+    /* A plain fixed-pixel mark: the reader's position, a border crossing.
+       `scale` is its radius, as it was for the map symbol it replaced. */
+    function dot(at, { fill, stroke, scale, z, shape }) {
+      const mark = document.createElement('i')
+      // A diamond's points are `scale` from its centre, so its sides are
+      // shorter by root two before it is turned.
+      const d = shape === 'diamond' ? (scale * 2) / Math.SQRT2 : scale * 2
+      mark.style.cssText =
+        `width:${d}px;height:${d}px;background:${fill};` +
+        (stroke ? `box-shadow:0 0 0 1.6px ${stroke};` : '') +
+        (shape === 'diamond' ? 'border-radius:1px;transform:rotate(45deg)' : '')
+      return pin(at, { z, inner: mark, hit: scale * 2 + 4 })
+    }
+
+    /* What a station is, so its badge can say it: a railway station has a
+       gauge; a stop with none is a pier if a boat leaves from it and a road
+       stop otherwise — a border town, a bus station, the end of a transfer. */
+    const kind = {}
+    for (const [id, st] of Object.entries(network.stations)) kind[id] = st.gauge ? 'rail' : 'road'
+    for (const leg of network.legs) {
+      if (leg.mode !== 'ferry') continue
+      for (const id of [leg.from, leg.to]) if (kind[id] === 'road') kind[id] = 'ferry'
+    }
+
+    // Pictograms on a 24 grid, in the badge's ink; the windows are cut in the
+    // badge's own colour so they read as glass rather than as more shape.
+    const ICONS = {
+      rail: (ink, bg) =>
+        `<rect x="5" y="2.5" width="14" height="15" rx="3.5" fill="${ink}"/>` +
+        `<rect x="7.3" y="5.3" width="9.4" height="5" rx="1.2" fill="${bg}"/>` +
+        `<circle cx="8.6" cy="14" r="1.25" fill="${bg}"/><circle cx="15.4" cy="14" r="1.25" fill="${bg}"/>` +
+        `<path d="M8.5 18 6.2 21.5M15.5 18l2.3 3.5" stroke="${ink}" stroke-width="1.9" stroke-linecap="round"/>`,
+      ferry: (ink, bg) =>
+        `<path d="M8 5.5h6.5l1.5 4.5H8z" fill="${ink}"/>` +
+        `<path d="M2.8 11.2h18.4l-2.6 5.6a2 2 0 0 1-1.8 1.2H7.2a2 2 0 0 1-1.8-1.2z" fill="${ink}"/>` +
+        `<path d="M3 21c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`,
+      road: (ink, bg) =>
+        `<rect x="4.5" y="3" width="15" height="15.5" rx="2.8" fill="${ink}"/>` +
+        `<rect x="6.6" y="5.8" width="10.8" height="5.4" rx="1" fill="${bg}"/>` +
+        `<circle cx="8.3" cy="14.8" r="1.2" fill="${bg}"/><circle cx="15.7" cy="14.8" r="1.2" fill="${bg}"/>` +
+        `<rect x="6.2" y="18" width="2.6" height="3" rx="0.8" fill="${ink}"/><rect x="15.2" y="18" width="2.6" height="3" rx="0.8" fill="${ink}"/>`,
+    }
+
+    // Light badge colours (the dark theme's) take dark ink; dark ones white.
+    const light = hex => {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+      if (!m) return false
+      const n = parseInt(m[1], 16)
+      return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 150
+    }
+
+    /* A station as a small transit sign: a rounded square in its mode's
+       colour with a train, a boat or a bus on it — the shape every map app
+       has taught people to read as "you can board here". `role` is where it
+       stands relative to the route on screen. */
+    function badge(id, role) {
+      const st = network.stations[id]
+      const k = kind[id] || 'rail'
+      const bg = tok(`--${k}`) || tok('--rail')
+      const ink = light(bg) ? tok('--sea') || '#0a191f' : '#ffffff'
+      const ring = light(tok('--land')) ? '#ffffff' : tok('--sea') || '#0a191f'
+      const b = document.createElement('i')
+      b.className = 'gst'
+      b.style.cssText = `background:${bg};--ring:${ring}`
+      b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k](ink, bg)}</svg>`
+      const tier = st.hub ? 'hub' : st.minor ? 'minor' : 'std'
+      const z = { end: 10, stop: 8, pass: 7, idle: 3, dim: 2 }[role] + (tier === 'hub' ? 0.5 : tier === 'minor' ? -0.5 : 0)
+      return pin(ll(st), {
+        id,
+        z: Math.round(z * 2),
+        hit: role === 'end' ? 40 : 32,
+        cls: 'gpin-st',
+        inner: b,
+        data: { tier, role, kind: k },
+      })
     }
 
     const clear = list => {
@@ -6969,7 +7051,7 @@ const GoogleMapView = (() => {
       const on = new Set(route ? route.stationIds : [])
       for (const [id, s] of Object.entries(network.stations)) {
         if (on.has(id)) continue
-        idle.push(dot(ll(s), { fill: tok('--idle-dot'), stroke: tok('--sea'), scale: s.hub ? 4.2 : 3.2, z: 3, id }))
+        idle.push(badge(id, route ? 'dim' : 'idle'))
       }
     }
 
@@ -6994,7 +7076,7 @@ const GoogleMapView = (() => {
             const a = network.stations[step.from]
             const b = network.stations[step.to]
             mine.push(dot({ lat: (a.lat + b.lat) / 2, lng: (a.lon + b.lon) / 2 }, {
-              fill: tok('--alert'), stroke: tok('--sea'), scale: 5.5, z: 9,
+              fill: tok('--alert'), stroke: tok('--sea'), scale: 5.5, z: 17,
               shape: 'diamond',
             }))
           }
@@ -7007,14 +7089,7 @@ const GoogleMapView = (() => {
       for (const id of route.stationIds) {
         const s = network.stations[id]
         if (!s) continue
-        if (ends.has(id)) {
-          drawn.push(dot(ll(s), { fill: tok('--rail'), stroke: tok('--sea'), scale: 7, z: 10, id }))
-        } else if (stops.has(id)) {
-          drawn.push(dot(ll(s), { fill: tok('--sea'), stroke: tok('--rail'), scale: 5, z: 8, id }))
-        } else {
-          // Passed through without stopping: still a station, still tappable.
-          drawn.push(dot(ll(s), { fill: tok('--rail'), stroke: tok('--sea'), scale: 3, z: 7, id }))
-        }
+        drawn.push(badge(id, ends.has(id) ? 'end' : stops.has(id) ? 'stop' : 'pass'))
       }
     }
 
@@ -7032,7 +7107,7 @@ const GoogleMapView = (() => {
           fillColor: c, fillOpacity: 0.14, strokeColor: c, strokeOpacity: 0.45, strokeWeight: 1,
         }))
       }
-      you.push(dot(at, { fill: c, stroke: '#ffffff', scale: 7, z: 12 }))
+      you.push(dot(at, { fill: c, stroke: '#ffffff', scale: 7, z: 30 }))
     }
 
     function fitRoute() {
