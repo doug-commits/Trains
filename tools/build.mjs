@@ -386,3 +386,10 @@ if (APP) {
   console.log(`dist/planner.html  ${kb('dist/planner.html')} KB`)
   console.log(`index.html         ${kb('index.html')} KB + app.js ${kb('app.js')} KB`)
 }
+// Whether a key went in, never the key: the only way to tell from a CI log
+// that the secret reached the build, short of unzipping what came out.
+console.log(
+  GMAPS_KEY
+    ? `google maps        on (${APP ? 'GOOGLE_MAPS_APP_KEY' : 'GOOGLE_MAPS_KEY'}, ${GMAPS_KEY.length} chars)`
+    : `google maps        off — no ${APP ? 'GOOGLE_MAPS_APP_KEY' : 'GOOGLE_MAPS_KEY'}; the canvas map is the map`
+)
