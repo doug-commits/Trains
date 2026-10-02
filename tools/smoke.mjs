@@ -1224,15 +1224,21 @@ const FAKE_GOOGLE = () => {
   await context.close()
 }
 
-/* The app must never carry a key, whatever the environment says. */
+/* Each build carries its own key and never the other's: the website's is
+   restricted to slowasia.com and would only be refused inside the apps. */
 {
   const { execFileSync } = await import('node:child_process')
-  const env = { ...process.env, GOOGLE_MAPS_KEY: 'AIza-test-key-0000' }
+  const env = { ...process.env, GOOGLE_MAPS_KEY: 'AIza-test-key-0000', GOOGLE_MAPS_APP_KEY: '' }
   execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: { ...env, APP: '1' }, stdio: 'pipe' })
-  const appBundle = readFileSync(join(root, 'dist/app.html'), 'utf8') +
+  const appBundle = () => readFileSync(join(root, 'dist/app.html'), 'utf8') +
     (existsSync(join(root, 'dist/app.js')) ? readFileSync(join(root, 'dist/app.js'), 'utf8') : '')
-  check('the app build never carries a Maps key, even when one is set',
-    !appBundle.includes('AIza-test-key-0000') && !/OVERLAND_GMAPS_KEY\s*=/.test(appBundle))
+  check("the app build never carries the website's Maps key",
+    !appBundle().includes('AIza-test-key-0000') && !/OVERLAND_GMAPS_KEY\s*=/.test(appBundle()))
+
+  execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root,
+    env: { ...env, GOOGLE_MAPS_APP_KEY: 'AIza-app-key-1111', APP: '1' }, stdio: 'pipe' })
+  check('but carries its own when one is set',
+    appBundle().includes('AIza-app-key-1111') && !appBundle().includes('AIza-test-key-0000'))
 
   execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env, stdio: 'pipe' })
   check('while the website build does carry it',
@@ -1247,8 +1253,12 @@ const FAKE_GOOGLE = () => {
   check('and the about page stops claiming the site fetches nothing',
     !/makes no network requests at all/.test(about))
 
+  check("and the website build never carries the apps' key",
+    !readFileSync(join(root, 'app.js'), 'utf8').includes('AIza-app-key-1111') &&
+      !readFileSync(join(root, 'index.html'), 'utf8').includes('AIza-app-key-1111'))
+
   // Back to the keyless build the rest of this suite assumes.
-  const bare = { ...process.env, GOOGLE_MAPS_KEY: '' }
+  const bare = { ...process.env, GOOGLE_MAPS_KEY: '', GOOGLE_MAPS_APP_KEY: '' }
   execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: bare, stdio: 'pipe' })
   execFileSync('node', [join(root, 'tools/build.mjs')], { cwd: root, env: { ...bare, APP: '1' }, stdio: 'pipe' })
   execFileSync('node', [join(root, 'tools/build-pages.mjs')], { cwd: root, env: bare, stdio: 'pipe' })
@@ -1321,12 +1331,18 @@ const FAKE_GOOGLE = () => {
   const { page, context } = await newPage({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true })
   await page.goto('file://' + join(root, 'dist/app.html'))
   await page.waitForFunction(() => document.querySelector('#panel h1'))
-  check('the apps show no location button, since neither asks for the permission',
-    !(await page.locator('#locate').isVisible()) && !(await page.locator('#youchip').isVisible()))
+  check('the apps have the location button too',
+    await page.locator('#locate').isVisible())
+  await page.click('#locate')
+  await page.waitForFunction(() => /Overland SEA/.test(document.getElementById('youchip').textContent))
+  const said = (await page.textContent('#youchip')).trim()
+  check('and a refusal there points at the phone’s settings, not a browser’s',
+    /phone’s Settings/.test(said) && !/browser/.test(said), said)
   await context.close()
   const priv = readFileSync(join(root, 'public/privacy.html'), 'utf8')
-  check('and the privacy policy says what happens to a position, and that it never leaves the device',
-    /Where you are\./.test(priv) && /Neither app asks for your location/.test(priv))
+  check('and the privacy policy says what happens to a position, in the apps as on the site',
+    /Where you are\./.test(priv) && /does not send it anywhere or store it/.test(priv) &&
+      /ACCESS_FINE_LOCATION|asks for your location the first time/.test(priv))
 }
 
 /* --------------------------------- the fragment, which has no assets beside it
@@ -1960,8 +1976,8 @@ const FAKE_GOOGLE = () => {
     check('the homepage itself links into the written pages',
       links('index').size > 0, `${links('index').size} links`)
 
-    /* The app is one file with no network permission, so a link to a page that
-       only exists on the website is a dead end reachable from every screen. */
+    /* The app is one bundled file, so a link to a page that only exists on
+       the website is a dead end reachable from every screen. */
     const appHtml = readFileSync(join(root, 'dist/app.html'), 'utf8')
     check('but the app does not carry that link, having no such page',
       !/<nav class="topnav"/.test(appHtml) && !/href="\/routes"/.test(appHtml))
@@ -3198,13 +3214,19 @@ const FAKE_GOOGLE = () => {
     const manifest = readFileSync(join(root, 'android/app/src/main/AndroidManifest.xml'), 'utf8')
     const gradle = readFileSync(join(root, 'android/app/build.gradle.kts'), 'utf8')
 
-    /* The load-bearing claim. Everything else on the page is a promise about
-       conduct; this one is enforced by the operating system, and it is only
-       true while the line is absent from the manifest. */
-    check('the app still has no internet permission, as the policy says',
-      !/android\.permission\.INTERNET/.test(manifest))
-    check('and the policy still says it',
-      /android\.permission\.INTERNET/.test(html) && /no internet permission/i.test(html))
+    /* The load-bearing claim: the app asks for the network, for Google's map,
+       and for location, for the "where am I" button — and nothing else. A
+       fourth permission here without a change to the policy fails the build. */
+    const perms = [...manifest.matchAll(/<uses-permission\s+android:name="([^"]+)"/g)].map(m => m[1]).sort()
+    const allowed = ['android.permission.ACCESS_COARSE_LOCATION', 'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.INTERNET']
+    check('the app asks for the network and location and nothing else, as the policy says',
+      JSON.stringify(perms) === JSON.stringify(allowed), perms.join(', '))
+    check('and the policy names the network permission and what it is for',
+      /android\.permission\.INTERNET/.test(html) && /network is for the map, and only the map/i.test(html))
+    check('and a GPS-less tablet can still install it',
+      !/<uses-feature[^>]*location[^>]*required="true"/.test(manifest) &&
+        /android\.hardware\.location\.gps" android:required="false"/.test(manifest))
 
     /* "There is no third-party SDK in the build." Everything declared has to
        be Google's own or the language's. */
@@ -3424,15 +3446,30 @@ const FAKE_GOOGLE = () => {
   check('the version is stamped rather than written in',
     /\$\(MARKETING_VERSION\)/.test(plist) && /\$\(CURRENT_PROJECT_VERSION\)/.test(plist))
 
-  /* Every one of these is a way to ask for something the privacy policy says
-     the app does not do. A usage description appearing here without a matching
+  /* Every one of these is a way to ask for something. Location is the one the
+     privacy policy describes; any other appearing here without a matching
      change to that page means one of the two is lying. */
-  const asks = ['NSLocationWhenInUseUsageDescription', 'NSCameraUsageDescription',
-    'NSContactsUsageDescription', 'NSPhotoLibraryUsageDescription',
+  const asks = ['NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription',
+    'NSCameraUsageDescription', 'NSContactsUsageDescription', 'NSPhotoLibraryUsageDescription',
     'NSMicrophoneUsageDescription', 'NSUserTrackingUsageDescription']
     .filter(k => plist.includes(k))
-  check('the iOS app asks for no permissions, as the policy says', asks.length === 0,
-    asks.join(', '))
+  check('the iOS app asks for location while in use and nothing else, as the policy says',
+    asks.length === 1 && asks[0] === 'NSLocationWhenInUseUsageDescription', asks.join(', '))
+  const why = (plist.match(/<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>([^<]+)</) || [])[1] || ''
+  check('and says why in the dialog, in the words the policy uses',
+    /station/.test(why) && /not sent anywhere or stored/.test(why), why)
+
+  /* The page's navigator.geolocation is answered by Core Location, and the
+     content rules let in Google's map servers and nothing else. */
+  const swift = readFileSync(join(root, 'ios/Overland/Sources/PlannerViewController.swift'), 'utf8')
+  const bridge = readFileSync(join(root, 'ios/Overland/Sources/LocationBridge.swift'), 'utf8')
+  const allowedHosts = [...swift.matchAll(/url-filter": "\^https:([^"]+)"/g)]
+    .map(m => (m[1].match(/([a-z]+)\\+\.com\/$/) || [])[1]).sort()
+  check('the iOS app reaches Google’s map servers and no one else',
+    JSON.stringify(allowedHosts) === JSON.stringify(['google', 'googleapis', 'gstatic']), allowedHosts.join(', '))
+  check('and answers the page’s geolocation with Core Location, asked only on use',
+    /requestWhenInUseAuthorization/.test(bridge) && !/requestAlwaysAuthorization/.test(bridge) &&
+      /location\.install\(into:/.test(swift))
 
   /* Play refuses an update whose target is more than a year behind the newest
      Android, and moves the line every year. The number lives in the gradle
@@ -3866,7 +3903,7 @@ const FAKE_GOOGLE = () => {
 
   /* A button, not a link. The guide pages send a reader to the planner because
      they cannot rebuild themselves; the app is the planner and must not send
-     anyone anywhere — it has no network to send them over. */
+     anyone anywhere — the route is planned from what is already inside it. */
   check('with a control the app can answer itself',
     await page.evaluate(() => {
       const el = document.querySelector('.way-go')

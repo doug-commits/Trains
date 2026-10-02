@@ -3,16 +3,18 @@ import WebKit
 
 /// One screen, one web view, one bundled page.
 ///
-/// The planner is already a self-contained document that makes no network
-/// requests, so this is not a shell around a website — it is the same program,
-/// running with the phone in flight mode. That is the entire reason for it to
-/// exist: the moment you most need to know whether the Padang Besar connection
-/// holds is the moment you have no signal.
+/// The planner is a self-contained document: the network, the routing and the
+/// itineraries are all in the bundle, so this is not a shell around a website —
+/// it is the same program, and it plans a whole journey with the phone in
+/// flight mode. That is the reason for it to exist: the moment you most need to
+/// know whether the Padang Besar connection holds is the moment you have no
+/// signal. With signal, the map is Google's; without, the one the page draws.
 final class PlannerViewController: UIViewController {
 
     private var web: WKWebView!
     private let assets = BundleAssets()
     private let bridge = ShellBridge()
+    private let location = LocationBridge()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -20,6 +22,7 @@ final class PlannerViewController: UIViewController {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(assets, forURLScheme: BundleAssets.scheme)
         installShellBridge(into: config.userContentController)
+        location.install(into: config.userContentController)
         config.websiteDataStore = .default()          // persistent localStorage
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = .all
@@ -28,6 +31,7 @@ final class PlannerViewController: UIViewController {
         config.preferences.isTextInteractionEnabled = true
 
         web = WKWebView(frame: .zero, configuration: config)
+        location.web = web
         web.navigationDelegate = self
         web.uiDelegate = self
         web.translatesAutoresizingMaskIntoConstraints = false
@@ -52,27 +56,32 @@ final class PlannerViewController: UIViewController {
         }
     }
 
-    /// The nearest thing iOS has to Android's missing internet permission.
+    /// Every load the web view attempts is refused unless it is our own scheme
+    /// or Google's map servers.
     ///
-    /// On Android the guarantee is the operating system's: the app does not
-    /// declare `INTERNET`, so it cannot open a socket at all. iOS has no such
-    /// declaration — an app either has the network or the platform assumes it
-    /// might. So the guarantee here is one level down and narrower, and it is
-    /// worth being exact about which: a content rule list that refuses every
-    /// load the web view attempts except from our own scheme. A tracking pixel
-    /// or a font that crept into the page could not fetch, and neither could
-    /// anything injected into it.
+    /// iOS has no internet permission to declare or withhold — an app has the
+    /// network or the platform assumes it might — so the line is drawn one
+    /// level down: a content rule list that WebKit enforces on every request
+    /// the page makes. The map is Google's when there is signal, and needs
+    /// `googleapis.com`, `gstatic.com` and `google.com`; nothing else can load.
+    /// A tracking pixel or a font that crept into the page could not fetch, and
+    /// neither could anything injected into it.
     ///
-    /// It is not the same promise. It covers the web view, which is the whole
-    /// app, but it is enforced by WebKit rather than by the kernel. The privacy
-    /// policy says so in those words rather than borrowing Android's stronger
-    /// claim.
+    /// Each host gets its own rule because the rule language has no `|`, and
+    /// each requires the dot before the domain, so `evilgoogleapis.com` is not
+    /// let in by a pattern written for `maps.googleapis.com`.
     private func blockRemoteLoads(then load: @escaping () -> Void) {
         let rules = """
         [
           { "trigger": { "url-filter": ".*" },
             "action": { "type": "block" } },
           { "trigger": { "url-filter": "^\(BundleAssets.scheme)://" },
+            "action": { "type": "ignore-previous-rules" } },
+          { "trigger": { "url-filter": "^https://[a-z0-9.-]*\\\\.googleapis\\\\.com/" },
+            "action": { "type": "ignore-previous-rules" } },
+          { "trigger": { "url-filter": "^https://[a-z0-9.-]*\\\\.gstatic\\\\.com/" },
+            "action": { "type": "ignore-previous-rules" } },
+          { "trigger": { "url-filter": "^https://[a-z0-9.-]*\\\\.google\\\\.com/" },
             "action": { "type": "ignore-previous-rules" } }
         ]
         """
@@ -81,8 +90,8 @@ final class PlannerViewController: UIViewController {
         ) { [weak self] list, error in
             if let list { self?.web.configuration.userContentController.add(list) }
             // A failure here means the belt is missing and the braces are not:
-            // the page still requests nothing. Loading anyway beats a blank
-            // screen over a rule the page does not need.
+            // the page itself requests only Google's map. Loading anyway beats
+            // a blank screen over a rule the page does not need.
             if error != nil { NSLog("offline rule list did not compile: \(error!)") }
             load()
         }
@@ -171,6 +180,12 @@ extension PlannerViewController: WKNavigationDelegate {
         if url.scheme == BundleAssets.scheme {
             return decisionHandler(.allow)
         }
+        // A frame inside the page — the map may make one — is part of the
+        // page, not a link the reader followed; the content rules above still
+        // decide what it can load.
+        if let frame = action.targetFrame, !frame.isMainFrame {
+            return decisionHandler(.allow)
+        }
         if url.scheme == "http" || url.scheme == "https" || url.scheme == "mailto" {
             UIApplication.shared.open(url)
             return decisionHandler(.cancel)
@@ -196,9 +211,9 @@ extension PlannerViewController: WKNavigationDelegate {
     /// way to tell whether the staging step was skipped, the scheme handler is
     /// misconfigured, or WebKit refused it. Say so instead.
     ///
-    /// This is the failure mode that matters most here, because the app has no
-    /// network to fall back on and no server-side log to inspect — whatever
-    /// went wrong went wrong on someone's phone, somewhere with no signal.
+    /// This is the failure mode that matters most here, because the page is
+    /// not fetched from anywhere and there is no server-side log to inspect —
+    /// whatever went wrong went wrong on someone's phone.
     private func showFailure(_ error: Error) {
         let message = (error as NSError).localizedDescription
         let html = """

@@ -12,9 +12,8 @@ import WebKit
 /// `appassets.androidplatform.net` rather than from `file://`.
 ///
 /// A custom scheme gets a real origin — `overlandsea://app` — which persists
-/// storage exactly as a website would. Nothing leaves the device: the handler
-/// only ever reads out of the app bundle, and returns nothing for a path that
-/// is not in it.
+/// storage exactly as a website would. The handler only ever reads out of the
+/// app bundle, and returns nothing for a path that is not in it.
 final class BundleAssets: NSObject, WKURLSchemeHandler {
 
     /// Not `app` or `assets`: a short common word is one an unrelated app or a

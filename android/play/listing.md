@@ -54,9 +54,13 @@ WHAT YOU GET
 
 IT WORKS WITH NO SIGNAL
 
-The whole network is inside the app. It does not request internet permission at all — so it cannot phone home even by accident, and it works in full at a border post, on a ferry, or in a carriage somewhere between Chumphon and Hat Yai with no bars showing. The moment you most need to know whether a connection holds is the moment you have no way to look it up.
+The whole network is inside the app. With signal, the map is Google Maps; with none, the app draws its own and plans the whole journey just the same — at a border post, on a ferry, or in a carriage somewhere between Chumphon and Hat Yai with no bars showing. The moment you most need to know whether a connection holds is the moment you have no way to look it up.
 
-Nothing is collected. No account, no sign-in, no analytics, no advertising, no third-party SDK of any kind. It has no way to send anything anywhere.
+SEE WHERE YOU ARE
+
+Tap the location button to see yourself on the map and how far you are from the station your journey starts at, or the nearest one. GPS needs no signal, and your position is never sent anywhere or stored.
+
+Nothing is collected. No account, no sign-in, no analytics, no advertising, no third-party SDK of any kind. The app goes online only to load Google's map.
 
 WHAT IT COVERS
 
@@ -124,14 +128,26 @@ usual reason a tablet listing looks like an afterthought.
 
 ## Data safety declaration
 
-The app collects nothing and transmits nothing, and the manifest is the proof:
-no `android.permission.INTERNET`. In the Console's Data safety form that is:
+From 2.0 the manifest has `INTERNET` (for Google Maps) and location (for the
+"where am I" button). The app itself sends nothing: no account, analytics,
+crash library or third-party SDK, and the position is used on the phone only.
+But Google's map servers, loaded into the app, receive the area of the map on
+screen — including the reader's own area once they ask to be shown — and Play
+counts data that third-party code receives. So in the Console's Data safety
+form:
 
-- Does your app collect or share any of the required user data types? **No**
-- Is all of the user data collected by your app encrypted in transit? **N/A** —
-  nothing is transmitted
-- Do you provide a way for users to request that their data be deleted? **N/A** —
-  nothing is held
+- Does your app collect or share any of the required user data types? **Yes**
+- Data type: **Location → Approximate location**
+  - Collected: **Yes**. Shared: **No** (Google serves the map for this app,
+    which Play treats as a service provider, not sharing)
+  - Processed ephemerally: **Yes**
+  - Required or optional: **Optional** — only when the reader taps the
+    location button
+  - Purpose: **App functionality**
+- Is all of the user data collected by your app encrypted in transit? **Yes** —
+  Google's map loads over HTTPS only
+- Do you provide a way for users to request that their data be deleted? **No**
+  — nothing is held by us to delete
 
 Privacy policy URL: `https://slowasia.com/privacy`
 

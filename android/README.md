@@ -29,18 +29,30 @@ not. The toggle still offers all three and remembers what it is told.
 
 That is also why this is not the wrapper-around-a-website that Play rejects
 under its minimum-functionality policy. There is no website being wrapped;
-there is a program that happens to be written in HTML, running offline.
+there is a program that happens to be written in HTML, which runs offline.
 
-## No internet permission
+## Internet and location
 
-The manifest requests **no** `INTERNET` permission, deliberately and
-permanently. The app cannot phone home even by accident. Outbound links —
-Google Maps, an operator's booking page, a hotel search — are handed to the
-browser as intents, which needs no permission of ours and puts the reader on
-an address bar that tells them whose site they are on.
+From 2.0 the manifest asks for two things, each for one job:
 
-This makes the Play data-safety declaration trivially true: no data collected,
-no data shared, nothing transmitted.
+- **`INTERNET`, for Google Maps.** With signal the map is Google's; with none
+  the page falls back to the map it draws itself, and everything else — the
+  network, the routing, the itineraries — is in the package and works the
+  same. Outbound links (Google Maps directions, an operator's booking page, a
+  hotel search) are still handed to the browser as intents, on an address bar
+  that tells the reader whose site they are on.
+- **Location, when the reader taps the location button.** Android's own
+  dialog asks then, not at launch. The position draws a dot and measures the
+  distance to a station; the app sends it nowhere. GPS needs no signal.
+
+The Maps key for the apps is `GOOGLE_MAPS_APP_KEY`, a GitHub Actions secret,
+separate from the website's key (see `tools/build.mjs` for why). Without it
+the app builds and works with the bundled map only.
+
+For Play's Data safety form, Google's map servers receive the area of the map
+being looked at — including the reader's own area once they ask to be shown —
+to draw it. The honest declaration is **approximate location**: collected,
+processed ephemerally, not shared, for app functionality, optional.
 
 ## Building
 

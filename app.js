@@ -9529,13 +9529,13 @@ const UI = (() => {
    * the station", not "how long is the walk"; the popup links out to Google
    * Maps for the walk, where the answer is actually known.
    *
-   * Hidden in the apps, which have no location permission yet: a button that
-   * can only fail is worse than no button. */
+   * The same in the apps, where the phone asks the first time the button is
+   * pressed. GPS needs no signal, so this works at a border post as well. */
   const locateBtn = $('#locate')
   const youChip = $('#youchip')
   let youWatch = null
   let youCentred = false
-  const canLocate = 'geolocation' in navigator && !document.documentElement.dataset.app
+  const canLocate = 'geolocation' in navigator
   if (!canLocate && locateBtn) locateBtn.hidden = true
 
   const distance = km =>
@@ -9632,7 +9632,9 @@ const UI = (() => {
           if (err.code === 1) {
             stopLocating()
             sayYou(
-              'Location is blocked for this site. Allow it in your browser’s site settings to be shown on the map.',
+              document.documentElement.dataset.app
+                ? 'Location is off for Overland SEA. Allow it in your phone’s Settings to be shown on the map.'
+                : 'Location is blocked for this site. Allow it in your browser’s site settings to be shown on the map.',
               'note'
             )
           } else if (!you) {
@@ -10816,19 +10818,19 @@ const UI = (() => {
     })
   }
 
-  /* Google Maps, on the website only, and only if a key was built in.
+  /* Google Maps, wherever a key was built in — the website and, with their
+   * own key, the apps.
    *
-   * Never in the app: the app has no network permission and works at a border
-   * with no signal, which a map that fetches tiles cannot do. The build leaves
-   * the key out of the app's copy entirely, and this checks the document mark
-   * as well, so the two would both have to fail for the app to try.
+   * In the apps it is the map while there is signal. With none, the script
+   * fails to load and the canvas map, which is bundled and needs nothing, is
+   * simply the map: the apps still plan a whole journey at a border post.
    *
    * The canvas map stays visible until Google has drawn its first tiles, then
    * the two cross-fade. If the script fails, the key is refused, or nothing
    * arrives within the timeout, the canvas map simply stays: the reader never
    * sees an empty grey box, which is the one outcome worse than either map. */
   const key = window.OVERLAND_GMAPS_KEY
-  if (key && !document.documentElement.dataset.app && typeof GoogleMapView !== 'undefined') {
+  if (key && typeof GoogleMapView !== 'undefined') {
     GoogleMapView.load(key)
       .then(() => {
         const host = document.createElement('div')

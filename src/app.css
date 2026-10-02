@@ -611,9 +611,6 @@ body {
 .btn-locate:hover { color: var(--you); background: var(--raise); }
 .btn-locate[aria-pressed='true'] { color: var(--you); }
 .btn-locate:focus-visible { outline: 2px solid var(--rail); outline-offset: 2px; }
-/* The apps have no location permission yet; a button that can only ever fail
-   is worse than none. */
-[data-app='true'] .btn-locate, [data-app='true'] .youchip { display: none !important; }
 
 /* Where you are, and how far the station is. On its own line in the control
    cluster: above the buttons on a desk, below them on a phone, where the

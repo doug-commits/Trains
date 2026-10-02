@@ -243,8 +243,8 @@ const css = read('src/app.css')
  * The shell is shared, and almost everything in it should be — that sharing is
  * why the app and the site cannot drift. But a link to /routes is a link to a
  * document that exists on the website and does not exist inside the app: the
- * app is one HTML file with no network permission, so the link would be a dead
- * end reachable from every screen. Marked rather than conditionally assembled,
+ * app is one bundled HTML file, so the link would be a dead end reachable from
+ * every screen. Marked rather than conditionally assembled,
  * so the exception is visible in the markup it applies to. */
 const shell = read('src/shell.html')
   .replace('<!--APPBANNER-->', read('src/appbanner.html'))
@@ -258,21 +258,22 @@ const partnerIds =
   `PARTNERS.booking.id = ${JSON.stringify(process.env.BOOKING_AID || '')};\n` +
   `PARTNERS.insurance.id = ${JSON.stringify(process.env.SAFETYWING_REF || '')};`
 
-/* The Google Maps key: the website's build only, and never the app's.
+/* The Google Maps key, one per build.
  *
- * The app has no network permission and works with no signal; a key in its
- * copy would invite exactly the code path that cannot work there. So APP=1
- * drops it even when the environment sets it, and tools/smoke.mjs fails the
- * build if the app bundle ever carries one.
+ * The website's is GOOGLE_MAPS_KEY, restricted in the Google Cloud console by
+ * HTTP referrer to slowasia.com. The apps take GOOGLE_MAPS_APP_KEY instead and
+ * never the website's: the app page has no slowasia.com address to send as a
+ * referrer, so the site's key is refused there, and a separate key can carry
+ * its own API restriction and daily quota. With neither set the canvas map is
+ * the map, and every build still works.
  *
  * It is not a secret in the usual sense — a Maps JavaScript key ships to every
- * browser that loads the page, by design. What protects it is the HTTP
- * referrer restriction set on it in the Google Cloud console, limiting it to
- * slowasia.com. A key without that restriction is a bill anyone can run up.
+ * device that loads the page, by design. What protects it is the restriction
+ * set on it in the console. A key without one is a bill anyone can run up.
  *
  * Placed ahead of every script rather than after them like the affiliate ids,
  * because app.js reads it as it runs, not later. */
-const GMAPS_KEY = APP ? '' : (process.env.GOOGLE_MAPS_KEY || '').trim()
+const GMAPS_KEY = (process.env[APP ? 'GOOGLE_MAPS_APP_KEY' : 'GOOGLE_MAPS_KEY'] || '').trim()
 const mapsKey = GMAPS_KEY
   ? `window.OVERLAND_GMAPS_KEY = ${JSON.stringify(GMAPS_KEY)};`
   : '/* no Google Maps key in this build: the canvas map is the map */'

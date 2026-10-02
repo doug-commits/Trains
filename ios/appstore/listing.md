@@ -81,7 +81,9 @@ WHAT YOU GET
 
 IT WORKS IN FLIGHT MODE
 
-The whole thing is inside the app — the network, the map, the routing, the border briefings. Nothing is fetched while you use it, so it works in full at a frontier post, on a ferry, or in a carriage somewhere between Chumphon and Hat Yai with no bars showing. The moment you most need to know whether a connection holds is the moment you have no way to look it up.
+The whole thing is inside the app — the network, the routing, the border briefings. With signal the map is Google Maps; with none the app draws its own, and it plans the whole journey just the same at a frontier post, on a ferry, or in a carriage somewhere between Chumphon and Hat Yai with no bars showing. The moment you most need to know whether a connection holds is the moment you have no way to look it up.
+
+Tap the location button to see yourself on the map and how far you are from the station your journey starts at. GPS needs no signal, and your position is never sent anywhere or stored.
 
 Nothing is collected. No account, no sign-in, no analytics, no advertising, no third-party SDK of any kind.
 
@@ -116,27 +118,37 @@ Also at slowasia.com.
 - **Marketing URL:** `https://slowasia.com`
 - **Primary category:** Travel
 - **Secondary category:** Navigation
-- **Age rating:** 4+. No user-generated content, no ads, no purchases, no
-  location, and the only outbound links are to transport operators.
+- **Age rating:** 4+. No user-generated content, no ads, no purchases, and
+  the only outbound links are to transport operators and maps.
 - **Copyright:** the year and the entity that owns the account.
 - **Contact:** `doug@mukbangshow.ae`
 
-## App Privacy ("Data Not Collected")
+## App Privacy
 
-Apple's questionnaire is answered in one click here, and it is the true answer
-rather than the convenient one: **Data Not Collected**, for every category.
+From 2.0 the answer is no longer "Data Not Collected", and the reason is
+Google's map rather than anything of ours. The app itself has no account, no
+analytics, no advertising identifier and no third-party SDK, and it sends the
+reader's position nowhere. But with signal the map is Google Maps, loaded into
+the page from Google, and Google's servers receive the area of the map on
+screen — the reader's own area, once they ask to be shown. Apple counts data
+that a third-party partner receives, so the questionnaire is:
 
-The app has no account, no analytics, no advertising identifier, no third-party
-SDK, and makes no network requests. If you have left Apple's own analytics
-sharing on at the system level, iOS may send Apple crash reports for any app on
-your device — that is Apple's channel, not ours, and it is explicitly outside
-the scope of this questionnaire.
+- **Location → Coarse Location**: collected
+  - Used for: **App Functionality**
+  - Linked to the user's identity: **No**
+  - Used for tracking: **No**
+- Every other category: not collected.
+
+If you have left Apple's own analytics sharing on at the system level, iOS may
+send Apple crash reports for any app on your device — that is Apple's channel,
+not ours, and it is explicitly outside the scope of this questionnaire.
 
 ## Encryption
 
 `ITSAppUsesNonExemptEncryption` is already `false` in `Info.plist`, so the
 export-compliance question does not appear on every upload. That is accurate:
-the app uses no encryption at all, not even HTTPS, because it makes no requests.
+the only encryption is the HTTPS iOS itself uses to load Google's map, which is
+exempt.
 
 ---
 
@@ -246,19 +258,24 @@ is checkable in about thirty seconds by the reviewer:
 
 ```
 This app is not a wrapper around a website. The entire product — the rail and
-ferry network, the map, the routing engine, the border briefings and the
-costings — is compiled into the binary. It makes no network requests at all.
+ferry network, the routing engine, the border briefings and the costings — is
+compiled into the binary. The only thing it fetches is Google Maps imagery for
+the map, when there is signal; with none it draws its own map from bundled
+data.
 
 The quickest way to confirm this: put the device in Airplane Mode and use the
 app normally. Plan Bangkok to Singapore, open the itinerary, read the border
 crossing detail, change the pace and the passport and watch the numbers
-recompute. Everything works, because nothing is being fetched.
+recompute. Everything works, because nothing the planner needs is fetched.
 
 The web view is an implementation detail of the rendering, not a browser
 pointed at a server. It loads from a custom URL scheme served out of the app
-bundle, and a WebKit content rule list blocks every load that does not come
-from that bundle — so it cannot reach the network even if something in the
-page tried to.
+bundle, and a WebKit content rule list blocks every load except that bundle and
+Google's map servers.
+
+Location: the location button shows the traveller on the map with the distance
+to their station. Permission is asked only when that button is tapped, and the
+position is not sent anywhere or stored.
 
 The only outbound links are to transport operators' own booking pages (State
 Railway of Thailand, KTMB, Vietnam Railways and so on) and to Apple Maps or a

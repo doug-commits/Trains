@@ -67,6 +67,10 @@ jobs:
       # website-only sections. It does not use the site's index.html.
       - name: Build the page and stage it into the app
         run: node tools/build-android.mjs
+        # The apps' own Maps key, never the website's (tools/build.mjs says
+        # why). Unset, the app builds with the bundled map only.
+        env:
+          GOOGLE_MAPS_APP_KEY: ${{ secrets.GOOGLE_MAPS_APP_KEY }}
 
       # Skipped on request, which is the whole of the unsigned path: with no
       # ANDROID_KEYSTORE_PATH, Gradle leaves the release build unsigned and

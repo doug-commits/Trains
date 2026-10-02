@@ -362,13 +362,14 @@ ${TOPBAR}
             ? `On this website the planner's map is Google Maps, so opening the planner
         fetches map imagery from Google and Google receives those requests — the
         <a href="/privacy">privacy policy</a> says exactly what that means. Nothing else
-        reports back, and the written route pages load nothing from anyone. The Android
-        app draws its own map and ships with an empty permission list, including no
-        internet permission`
+        reports back, and the written route pages load nothing from anyone. The apps use
+        Google's map too when there is signal, and draw their own when there is none,
+        planning the whole journey from data inside them`
             : `The page makes no network requests at all once it
-        has loaded — no fetch, no beacon, nothing reporting back. The Android build ships with
-        an empty permission list, including no internet permission`
-        }, which is the only honest way to say it works at a border with no signal.</p>
+        has loaded — no fetch, no beacon, nothing reporting back. The apps use Google's
+        map when there is signal and draw their own when there is none, planning the whole
+        journey from data inside them`
+        }, so they still work at a border with no signal.</p>
         <p>Some booking links are affiliate links. Where one is, it is a link to the operator
         or agent I would have sent you to anyway, and it never changes which route the planner
         recommends — the routing code cannot see them. The <a href="/privacy">privacy
@@ -716,10 +717,12 @@ function supportPage(css) {
       plan around them.`],
 
     ['Does it work without a signal?',
-     `Entirely. The network, the map, the routing and every border briefing are
-      inside the app; nothing is fetched while you use it. It works in flight
-      mode at a frontier post, which is the situation it was built for.
-      <br><br>The only things that need a connection are the outbound links —
+     `Yes. The rail network, the routing and every border briefing are inside
+      the app. With a signal the map is Google Maps; without one the app draws
+      its own map, and everything else works exactly the same in flight mode at
+      a frontier post, which is the situation it was built for. The location
+      button works without a signal too: GPS needs none.
+      <br><br>The other things that need a connection are the outbound links —
       an operator's booking page, or a location in a maps app — and those open
       in your browser rather than in the app.`],
 
@@ -779,8 +782,9 @@ function supportPage(css) {
 
   <section class="block">
     <h2>Privacy</h2>
-    <p>Nothing is collected — no account, no analytics, no advertising, and on
-    Android no permission to reach the network at all. The
+    <p>Nothing is collected — no account, no analytics, no advertising. The
+    apps go online only to load Google's map, and your position never leaves
+    the phone. The
     <a href="/privacy">privacy policy</a> sets out exactly what that means on
     each platform, including the places the claim is weaker than it sounds.</p>
   </section>`
@@ -835,24 +839,24 @@ ${DOCFOOT}
 /* ------------------------------------------------------- privacy policy */
 
 /* Play will not take a submission without one of these at a public URL, which
- * is why it exists — but the reason it can be this short is that the app was
- * built without a network permission in the first place. Everything below is
+ * is why it exists — but the reason it can be this short is that the apps
+ * reach the network for one thing only, Google's map. Everything below is
  * checkable against the repository rather than a promise: the manifest, the
- * dependency list and the two storage keys are all in the source, and
- * tools/smoke.mjs fails the build if the page starts claiming something the
- * code stopped doing.
+ * iOS content rules, the dependency list and the storage keys are all in the
+ * source, and tools/smoke.mjs fails the build if the page starts claiming
+ * something the code stopped doing.
  *
  * Dates are written out rather than taken from the clock: a policy whose
  * effective date silently moves on every deploy is a policy nobody can cite. */
-const PRIVACY_UPDATED = '31 July 2026'
+const PRIVACY_UPDATED = '2 October 2026'
 
 function privacyPage(css) {
   const url = ORIGIN ? `${ORIGIN}/privacy` : null
   const title = `Privacy — ${TITLE_SUFFIX}`
   const desc =
-    'Overland SEA collects nothing. The Android app has no internet permission ' +
-    'at all; the website sets no cookies and runs no analytics. What is stored, ' +
-    'where, and the few exceptions — in full.'
+    'Overland SEA collects nothing: no account, no analytics, no advertising. The ' +
+    'apps go online only for Google Maps, and your position never leaves your ' +
+    'device. What is stored, where, and the few exceptions — in full.'
 
   const body = `
   <section class="block">
@@ -871,14 +875,29 @@ function privacyPage(css) {
     <h2>The Android app</h2>
 
     <div class="callout">
-      <h3>It has no internet permission</h3>
-      <p>Not "we choose not to send anything" — the app does not request
-      <code>android.permission.INTERNET</code>, so Android will not let it open
-      a network connection at all, including by accident and including if a
-      future bug tried to. The rail network, the map, the photographs and the
-      routing are all inside the installed package. That is also why it works
-      in flight mode at a border with no signal, which is the point of it.</p>
+      <h3>The network is for the map, and only the map</h3>
+      <p>From version 2.0 the app requests
+      <code>android.permission.INTERNET</code>, for one reason: when there is
+      signal, its map is Google Maps. The rail network, the routing, the border
+      briefings and the photographs are all inside the installed package, and
+      with no signal the app draws its own map instead — so it still plans a
+      whole journey in flight mode at a border, which is the point of it.</p>
+      <p>Loading the map means Google's servers receive those requests: your
+      IP address, the standard request details, and which part of the map is on
+      screen, handled under
+      <a href="https://policies.google.com/privacy">Google's privacy policy</a>.
+      What you type is not sent to Google or to anyone; the route is worked out
+      on the phone. But the map moves to show the route it finds, so treat the
+      region you are looking at as known to Google.</p>
     </div>
+
+    <p><b>Where you are.</b> The app asks for your location the first time you
+    tap the location button, never before, using Android's own permission
+    dialog. Your position draws a dot on the map and measures how far you are
+    from a station. The app does not send it anywhere or store it; tapping the
+    button again stops it. GPS needs no signal, so this works offline too. With
+    signal, the map then shows your area, so Google's map servers see that area
+    as they see any part of the map you look at.</p>
 
     <p>What it keeps on your phone: whether you chose the light or dark theme,
     whether you left the search panel folded, and the journey you last planned
@@ -894,10 +913,10 @@ function privacyPage(css) {
     record of where you went, because nothing here knows where you went.</p>
 
     <p>What it does not have: any account or sign-in, your email address, your
-    location, your contacts, an advertising identifier, an analytics library,
-    or a crash-reporting library. Its only dependencies are two of Google's own
+    contacts, an advertising identifier, an analytics library, or a
+    crash-reporting library. Its only dependencies are two of Google's own
     AndroidX components, WebView and AppCompat. There is no third-party SDK in
-    the build.</p>
+    the build; Google's map is loaded into the page from Google, not built in.</p>
 
     <p>When you tap an operator's booking site or "open in maps", the app hands
     that address to whichever browser or maps app you have and stops being
@@ -917,29 +936,32 @@ function privacyPage(css) {
 
     <p>Same program, same bundled data, the same handful of settings kept on
     the device, same absence of accounts, analytics, advertising identifiers
-    and third-party code. What differs is one sentence of the guarantee above, and it differs
-    enough to be worth spelling out rather than quietly reusing.</p>
+    and third-party code, and the same Google map when there is signal. What
+    differs is how the limit on the network is enforced, and it differs enough
+    to be worth spelling out rather than quietly reusing.</p>
 
     <div class="callout">
-      <h3>iOS has no permission to withhold</h3>
-      <p>Android lets an app decline the network outright, and the operating
-      system then enforces it. iOS has no equivalent: an app either has network
-      access or the platform assumes it might. So the promise here is one level
-      down and narrower. The app makes no network calls of its own, and the web
+      <h3>Only Google's map servers can be reached</h3>
+      <p>Android asks an app to declare whether it uses the network at all.
+      iOS has no equivalent: an app either has network access or the platform
+      assumes it might. So the line is drawn inside the app instead. The web
       view it is built around runs under a WebKit content rule that refuses
-      every load except from the app's own bundle — a tracking pixel or a
-      remote font that somehow got into the page could not fetch, and neither
-      could anything injected into it. That is enforced by WebKit rather than
-      by the kernel. It is a good guarantee and it is not the same guarantee,
-      and you should hold it as the weaker one.</p>
+      every load except from the app's own bundle and from Google's map
+      servers (<code>googleapis.com</code>, <code>gstatic.com</code> and
+      <code>google.com</code>) — a tracking pixel or a remote font that somehow
+      got into the page could not fetch, and neither could anything injected
+      into it. That is enforced by WebKit rather than by the operating system,
+      and you should hold it as the weaker of the two guarantees.</p>
     </div>
 
-    <p>Everything else reads across. Nothing is collected. Tapping an operator's
-    booking site hands the address to Safari and the app stops being involved.
-    And as on Android there is a channel that is not ours: if you have left
-    Apple's analytics sharing on, iOS may send Apple crash reports for any app
-    on the device. What we can see of that is aggregate stack traces in App
-    Store Connect, with no identity attached.</p>
+    <p>Location works as on Android: iOS asks the first time you tap the
+    location button, with the reason shown in the dialog, and the position is
+    used on the device and not sent anywhere or stored. Everything else reads
+    across. Tapping an operator's booking site hands the address to Safari and
+    the app stops being involved. And as on Android there is a channel that is
+    not ours: if you have left Apple's analytics sharing on, iOS may send Apple
+    crash reports for any app on the device. What we can see of that is
+    aggregate stack traces in App Store Connect, with no identity attached.</p>
   </section>
 
   <section class="block">
@@ -971,8 +993,7 @@ ${
     What you type is not sent to Google: the route is still worked out on your
     device. But the map moves to show the route it finds, so the imagery Google
     serves does reveal the region you are looking at, and you should treat that
-    as known to Google. The written route pages do not load Google Maps, and
-    neither does either app.</p>`
+    as known to Google. The written route pages do not load Google Maps.</p>`
     : ''
 }
 
@@ -988,7 +1009,7 @@ ${
     becomes visible to Google in the same way as any part of the map you look
     at.`
         : ''
-    } Neither app asks for your location.</p>
+    } The apps work the same way, as described above.</p>
 
     <p>The route you plan lives in the part of the address after the
     <code>#</code>. Browsers do not send that fragment to the server, so an
@@ -1062,13 +1083,14 @@ ${
 
   <section class="block">
     <h2>Changes</h2>
-    <p>If either app ever gains the ability to send something — neither has
-    any plans to — this page changes before that release ships, and the date
-    below changes with it. On Android you would also see it: the permission
-    appears at install time. On iOS you would not, which is the practical
-    consequence of the difference described above and another reason to state
-    it here rather than leave it implied. There is no mailing list, so this
-    page is the notice.</p>
+    <p>Version 2.0 is the first in which the apps reach the network, for
+    Google's map and nothing else, and this page changed before it shipped. If
+    either app ever sends anything more, this page changes first, and the date
+    below changes with it. On Android the permissions are also listed on the
+    Play Store page. On iOS there is no such list for the network, which is the
+    practical consequence of the difference described above and another reason
+    to state it here rather than leave it implied. There is no mailing list, so
+    this page is the notice.</p>
     <p>Last updated ${PRIVACY_UPDATED}.</p>
   </section>
 

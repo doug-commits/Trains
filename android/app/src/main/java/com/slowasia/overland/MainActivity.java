@@ -1,12 +1,16 @@
 package com.slowasia.overland;
 
+import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.webkit.GeolocationPermissions;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -16,7 +20,10 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -27,15 +34,17 @@ import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebViewAssetLoader;
 
 import java.util.Collections;
+import java.util.Map;
 
 /**
  * One activity, one WebView, one bundled page.
  *
- * The planner is already a self-contained document that makes no network
- * requests, so the app is not a shell around a website — it is the same
- * program, running with the phone in flight mode. That is the entire reason
- * for it to exist: the moment you most need to know whether the Padang Besar
- * connection holds is the moment you have no signal.
+ * The planner is a self-contained document: the network, the routing and the
+ * itineraries are all in the package, so the app plans a whole journey with
+ * the phone in flight mode. That is the reason for it to exist — the moment
+ * you most need to know whether the Padang Besar connection holds is the
+ * moment you have no signal. With signal, the map is Google's; without, it is
+ * the one the page draws itself.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -49,6 +58,29 @@ public class MainActivity extends AppCompatActivity {
   private static final String HOME = "https://" + DOMAIN + "/assets/index.html";
 
   private WebView web;
+
+  /* The page's request for a position, held while Android asks the reader.
+     WebView asks through onGeolocationPermissionsShowPrompt; the answer has
+     to come from the runtime permission, which only an activity can request. */
+  private String pendingOrigin;
+  private GeolocationPermissions.Callback pendingGeo;
+
+  private final ActivityResultLauncher<String[]> askLocation = registerForActivityResult(
+      new ActivityResultContracts.RequestMultiplePermissions(),
+      (Map<String, Boolean> result) -> {
+        boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
+            || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+        if (pendingGeo != null) pendingGeo.invoke(pendingOrigin, granted, false);
+        pendingGeo = null;
+        pendingOrigin = null;
+      });
+
+  private boolean mayLocate() {
+    return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED;
+  }
 
   /* The WebView sits inside this, and this carries the window insets as
      padding. Painting the strips behind the status and gesture bars is the
@@ -77,6 +109,33 @@ public class MainActivity extends AppCompatActivity {
     s.setSupportZoom(false);           // the map does its own zooming
     s.setBuiltInZoomControls(false);
     s.setMediaPlaybackRequiresUserGesture(true);
+    s.setGeolocationEnabled(true);     // the "where am I" button, on request
+
+    /* The page asks for a position only when the reader taps the location
+       button, and only our own bundled page may ask at all. Android's
+       permission dialog is the one the reader sees; WebView's own is skipped
+       because answering it twice would be asking twice. */
+    web.setWebChromeClient(new WebChromeClient() {
+      @Override
+      public void onGeolocationPermissionsShowPrompt(String origin,
+                                                     GeolocationPermissions.Callback callback) {
+        if (origin == null || !origin.startsWith("https://" + DOMAIN)) {
+          callback.invoke(origin, false, false);
+          return;
+        }
+        if (mayLocate()) {
+          callback.invoke(origin, true, false);
+          return;
+        }
+        if (pendingGeo != null) pendingGeo.invoke(pendingOrigin, false, false);
+        pendingOrigin = origin;
+        pendingGeo = callback;
+        askLocation.launch(new String[] {
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        });
+      }
+    });
 
     web.setWebViewClient(new WebViewClient() {
       @Override
@@ -89,9 +148,9 @@ public class MainActivity extends AppCompatActivity {
        * and no way to tell whether the asset is missing, the loader is
        * misconfigured, or the WebView is too old. Say so instead.
        *
-       * This is the failure mode that matters most here, because the app has no
-       * network to fall back on and no server-side log to inspect — whatever
-       * went wrong went wrong on someone's phone in a place with no signal.
+       * This is the failure mode that matters most here, because the page is
+       * not fetched from anywhere and there is no server-side log to inspect —
+       * whatever went wrong went wrong on someone's phone.
        */
       /* The page reports its own colour on every theme change, but the first
          one happens before the listener above can be talked to. */

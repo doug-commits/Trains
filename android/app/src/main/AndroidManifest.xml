@@ -1,13 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-  <!-- No INTERNET permission, deliberately and permanently.
-       The planner fetches nothing: the network, the map, the photographs and
-       the itinerary logic are all inside the package. Outbound links (Google
-       Maps, operator booking sites) are handed to the browser as intents, which
-       needs no permission of ours. The app therefore cannot phone home even by
-       accident, which is both the honest position and what makes the Play data
-       safety declaration trivially true. -->
+  <!-- The network is for Google Maps and nothing else. The planner itself —
+       the network, the routing, the photographs, the itineraries — is inside
+       the package and needs no signal; with none, the page falls back to the
+       map it draws itself. Outbound links (Google Maps directions, operator
+       booking sites) are still handed to the browser as intents. -->
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <!-- Asked for the first time the reader taps the location button, never at
+       launch. The app sends the position nowhere: it draws a dot on the map
+       and measures the distance to a station. (The map then shows that area,
+       so Google's map servers see which area, as with any view.) GPS needs no
+       signal, so this works offline too. Coarse alone is enough if that is all
+       the reader grants. -->
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+  <!-- A fine-location permission otherwise tells Play the app needs GPS
+       hardware, and Play hides it from every tablet without. It does not. -->
+  <uses-feature android:name="android.hardware.location" android:required="false" />
+  <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+  <uses-feature android:name="android.hardware.location.network" android:required="false" />
 
   <application
       android:allowBackup="true"

@@ -83,6 +83,10 @@ jobs:
       # than opening to a blank screen on a phone.
       - name: Build the page and stage it into the app
         run: node tools/build-ios.mjs
+        # The apps' own Maps key, never the website's (tools/build.mjs says
+        # why). Unset, the app builds with the bundled map only.
+        env:
+          GOOGLE_MAPS_APP_KEY: ${{ secrets.GOOGLE_MAPS_APP_KEY }}
 
       # Named, not "whichever came with the image". The failure when these
       # disagree is `objectVersion (77)` and a suggestion to adjust the project

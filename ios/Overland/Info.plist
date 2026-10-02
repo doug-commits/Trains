@@ -52,9 +52,13 @@
   <key>UIViewControllerBasedStatusBarAppearance</key>
   <true/>
 
-  <!-- No location, camera, contacts, microphone, photos, or tracking, so there
-       is no usage description to write. If one ever appears here without a
-       corresponding change to the privacy policy, one of the two is wrong. -->
+  <!-- Location, when the reader taps the location button and never at launch
+       (see LocationBridge.swift). Nothing else: no camera, contacts,
+       microphone, photos, or tracking. A usage description appearing here
+       without a matching change to the privacy policy means one of the two is
+       wrong. -->
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Your position is shown on the map with the distance to the nearest station, or to where your journey starts. It is not sent anywhere or stored.</string>
 
   <key>ITSAppUsesNonExemptEncryption</key>
   <false/>
