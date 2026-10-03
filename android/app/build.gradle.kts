@@ -67,8 +67,22 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = false   // One activity and no library code to shrink.
-      isShrinkResources = false
+      /* R8, which Play recommends and was off on the mistaken grounds that
+       * there was nothing to shrink. There is one activity of ours, but
+       * AppCompat and the Kotlin standard library come with it, and most of
+       * both is never called. R8 drops what is unused and optimises the rest;
+       * resource shrinking then drops the resources only that code needed.
+       *
+       * Nothing here is reached by reflection or looked up by name — the
+       * page talks to the app through a WebMessageListener and a WebView
+       * client, both ordinary calls — so the default rules need no additions
+       * beyond the one line in proguard-rules.pro that keeps names readable. */
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(
+        getDefaultProguardFile("proguard-android-optimize.txt"),
+        "proguard-rules.pro",
+      )
       if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
         signingConfig = signingConfigs.getByName("release")
       }
